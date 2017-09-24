@@ -1,0 +1,13 @@
+flags: {}
+extra-package-dbs: []
+packages:
+- '.'
+- location:
+    git: https://github.com/DAHeath/z3-haskell
+    commit: 202b428965c6e12a934e5ba79675c4ca6bd6e26f
+  extra-dep: true
+extra-deps:
+- safepath-0.1.0.0
+- validity-0.3.3.0
+- random-extras-0.19
+resolver: lts-9.0

@@ -1,0 +1,444 @@
+{-# LANGUAGE FlexibleContexts
+           , GeneralizedNewtypeDeriving
+           , LambdaCase
+           #-}
+
+module Logic.Solver.Z3 where
+
+import           Bound
+
+import           Control.Monad.State
+import           Control.Monad.Reader
+
+import           Data.List (partition, uncons)
+import           Data.Maybe
+import qualified Data.Map as M
+import           Data.Map (Map)
+import qualified Data.Tree as Tr
+import           Data.Tree (Tree)
+
+import           Logic.Chc (Chc)
+import qualified Logic.Chc as C
+import           Logic.Formula (Form)
+import qualified Logic.Formula as F
+import           Logic.Type (Type((:=>)))
+import qualified Logic.Type as T
+import qualified Logic.Model as M
+
+import           Z3.Monad hiding (local)
+
+-- | Invoke `duality` to solve the relational post fixed-point problem.
+solveChc :: MonadIO m => [Chc] -> m (Either M.Model M.Model)
+solveChc hcs = runEnvZ3 script
+  where
+    script =
+      let (queries, rules) = partition C.isQuery hcs
+          qids = map (\n -> "q" ++ show n) [0..length queries-1]
+          satForms = map C.chcToForm rules ++ zipWith mkQuery queries qids
+          rids = map (\n -> "RULE" ++ show n) [0..length hcs-1]
+      in do
+         useDuality
+         forms <- traverse formToAst satForms
+         rids' <- traverse mkStringSymbol rids
+         zipWithM_ fixedpointAddRule forms rids'
+
+         let quers = map (\q -> F.Variable T.Bool q) qids
+         quers' <- traverse funcToDecl quers
+         res <- fixedpointQueryRelations quers'
+         case res of
+           Unsat -> Right <$> (modelToModel =<< fixedpointGetModel)
+           _     -> Right <$> (modelToModel =<< fixedpointGetRefutation)
+
+    mkQuery q n =
+      let theQuery = F.V $ F.Variable T.Bool n in
+      F.app2 F.Impl (F.Apply F.Not (C.chcToForm q)) theQuery
+
+    useDuality = do
+      pars <- mkParams
+      join $ paramsSetSymbol pars <$> mkStringSymbol "engine" <*> mkStringSymbol "duality"
+      fixedpointSetParams pars
+
+-- | Given some formulas, determine if the conjunction of the formulas is satisfiable.
+-- If it is not, find some minimal set such that removing any additional formulas from
+-- the set is satisfiable.
+unsatCore :: MonadIO m => [Form] -> m (Maybe [Form])
+unsatCore = fixedM z3Core
+  where
+    fixedM :: (Eq a, Monad m) => (a -> m (Maybe a)) -> a -> m (Maybe a)
+    fixedM f x =
+      maybe
+        (return Nothing)
+        (\x' -> if x' == x then return (Just x') else fixedM f x') =<< f x
+
+    z3Core fs = runEnvZ3 $ do
+      let labels = map (\i -> "LABEL" ++ show i) [0..length fs - 1]
+      lbls <- traverse (\l -> join $ mkConst <$> mkStringSymbol l <*> mkBoolSort) labels
+      fs' <- traverse formToAst fs
+
+      let mapping = zip lbls fs
+
+      zipWithM_ solverAssertAndTrack fs' lbls
+      res <- solverCheck
+      case res of
+        Unsat -> do lbls' <- solverGetUnsatCore
+                    return $ Just $ mapMaybe (`lookup` mapping) lbls'
+        _ -> return Nothing
+
+-- | Find a satisfying model of an input formula (if one exists).
+satisfy :: MonadIO m => Form -> m (Maybe M.Model)
+satisfy f = runEnvZ3 $ do
+  assert =<< formToAst f
+  (_, m) <- solverCheckAndGetModel
+  case m of
+    Nothing -> return Nothing
+    Just m' -> Just <$> modelToModel m'
+
+-- | The the satisfiability of the input formula.
+isSat :: MonadIO m => Form -> m Bool
+isSat f = do
+  sol <- runEnvZ3 sc
+  case sol of
+    Sat -> return True
+    _   -> return False
+
+  where sc = (assert =<< formToAst f) >> check
+
+-- | Test the validity of the input formula.
+isValid :: MonadIO m => Form -> m Bool
+isValid f = do
+  sol <- runEnvZ3 sc
+  case sol of
+    Unsat -> return True
+    _     -> return False
+
+  where sc = (assert =<< formToAst (F.Apply F.Not f)) >> check
+
+-- | Is `f -> g` a valid formula?
+entails :: MonadIO m => Form -> Form -> m Bool
+entails f g = isValid (F.app2 F.Impl f g)
+
+-- | Construct a tree interpolant for a tree of formulas. The tree interpolant
+-- is constructed such that:
+--  + Each node formula conjoined with all child interpolants implies the node's
+--    interpolant.
+--  + The root node is contradicted.
+--
+--  Note that an interpolant tree is only constructed given that the original tree
+--  of formulas is mutually unsatisfiable.
+interpolate :: MonadIO m => Tree Form -> m (Either M.Model (Tree Form))
+interpolate ftree = runEnvZ3 $ do
+  -- The full formula needs an interpolant wrapper (which should generate the
+  -- interpolant `false` if the input is unsatisfiable).
+  t <- mkInterpolant =<< buildInterp ftree
+  is <- computeInterpolant t =<< mkParams
+  case is of
+    Just (Right is') ->
+      Right <$> (buildTree <$> traverse astToForm is' <*> pure ftree)
+    Just (Left m) ->
+      Left <$> modelToModel m
+    _ -> undefined -- return Nothing
+  where
+    -- Z3 represents tree interpolants using the `mkInterpolant` wrapper for
+    -- subformulas. `mkInterpolant` indicates that an interpolant for the
+    -- marked subformula should be generated. To produce the correct tree,
+    -- each child of the current node is marked for generating an interpolant.
+    buildInterp (Tr.Node n cs) = do
+      f <- formToAst n
+      fs <- traverse (mkInterpolant <=< buildInterp) cs
+      mkAnd (f : fs)
+
+    -- Move the obtained interpolants into a tree which corresponds to the input.
+    buildTree fs t = evalState (populate t) fs
+
+    -- Z3 returns the interpolants as just a list. The interpolants are organized
+    -- in postorder. `populate` will crash (`fromJust`) if the result contains
+    -- fewer interpolants than the number of nodes in the input tree.
+    populate (Tr.Node _ cs) =
+      flip Tr.Node <$> traverse populate cs <*> state (fromJust . uncons)
+
+-- | A monadic context for Z3 actions which caches the variables and functions
+-- which have already been created. It also resolve DeBrujin indices which Z3
+-- uses to represent variables.
+newtype EnvZ3 a = EnvZ3 { getEnvZ3 :: ReaderT DeBrujin (StateT Env Z3) a }
+  deriving ( Functor
+           , Applicative
+           , Monad
+           , MonadState Env
+           , MonadReader DeBrujin
+           , MonadIO
+           )
+
+data Env = Env { vars :: Map F.Variable AST
+               , funs :: Map F.Variable FuncDecl
+               } deriving (Show, Eq, Ord)
+
+-- | The list of variable names ordered by their DeBrujin index. This list is
+-- maintained by quantifier instantiations.
+type DeBrujin = [String]
+
+instance MonadZ3 EnvZ3 where
+  getSolver     = EnvZ3 $ lift $ lift getSolver
+  getContext    = EnvZ3 $ lift $ lift getContext
+  getFixedpoint = EnvZ3 $ lift $ lift getFixedpoint
+
+runEnvZ3 :: MonadIO m => EnvZ3 a -> m a
+runEnvZ3 ac = liftIO $ evalZ3 (evalStateT (runReaderT (getEnvZ3 ac') []) emptyEnv)
+  where
+    ac' = push *> ac <* reset
+    emptyEnv = Env M.empty M.empty
+
+-- | Convert the ADT formula to a Z3 formula.
+formToAst :: (MonadState Env z3, MonadZ3 z3) => Form -> z3 AST
+formToAst f =
+  case f of
+    F.Forall t e       -> quantify mkForallConst t e
+    -- F.Exists vs e       -> quantify mkExistsConst vs e
+    F.V v               -> var v
+    F.LUnit             -> undefined
+    F.LBool True        -> mkTrue
+    F.LBool False       -> mkFalse
+    F.LInt l            -> mkInteger l
+    F.LReal _           -> undefined
+    F.Apply f' a        -> let (f'', as) = gatherApp f' [a]
+                           in appToZ3 f'' as
+    _ -> undefined
+  where
+    gatherApp :: Form -> [Form] -> (Form, [Form])
+    gatherApp (F.Apply f' a) args = gatherApp f' (a : args)
+    gatherApp x args = (x, args)
+
+    quantify q t e = do
+      s <- typeToSort t
+      fd <- mkFreshFuncDecl "" [] s
+      n <- getSymbolString =<< getDeclName fd
+      let v = F.Variable t n
+      a <- toApp =<< register v
+      q [] [a] =<< (formToAst $ instantiate1 (F.V v) e)
+
+    register v = do
+      fd <- varDec v
+      fixedpointRegisterVariable fd
+      v' <- mkApp fd []
+      modify (\e -> e { vars = M.insert v v' (vars e) })
+      return v'
+
+    var v = do
+      env <- gets vars
+      case M.lookup v env of
+        Nothing -> register v
+        Just v' -> return v'
+
+-- | Convert a function application to a Z3 formula.
+appToZ3 :: (MonadState Env z3, MonadZ3 z3) => Form -> [Form] -> z3 AST
+appToZ3 f args = case f of
+  F.V v        -> join $ mkApp <$> funcToDecl v <*> traverse formToAst args
+  F.Not        -> mkNot =<< formToAst (head args)
+  F.And        -> many mkAnd
+  F.Or         -> many mkOr
+  F.Add _      -> many mkAdd
+  F.Mul _      -> many mkMul
+  F.Sub _      -> many mkSub
+  F.Distinct _ -> many mkDistinct
+  F.Impl       -> two mkImplies
+  F.Iff        -> two mkIff
+  F.Div _      -> two mkDiv
+  F.Mod _      -> two mkMod
+  F.If _       -> join $ mkIte <$> formToAst (head args)
+                               <*> formToAst (args !! 1)
+                               <*> formToAst (args !! 2)
+
+  F.Eql _      -> two mkEq
+  F.Lt _       -> two mkLt
+  F.Le _       -> two mkLe
+  F.Gt _       -> two mkGt
+  F.Ge _       -> two mkGe
+
+  F.LUnit      -> undefined
+  F.LBool _    -> undefined
+  F.LInt _     -> undefined
+  F.LReal _    -> undefined
+  F.Apply{}    -> undefined
+  F.Forall _ _ -> undefined
+  F.Exists _ _ -> undefined
+
+  where
+    many o = o =<< traverse formToAst args
+    two o = join $ o <$> formToAst (head args) <*> formToAst (args !! 1)
+
+funcToDecl :: (MonadState Env z3, MonadZ3 z3) => F.Variable -> z3 FuncDecl
+funcToDecl r@(F.Variable t n) = do
+  env <- gets funs
+  case M.lookup r env of
+    Nothing -> do
+      sorts <- traverse typeToSort (T.domain t)
+      sym <- mkStringSymbol n
+      r' <- mkFuncDecl sym sorts =<< typeToSort (T.range t)
+      fixedpointRegisterRelation r'
+      modify (\e -> e { funs = M.insert r r' (funs e) })
+      return r'
+    Just r' -> return r'
+
+formFromApp :: (MonadReader DeBrujin z3, MonadZ3 z3) => String -> [AST] -> Sort -> z3 Form
+formFromApp name args range
+  | name == "true"     = return $ F.LBool True
+  | name == "false"    = return $ F.LBool False
+  -- The 'app' is just a variable
+  | null args          = F.V <$> (F.Variable <$> sortToType range <*> pure name)
+  | name == "ite" || name == "if" = do
+    c <- astToForm (head args)
+    e1 <- astToForm (args !! 1)
+    e2 <- astToForm (args !! 2)
+    return $ F.appMany (F.If (T.typeOf e1)) [c, e1, e2]
+  | name == "and"      = liftMany F.And
+  | name == "or"       = liftMany F.Or
+  | name == "+"        = liftMany (F.Add T.Int)
+  | name == "*"        = liftMany (F.Mul T.Int)
+  | name == "distinct" = liftMany (F.Distinct T.Int)
+  | name == "div"      = lift2 (F.Div T.Int)
+  | name == "iff"      = lift2 F.Iff
+  | name == "=>"       = lift2 F.Impl
+  | name == "<"        = lift2 (F.Lt T.Int)
+  | name == "<="       = lift2 (F.Le T.Int)
+  | name == ">"        = lift2 (F.Gt T.Int)
+  | name == ">="       = lift2 (F.Ge T.Int)
+  | name == "="        = lift2 (F.Eql T.Int)
+  | name == "not"      = F.Apply F.Not <$> astToForm (head args)
+  | name == "-"        = if length args == 1
+                         then F.app2 (F.Sub T.Int) (F.LInt 0) <$> astToForm (head args)
+                         else lift2 (F.Sub T.Int)
+  | otherwise = do
+    -- Found a function that is as of yet unknown.
+    liftIO $ putStrLn ("applying: " ++ name)
+    args' <- traverse astToForm args
+    domain <- traverse getType args
+    range' <- sortToType range
+    let f = F.Variable (T.curryType domain range') name
+    return $ F.appMany (F.V f) args'
+  where lift2 f = F.app2 f <$> astToForm (head args) <*> astToForm (args !! 1)
+        liftMany f = F.appMany f <$> traverse astToForm args
+
+-- | Convert a Z3 model to the AST-based formula model.
+modelToModel :: ( MonadState Env z3
+                , MonadZ3 z3
+                , MonadReader DeBrujin z3) => Model -> z3 M.Model
+modelToModel m = do
+  M.Model <$> (M.union <$> functions <*> constants)
+  where
+    functions = do
+      fds <- modelGetFuncDecls m
+      fds' <- traverse declToFunc fds
+      fi <- catMaybes <$> traverse (modelGetFuncInterp m) fds
+      fe <- traverse (astToForm <=< funcInterpGetElse) fi
+      return $ M.fromList $ zip fds' fe
+
+    constants = do
+      fds <- modelGetConstDecls m
+      vs <- traverse declToFunc fds
+      fi <- catMaybes <$> traverse (modelGetConstInterp m) fds
+      fe <- traverse astToForm fi
+      return $ M.fromList $ zip vs fe
+
+    declToFunc fd = do
+      name <- declName fd
+      domain <- traverse sortToType =<< getDomain fd
+      range  <- sortToType =<< getRange fd
+      return $ F.Variable (T.curryType domain range) name
+
+-- | Convert the Z3 internal representation of a formula to the AST representation.
+astToForm :: (MonadReader DeBrujin z3, MonadZ3 z3) => AST -> z3 Form
+astToForm arg = do
+  k <- getAstKind arg
+  case k of
+    Z3_NUMERAL_AST ->
+      do t <- getType arg
+         rep <- getNumeralString arg
+         case t of
+           T.Int  -> return $ F.LInt  $ read rep
+           T.Real -> return $ F.LReal $ read rep
+           _       -> error "unknown numeric type"
+
+    Z3_APP_AST ->
+      do app <- toApp arg
+         decl <- getAppDecl app
+         name <- declName decl
+         args <- getAppArgs app
+         range <- getRange decl
+         formFromApp name args range
+
+    Z3_VAR_AST ->
+      do typ <- getType arg
+         idx <- getIndexValue arg
+         n <- lookupDeBrujin idx
+         return $ F.V $ case n of
+           Nothing -> F.Variable typ ('#' : show idx)
+           Just n' -> F.Variable typ n'
+
+    Z3_QUANTIFIER_AST ->
+      do binds <- getQuantifierBindings arg
+         body  <- getQuantifierBody arg
+         isFA  <- isQuantifierForall arg
+
+         names <- traverse getSymbolString (map fst binds)
+         vs <- traverse (uncurry bind) binds
+         body' <- local (reverse names ++) (astToForm body)
+
+         if isFA
+         then return $ F.manyForall vs body'
+         else return $ F.manyExists vs body'
+
+    Z3_SORT_AST -> do liftIO $ putStrLn "sort!"
+                      undefined
+
+    Z3_FUNC_DECL_AST -> do liftIO $ putStrLn "func decl!"
+                           undefined
+
+    Z3_UNKNOWN_AST -> do liftIO $ putStrLn "unknown!"
+                         undefined
+  where
+    lookupDeBrujin i = do
+      listing <- ask
+      return $ if i >= length listing
+               then Nothing
+               else Just $ listing !! i
+
+    bind sym s = do
+      n <- getSymbolString sym
+      t <- sortToType s
+      return $ F.Variable t n
+
+typeToSort :: MonadZ3 z3 => Type -> z3 Sort
+typeToSort = \case
+  T.Unit    -> mkIntSort
+  T.Bool    -> mkBoolSort
+  T.Int     -> mkIntSort
+  T.Real    -> mkRealSort
+  _ :=> _   -> undefined
+  T.List _  -> undefined
+
+sortToType :: MonadZ3 z3 => Sort -> z3 Type
+sortToType s = do
+  sk <- getSortKind s
+  case sk of
+    Z3_UNINTERPRETED_SORT  -> error "unsupported sort kind"
+    Z3_BOOL_SORT           -> return T.Bool
+    Z3_INT_SORT            -> return T.Int
+    Z3_REAL_SORT           -> return T.Real
+    Z3_BV_SORT             -> error "unsupported sort kind"
+    Z3_ARRAY_SORT          -> error "unsupported sort kind"
+    Z3_DATATYPE_SORT       -> error "unsupported sort kind"
+    Z3_RELATION_SORT       -> error "unsupported sort kind"
+    Z3_FINITE_DOMAIN_SORT  -> error "unsupported sort kind"
+    Z3_FLOATING_POINT_SORT -> error "unsupported sort kind"
+    Z3_ROUNDING_MODE_SORT  -> error "unsupported sort kind"
+    Z3_UNKNOWN_SORT        -> error "unsupported sort kind"
+
+getType :: MonadZ3 z3 => AST -> z3 Type
+getType = getSort >=> sortToType
+
+declName :: MonadZ3 z3 => FuncDecl -> z3 String
+declName = getDeclName >=> getSymbolString
+
+varDec :: MonadZ3 z3 => F.Variable -> z3 FuncDecl
+varDec (F.Variable t n) = do
+  sym <- mkStringSymbol n
+  mkFuncDecl sym [] =<< typeToSort t
