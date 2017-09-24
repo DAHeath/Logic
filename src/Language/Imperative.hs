@@ -1,25 +1,23 @@
 {-# LANGUAGE DeriveDataTypeable, LambdaCase, QuasiQuotes #-}
-module Imperative.Command where
+module Language.Imperative where
 
 import           Logic.Type as T
 import           Logic.Formula
 import           Logic.Formula.Parser
 
-import qualified Data.Map as M
 import           Data.Data (Data)
 import           Data.List (sort)
-import           Data.Bifunctor (second)
 import           Data.Monoid ((<>))
 import qualified Data.GraphViz as GV
 import qualified Data.Text.Lazy.IO as TIO
 
 import           Data.Graph.Inductive.PatriciaTree
 import           Data.Graph.Inductive.Graph
-import           Data.Graph.Inductive.Basic
-import           Data.Graph.Inductive.Query.BFS
 
 import           Text.PrettyPrint.HughesPJClass ((<+>), Pretty, pPrint)
 import qualified Text.PrettyPrint.HughesPJClass as PP
+
+import Data.Graph.Inductive.Extras
 
 type Lbl = Int
 
@@ -96,31 +94,6 @@ proc =
     x = Variable T.Int "x"
     s = Variable T.Int "s"
 
-unfoldEdge :: LEdge e -> Gr n e -> Gr n e
-unfoldEdge (l1, l2, b) g =
-  let simpl = removeBackedges $ removeReaching l2 g
-      rev = grev simpl
-      allPs = bft l1 rev
-      ps = concat $ filter (\case
-                             [] -> False
-                             ls -> head ls == l2 && last ls == l1) allPs
-      g' = subgraph ps simpl
-      ns = nodes g'
-      m = M.fromList (zip ns (newNodes (length ns) g))
-      rel n = M.findWithDefault undefined n m
-      relabelled = gmap (\(adjl, l, n, adjr) -> ( map (second rel) adjl
-                                                , rel l
-                                                , n
-                                                , map (second rel) adjr)) g'
-      toReroute = filter (\(l1, l2, _) -> l1 `notElem` ns && l2 `elem` ns) (labEdges g)
-      reroutesRemoved = efilter (`notElem` toReroute) g
-      merged = foldr insEdge (foldr insNode reroutesRemoved
-                                            (labNodes relabelled))
-                             (labEdges relabelled)
-      connected = insEdge (rel l1, l2, b) merged
-      rerouted = foldr (\(l1, l2, b) gr -> insEdge (l1, rel l2, b) gr) connected toReroute
-  in rerouted
-
 display :: FilePath -> FlowGraph -> IO ()
 display fn g =
   let g' = nmap PP.prettyShow $ emap PP.prettyShow g
@@ -129,12 +102,3 @@ display fn g =
                                      }
       dot = GV.graphToDot params g'
   in TIO.writeFile fn (GV.printDotGraph dot)
-
-removeBackedges :: FlowGraph -> FlowGraph
-removeBackedges = efilter (\(l1, l2, _) -> l1 < l2)
-
-backEdges :: Gr n e -> [LEdge e]
-backEdges = filter (\(l1, l2, _) -> l2 < l1) . labEdges
-
-removeReaching :: Lbl -> FlowGraph -> FlowGraph
-removeReaching l = efilter (\(_, l2, _) -> l2 /= l)

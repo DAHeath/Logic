@@ -13,13 +13,15 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
+  ghc-options: -Wall
   exposed-modules:     Logic.Formula
                      , Logic.Formula.Parser
                      , Logic.Type
                      , Logic.Model
                      , Logic.Chc
                      , Logic.Solver.Z3
-                     , Imperative.Command
+                     , Language.Imperative
+                     , Data.Graph.Inductive.Extras
 
   other-extensions:    LambdaCase
                      , GeneralizedNewtypeDeriving
