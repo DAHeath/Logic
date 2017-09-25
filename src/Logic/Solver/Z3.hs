@@ -370,7 +370,7 @@ astToForm arg = do
          idx <- getIndexValue arg
          n <- lookupDeBrujin idx
          return $ F.V $ case n of
-           Nothing -> F.Var typ ('#' : show idx)
+           Nothing -> F.Var typ (show idx)
            Just n' -> F.Var typ n'
 
     Z3_QUANTIFIER_AST ->

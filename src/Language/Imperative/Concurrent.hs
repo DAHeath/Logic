@@ -132,8 +132,8 @@ testChc =
       g2 = graph proc2
       bs = backEdges g1
       g1' = efilter (`notElem` bs) $ unfold (head $ backEdges g1) g1
-      g1'' = reverseReached finalLbl g1'
-      g2' = reverseReached finalLbl g2
+      -- g1'' = reverseReached finalLbl g1'
+      -- g2' = reverseReached finalLbl g2
       x = Var T.Int "x"
       s = Var T.Int "s"
       n = Var T.Int "n"
@@ -141,12 +141,14 @@ testChc =
       vs2 = S.fromList [s]
       vars = S.toList $ S.union vs1 vs2
 
-      start = Var (T.Int :=> T.Int :=> T.Int :=> T.Bool) "r5_0"
-      end = Var (T.Int :=> T.Int :=> T.Int :=> T.Bool) "r10_3"
+      start = Var (T.Int :=> T.Int :=> T.Int :=> T.Bool) "r0_0"
+      end = Var (T.Int :=> T.Int :=> T.Int :=> T.Bool) "r7_1"
   in
-  Rule [] [form|s:Int = 0 && n:Int = 1|] (App start vars) :
-  conccurentDags (vs1, g1'') (vs2, g2')
+  Rule [] [form|s:Int = 0 && n:Int = 2|] (App start vars) :
+  conccurentDags (vs1, g1') (vs2, g2)
   ++ [Query [App end vars] (LBool True) [form| s:Int = (2* n:Int) + 1 |]]
 
 
 disp = mapM_ (print . prettyShow) testChc
+
+fullTest = putStrLn . prettyShow =<< solveChc testChc

@@ -50,21 +50,13 @@ type BasicBlock = [(Var, RHS)]
 
 type FlowGraph = Gr BasicBlock Form
 
-initLbl :: Lbl
-initLbl = -1
-
-finalLbl :: Lbl
-finalLbl = maxBound
-
 graph :: Proc -> FlowGraph
 graph instrs =
   let hs = S.toList $ headers instrs
       cs = separate 0 (tail hs) instrs
       ns = zip hs (map (concatMap commToAssign) cs)
-      es = concatMap cOut (zip3 (-1 : hs) (hs ++ [finalLbl]) ([] : cs))
-      in foldr insEdge (foldr insNode
-               (insNode (finalLbl, []) $ insNode (initLbl, []) empty)
-               ns) es
+      es = concatMap cOut (zip3 hs (tail hs) cs)
+      in foldr insEdge (foldr insNode empty ns) es
   where
     commToAssign :: Command -> [(Var, RHS)]
     commToAssign = \case
@@ -75,7 +67,7 @@ graph instrs =
       cs -> case last cs of
         Branch f lbl -> [(here, lbl, f), (here, next, Apply Not f)]
         Jump lbl -> [(here, lbl, LBool True)]
-        Done -> [(here, finalLbl, LBool True)]
+        Done -> []
         _ := _ -> [(here, next, LBool True)]
 
 separate :: Lbl -> [Lbl] -> [Command] -> [[Command]]
