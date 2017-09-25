@@ -1,12 +1,13 @@
-{-# LANGUAGE DeriveDataTypeable, LambdaCase, QuasiQuotes #-}
+{-# LANGUAGE DeriveDataTypeable, LambdaCase #-}
 module Language.Imperative where
 
 import           Logic.Type as T
 import           Logic.Formula
-import           Logic.Formula.Parser
 
 import           Data.Data (Data)
 import           Data.List (sort)
+import           Data.Set (Set)
+import qualified Data.Set as S
 import           Data.Monoid ((<>))
 import qualified Data.GraphViz as GV
 import qualified Data.Text.Lazy.IO as TIO
@@ -22,7 +23,7 @@ import Data.Graph.Inductive.Extras
 type Lbl = Int
 
 data Command
-  = Variable := RHS
+  = Var := RHS
   | Jump Lbl
   | Branch Form Lbl
   | Done
@@ -45,54 +46,50 @@ instance Pretty RHS where
 
 type Proc = [Command]
 
-type BasicBlock = [(Variable, RHS)]
+type BasicBlock = [(Var, RHS)]
 
 type FlowGraph = Gr BasicBlock Form
 
+initLbl :: Lbl
+initLbl = -1
+
+finalLbl :: Lbl
+finalLbl = maxBound
+
 graph :: Proc -> FlowGraph
 graph instrs =
-  let hs = headers instrs
+  let hs = S.toList $ headers instrs
       cs = separate 0 (tail hs) instrs
       ns = zip hs (map (concatMap commToAssign) cs)
-      es = concatMap cOut (zip3 hs (tail hs) cs)
-  in foldr insEdge (foldr insNode empty ns) es
+      es = concatMap cOut (zip3 (-1 : hs) (hs ++ [finalLbl]) ([] : cs))
+      in foldr insEdge (foldr insNode
+               (insNode (finalLbl, []) $ insNode (initLbl, []) empty)
+               ns) es
   where
-    commToAssign :: Command -> [(Variable, RHS)]
+    commToAssign :: Command -> [(Var, RHS)]
     commToAssign = \case
       v := rhs -> [(v, rhs)]
       _ -> []
     cOut (here, next, comms') = case comms' of
-      [] -> []
+      [] -> [(here, next, LBool True)]
       cs -> case last cs of
         Branch f lbl -> [(here, lbl, f), (here, next, Apply Not f)]
         Jump lbl -> [(here, lbl, LBool True)]
-        _ -> []
+        Done -> [(here, finalLbl, LBool True)]
+        _ := _ -> [(here, next, LBool True)]
 
 separate :: Lbl -> [Lbl] -> [Command] -> [[Command]]
 separate _ [] is = [is]
 separate idx (h : hs) is = take (h - idx) is : separate h hs (drop (h - idx) is)
 
-headers :: [Command] -> [Lbl]
-headers instrs = sort $ concatMap iHeaders (zip [0..] instrs)
+headers :: [Command] -> Set Lbl
+headers instrs = S.insert 0 (S.fromList $ concatMap iHeaders (zip [0..] instrs))
   where
     iHeaders (here, i) = case i of
       _ := _ -> []
       Jump there -> [there]
       Branch _ there -> [here+1, there]
       Done -> []
-
-proc :: Proc
-proc =
-  [ Branch [form|x:Int >= n:Int|] 5
-  , x := Expr [form|x:Int + 1|]
-  , s := Expr [form|s:Int + 1|]
-  , s := Expr [form|s:Int + 1|]
-  , Jump 0
-  , Done
-  ]
-  where
-    x = Variable T.Int "x"
-    s = Variable T.Int "s"
 
 display :: FilePath -> FlowGraph -> IO ()
 display fn g =

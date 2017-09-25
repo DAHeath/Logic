@@ -42,7 +42,7 @@ solveChc hcs = runEnvZ3 script
          rids' <- traverse mkStringSymbol rids
          zipWithM_ fixedpointAddRule forms rids'
 
-         let quers = map (\q -> F.Variable T.Bool q) qids
+         let quers = map (\q -> F.Var T.Bool q) qids
          quers' <- traverse funcToDecl quers
          res <- fixedpointQueryRelations quers'
          case res of
@@ -50,7 +50,7 @@ solveChc hcs = runEnvZ3 script
            _     -> Right <$> (modelToModel =<< fixedpointGetRefutation)
 
     mkQuery q n =
-      let theQuery = F.V $ F.Variable T.Bool n in
+      let theQuery = F.V $ F.Var T.Bool n in
       F.app2 F.Impl (F.Apply F.Not (C.chcToForm q)) theQuery
 
     useDuality = do
@@ -168,8 +168,8 @@ newtype EnvZ3 a = EnvZ3 { getEnvZ3 :: ReaderT DeBrujin (StateT Env Z3) a }
            , MonadIO
            )
 
-data Env = Env { vars :: Map F.Variable AST
-               , funs :: Map F.Variable FuncDecl
+data Env = Env { vars :: Map F.Var AST
+               , funs :: Map F.Var FuncDecl
                } deriving (Show, Eq, Ord)
 
 -- | The list of variable names ordered by their DeBrujin index. This list is
@@ -211,7 +211,7 @@ formToAst f =
       s <- typeToSort t
       fd <- mkFreshFuncDecl "" [] s
       n <- getSymbolString =<< getDeclName fd
-      let v = F.Variable t n
+      let v = F.Var t n
       a <- toApp =<< register v
       q [] [a] =<< (formToAst $ instantiate1 (F.V v) e)
 
@@ -265,8 +265,8 @@ appToZ3 f args = case f of
     many o = o =<< traverse formToAst args
     two o = join $ o <$> formToAst (head args) <*> formToAst (args !! 1)
 
-funcToDecl :: (MonadState Env z3, MonadZ3 z3) => F.Variable -> z3 FuncDecl
-funcToDecl r@(F.Variable t n) = do
+funcToDecl :: (MonadState Env z3, MonadZ3 z3) => F.Var -> z3 FuncDecl
+funcToDecl r@(F.Var t n) = do
   env <- gets funs
   case M.lookup r env of
     Nothing -> do
@@ -283,7 +283,7 @@ formFromApp name args range
   | name == "true"     = return $ F.LBool True
   | name == "false"    = return $ F.LBool False
   -- The 'app' is just a variable
-  | null args          = F.V <$> (F.Variable <$> sortToType range <*> pure name)
+  | null args          = F.V <$> (F.Var <$> sortToType range <*> pure name)
   | name == "ite" || name == "if" = do
     c <- astToForm (head args)
     e1 <- astToForm (args !! 1)
@@ -312,7 +312,7 @@ formFromApp name args range
     args' <- traverse astToForm args
     domain <- traverse getType args
     range' <- sortToType range
-    let f = F.Variable (T.curryType domain range') name
+    let f = F.Var (T.curryType domain range') name
     return $ F.appMany (F.V f) args'
   where lift2 f = F.app2 f <$> astToForm (head args) <*> astToForm (args !! 1)
         liftMany f = F.appMany f <$> traverse astToForm args
@@ -342,7 +342,7 @@ modelToModel m = do
       name <- declName fd
       domain <- traverse sortToType =<< getDomain fd
       range  <- sortToType =<< getRange fd
-      return $ F.Variable (T.curryType domain range) name
+      return $ F.Var (T.curryType domain range) name
 
 -- | Convert the Z3 internal representation of a formula to the AST representation.
 astToForm :: (MonadReader DeBrujin z3, MonadZ3 z3) => AST -> z3 Form
@@ -370,8 +370,8 @@ astToForm arg = do
          idx <- getIndexValue arg
          n <- lookupDeBrujin idx
          return $ F.V $ case n of
-           Nothing -> F.Variable typ ('#' : show idx)
-           Just n' -> F.Variable typ n'
+           Nothing -> F.Var typ ('#' : show idx)
+           Just n' -> F.Var typ n'
 
     Z3_QUANTIFIER_AST ->
       do binds <- getQuantifierBindings arg
@@ -404,7 +404,7 @@ astToForm arg = do
     bind sym s = do
       n <- getSymbolString sym
       t <- sortToType s
-      return $ F.Variable t n
+      return $ F.Var t n
 
 typeToSort :: MonadZ3 z3 => Type -> z3 Sort
 typeToSort = \case
@@ -438,7 +438,7 @@ getType = getSort >=> sortToType
 declName :: MonadZ3 z3 => FuncDecl -> z3 String
 declName = getDeclName >=> getSymbolString
 
-varDec :: MonadZ3 z3 => F.Variable -> z3 FuncDecl
-varDec (F.Variable t n) = do
+varDec :: MonadZ3 z3 => F.Var -> z3 FuncDecl
+varDec (F.Var t n) = do
   sym <- mkStringSymbol n
   mkFuncDecl sym [] =<< typeToSort t

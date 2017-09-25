@@ -14,16 +14,20 @@ unfold (l1, l2, b) g =
   let g' = subgraphBetween l1 l2 g
       ns = nodes g'
       -- remove the edges which enter the expanded subgraph
-      toReroute = filter (\(l1', l2', _) -> l1' `notElem` ns && l2' `elem` ns) (labEdges g)
-      reroutesRemoved = efilter (`notElem` toReroute) g
+      incoming = filter (\(l1', l2', _) -> l1' `notElem` ns && l2' `elem` ns) (labEdges g)
+      outgoing = filter (\(l1', l2', _) -> l1' `elem` ns && l2' `notElem` ns) (labEdges g)
+      incomingRemoved = efilter (`notElem` incoming) g
       -- relabel the subgraph
       rel = relabelWithRespectTo g' g
       relabelled = relabel rel g'
-      merged = overlay reroutesRemoved relabelled
+      merged = overlay incomingRemoved relabelled
       connected = insEdge (rel l1, l2, b) merged
-      rerouted = foldr (\(l1', l2', b') gr -> insEdge (l1', rel l2', b') gr)
-                       connected toReroute
-  in rerouted
+      incRerouted = foldr (\(l1', l2', b') gr -> insEdge (l1', rel l2', b') gr)
+                          connected incoming
+      outDuplicated = foldr (\(l1', l2', b') gr -> insEdge (rel l1', l2', b') gr)
+                            incRerouted outgoing
+
+  in outDuplicated
 
 -- | Combine two graphs
 overlay :: DynGraph gr => gr n e -> gr n e -> gr n e

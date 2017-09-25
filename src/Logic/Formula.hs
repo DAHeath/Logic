@@ -15,7 +15,8 @@ module Logic.Formula where
 import           Logic.Type (Type((:=>)), Typed)
 import qualified Logic.Type as T
 
-import           Bound
+import           Bound hiding (Var)
+import qualified Bound as B
 
 import           Control.Lens
 
@@ -30,14 +31,14 @@ import           Text.PrettyPrint.HughesPJClass ((<+>), Pretty, pPrint)
 import qualified Text.PrettyPrint.HughesPJClass as PP
 
 type Name = String
-data Variable = Variable { varType :: Type, varName :: Name }
+data Var = Var { varType :: Type, varName :: Name }
   deriving (Show, Eq, Ord, Data)
 
-instance Typed Variable
-  where typeOf (Variable t _) = t
+instance Typed Var
+  where typeOf (Var t _) = t
 
-instance Pretty Variable
-  where pPrint (Variable t n) = PP.text (n ++ ":") <> PP.pPrint t
+instance Pretty Var
+  where pPrint (Var t n) = PP.text (n ++ ":") <> PP.pPrint t
 
 data Form' v
   = Forall Type (Scope () Form' v)
@@ -82,12 +83,12 @@ deriving instance Ord v => Ord (Form' v)
 deriving instance Show v => Show (Form' v)
 deriving instance Data v => Data (Form' v)
 
-type Form = Form' Variable
+type Form = Form' Var
 
-test :: Form' Variable
-test = manyForall [Variable T.Int "x", Variable T.Int "y"]
-      (Apply (Apply (Eql T.Int) (V $ Variable T.Int "x"))
-                                (V $ Variable T.Int "y"))
+test :: Form' Var
+test = manyForall [Var T.Int "x", Var T.Int "y"]
+      (Apply (Apply (Eql T.Int) (V $ Var T.Int "x"))
+                                (V $ Var T.Int "y"))
 
 app2 :: Form' v -> Form' v -> Form' v -> Form' v
 app2 f x y = Apply (Apply f x) y
@@ -149,15 +150,15 @@ instance Typed v => Typed (Form' v) where
 class PRec a where
   recPrint :: Int -> a -> PP.Doc
 
-instance PRec Variable where
+instance PRec Var where
   recPrint = const pPrint
 
-instance (PRec v, Pretty v) => PRec (Var () (Form' v)) where
+instance (PRec v, Pretty v) => PRec (B.Var () (Form' v)) where
   recPrint n (B ()) = PP.pPrint n
   recPrint n (F (V v)) = recPrint (n+1) v
   recPrint _ (F v) = PP.pPrint v
 
-instance (PRec v, Pretty v) => Pretty (Var () (Form' v)) where
+instance (PRec v, Pretty v) => Pretty (B.Var () (Form' v)) where
   pPrint = recPrint 0
 
 instance (PRec v, Pretty v) => Pretty (Form' v) where

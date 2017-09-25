@@ -12,7 +12,7 @@ import qualified Data.Map as M
 import           Text.PrettyPrint.HughesPJClass (Pretty, pPrint)
 import qualified Text.PrettyPrint.HughesPJClass as PP
 
-newtype Model = Model (Map Variable Form)
+newtype Model = Model (Map Var Form)
   deriving (Show, Eq, Ord, Data)
 
 apply :: Model -> Form -> Form

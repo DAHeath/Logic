@@ -16,7 +16,7 @@ data Chc
   | Query [App] Form Form
   deriving (Show, Eq, Ord, Data)
 
-data App = App { appOperator :: Variable, appOperands :: [Variable] }
+data App = App { appOperator :: Var, appOperands :: [Var] }
   deriving (Show, Eq, Ord, Data)
 
 chcBody :: Lens' Chc Form
@@ -35,7 +35,7 @@ chcLhs :: Chc -> [App]
 chcLhs (Rule lhs _ _) = lhs
 chcLhs (Query lhs _ _) = lhs
 
-chcBindings :: Chc -> [Variable]
+chcBindings :: Chc -> [Var]
 chcBindings (Rule _ _ rhs) = appOperands rhs
 chcBindings Query{} = []
 
@@ -43,7 +43,7 @@ chcApp :: Chc -> Maybe App
 chcApp (Rule _ _ rhs) = Just rhs
 chcApp Query{} = Nothing
 
-predicates :: Chc -> [Variable]
+predicates :: Chc -> [Var]
 predicates (Rule lhs _ rhs) = map appOperator (lhs ++ [rhs])
 predicates (Query lhs _ _) = map appOperator lhs
 
