@@ -36,6 +36,7 @@ library
                      , graphviz
                      , lens             >= 4.15
                      , mtl              >= 2.2
+                     , extra
                      , parsec           >= 3.1
                      , pretty           >= 1.1.3
                      , template-haskell >= 2.11

@@ -47,7 +47,7 @@ solveChc hcs = runEnvZ3 script
          res <- fixedpointQueryRelations quers'
          case res of
            Unsat -> Right <$> (modelToModel =<< fixedpointGetModel)
-           _     -> Right <$> (modelToModel =<< fixedpointGetRefutation)
+           _     -> Left <$> (modelToModel =<< fixedpointGetRefutation)
 
     mkQuery q n =
       let theQuery = F.V $ F.Var T.Bool n in

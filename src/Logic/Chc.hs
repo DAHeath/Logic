@@ -59,24 +59,9 @@ applyChc f = \case
   Query lhs ctx rhs -> app2 Impl (mkAnd (ctx : map f lhs)) rhs
   Rule  lhs ctx rhs -> app2 Impl (mkAnd (ctx : map f lhs)) (f rhs)
 
--- applyModelToApp :: Model -> App -> Form
--- applyModelToApp (Model m) (App fun vs) =
---   instantiate vs ((\f -> M.findWithDefault (LBool False) f m) fun)
-
 isQuery :: Chc -> Bool
 isQuery Query{} = True
 isQuery _ = False
-
--- instance Variadic App where
---   variables = S.fromList . appOperands
---   substitute m (App f vs) = App f (substitute m vs)
-
--- instance Variadic Chc where
---   variables (Rule  lhs f rhs) = variables lhs <> variables f <> variables rhs
---   variables (Query lhs f rhs) = variables lhs <> variables f <> variables rhs
-
---   substitute m (Rule  lhs f rhs) = Rule  (substitute m lhs) (substitute m f) (substitute m rhs)
---   substitute m (Query lhs f rhs) = Query (substitute m lhs) (substitute m f) (substitute m rhs)
 
 instance Pretty Chc where
   pPrint (Rule as f h)  = PP.sep (map pPrint as ++ [pPrint f, PP.text "=>", pPrint h])
@@ -85,3 +70,8 @@ instance Pretty Chc where
 instance Pretty App where
   pPrint a = PP.braces (PP.sep
     (PP.text (varName (appOperator a)) : map pPrint (appOperands a)))
+
+substituteApps :: (App -> Form) -> Chc -> Form
+substituteApps f = \case
+  Rule  as b h -> app2 Impl (mkAnd (b : map f as)) (f h)
+  Query as b h -> app2 Impl (mkAnd (b : map f as)) h
