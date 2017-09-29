@@ -14,7 +14,7 @@ data Type
   | Real
   | Type :=> Type
   | List Type
-  deriving (Show, Eq, Ord, Data)
+  deriving (Show, Read, Eq, Ord, Data)
 
 infixr 0 :=>
 
@@ -40,4 +40,4 @@ instance Pretty Type where
     List t   -> PP.text "List<" <> PP.pPrint t <> PP.text ">"
 
 class Typed a where
-   typeOf :: a -> Type
+  typeOf :: a -> Type

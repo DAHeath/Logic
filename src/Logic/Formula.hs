@@ -15,36 +15,41 @@ module Logic.Formula where
 import           Logic.Type (Type((:=>)), Typed)
 import qualified Logic.Type as T
 
-import           Bound hiding (Var)
-import qualified Bound as B
-
 import           Control.Lens
 
 import           Data.Data (Data)
-import           Data.Data.Lens (uniplate)
+import           Data.Data.Lens (biplate, uniplate)
 import           Data.Monoid ((<>))
-import           Data.Eq.Deriving
-import           Data.Ord.Deriving
-import           Text.Show.Deriving
+import           Data.Map (Map)
+import qualified Data.Map as M
+import           Data.Set (Set)
+import qualified Data.Set as S
 
 import           Text.PrettyPrint.HughesPJClass ((<+>), Pretty, pPrint)
 import qualified Text.PrettyPrint.HughesPJClass as PP
 
 type Name = String
-data Var = Var { varType :: Type, varName :: Name }
-  deriving (Show, Eq, Ord, Data)
+
+data Var
+  = Bound Int Type
+  | Free Name Type
+  deriving (Show, Read, Eq, Ord, Data)
+
+varName :: Var -> Name
+varName (Bound i _) = show i
+varName (Free n _) = n
 
 instance Typed Var
-  where typeOf (Var t _) = t
+  where typeOf (Bound _ t) = t
+        typeOf (Free _ t) = t
 
 instance Pretty Var
-  where pPrint (Var t n) = PP.text (n ++ ":") <> PP.pPrint t
+  where pPrint (Bound n t) = PP.text (show n ++ ":") <> PP.pPrint t
+        pPrint (Free  n t) = PP.text (n ++ ":") <> PP.pPrint t
 
-data Form' v
-  = Forall Type (Scope () Form' v)
-  | Exists Type (Scope () Form' v)
-  | Apply (Form' v) (Form' v)
-  | V v
+data Form
+  = Apply Form Form
+  | V Var
 
   | If Type
 
@@ -71,51 +76,55 @@ data Form' v
   | LBool Bool
   | LInt Integer
   | LReal Double
-  deriving (Functor, Foldable, Traversable)
+  deriving (Show, Read, Eq, Ord, Data)
 
-makeBound ''Form'
+instance Plated Form where
+  plate = uniplate
 
-deriveEq1 ''Form'
-deriveOrd1 ''Form'
-deriveShow1 ''Form'
-deriving instance Eq v => Eq (Form' v)
-deriving instance Ord v => Ord (Form' v)
-deriving instance Show v => Show (Form' v)
-deriving instance Data v => Data (Form' v)
+class Variadic a where
+  vars :: a -> Set Var
+  subst :: Map Var Var -> a -> a
 
-type Form = Form' Var
+instance Variadic Form where
+  vars f = f ^.. biplate & S.fromList
+  subst m = transform
+    (\case V v -> V $ M.findWithDefault v v m
+           f   -> f)
 
-test :: Form' Var
-test = manyForall [Var T.Int "x", Var T.Int "y"]
-      (Apply (Apply (Eql T.Int) (V $ Var T.Int "x"))
-                                (V $ Var T.Int "y"))
+abstract :: Variadic a => [Var] -> a -> a
+abstract vs f =
+  let m = foldl (\(n, m') v -> (n + 1, M.insert v (Bound n (T.typeOf v)) m')) (0, M.empty) vs
+  in subst (snd m) f
 
-app2 :: Form' v -> Form' v -> Form' v -> Form' v
+instantiate :: Variadic a => [Var] -> a -> a
+instantiate vs f =
+  let m = foldl (\(n, m') v -> (n + 1, M.insert (Bound n (T.typeOf v)) v m')) (0, M.empty) vs
+  in subst (snd m) f
+
+substForm :: Map Var Var -> Form -> Form
+substForm m = transform
+  (\case V v -> V $ M.findWithDefault v v m
+         f   -> f)
+
+formVars :: Form -> Set Var
+formVars f = f ^.. biplate & S.fromList
+
+app2 :: Form -> Form -> Form -> Form
 app2 f x y = Apply (Apply f x) y
 
-appMany :: Form' v -> [Form' v] -> Form' v
+appMany :: Form -> [Form] -> Form
 appMany f xs = foldl Apply f xs
 
-mkForall, mkExists :: (Typed v, Eq v) => v -> Form' v -> Form' v
-mkForall v f = Forall (T.typeOf v) (abstract1 v f)
-mkExists v f = Exists (T.typeOf v) (abstract1 v f)
-
-manyForall, manyExists :: (Typed v, Eq v) => [v] -> Form' v -> Form' v
-manyForall vs f = foldl (flip mkForall) f vs
-manyExists vs f = foldl (flip mkExists) f vs
-
-mkAnd, mkOr :: Foldable f => f (Form' v) -> (Form' v)
+mkAnd, mkOr :: Foldable f => f Form -> Form
 mkAnd = foldr (app2 And) (LBool True)
 mkOr  = foldr (app2 Or) (LBool False)
 
-instance Monoid (Form' v) where
+instance Monoid Form where
   mappend = app2 And
   mempty = LBool True
 
-instance Typed v => Typed (Form' v) where
+instance Typed Form where
   typeOf = \case
-    Forall{}    -> T.Bool
-    Exists{}    -> T.Bool
     V v         -> T.typeOf v
     Apply v _   -> case T.typeOf v of
                      _ :=> t -> t
@@ -147,24 +156,8 @@ instance Typed v => Typed (Form' v) where
     LInt _      -> T.Int
     LReal _     -> T.Real
 
-class PRec a where
-  recPrint :: Int -> a -> PP.Doc
-
-instance PRec Var where
-  recPrint = const pPrint
-
-instance (PRec v, Pretty v) => PRec (B.Var () (Form' v)) where
-  recPrint n (B ()) = PP.pPrint n
-  recPrint n (F (V v)) = recPrint (n+1) v
-  recPrint _ (F v) = PP.pPrint v
-
-instance (PRec v, Pretty v) => Pretty (B.Var () (Form' v)) where
-  pPrint = recPrint 0
-
-instance (PRec v, Pretty v) => Pretty (Form' v) where
+instance Pretty (Form) where
   pPrint = \case
-    Forall t f   -> PP.text "forall" <+> PP.pPrint t <+> PP.parens (pPrint $ unscope f)
-    Exists t f   -> PP.text "exists" <+> PP.pPrint t <+> PP.parens (pPrint $ unscope f)
     V v          -> PP.pPrint v
     Apply (Apply f x) y -> PP.parens (inlinePrint f x <+> pPrint y)
     Apply f x    -> PP.parens (pPrint f <+> pPrint x)
@@ -199,6 +192,3 @@ instance (PRec v, Pretty v) => Pretty (Form' v) where
       inlinePrint f x = case f of
         Apply f' y -> inlinePrint f' y <+> pPrint x
         f' -> pPrint f' <+> pPrint x
-
-instance Data v => Plated (Form' v) where
-  plate = uniplate

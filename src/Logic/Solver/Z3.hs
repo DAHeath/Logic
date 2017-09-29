@@ -5,8 +5,6 @@
 
 module Logic.Solver.Z3 where
 
-import           Bound
-
 import           Control.Monad.State
 import           Control.Monad.Reader
 
@@ -42,7 +40,7 @@ solveChc hcs = runEnvZ3 script
          rids' <- traverse mkStringSymbol rids
          zipWithM_ fixedpointAddRule forms rids'
 
-         let quers = map (\q -> F.Var T.Bool q) qids
+         let quers = map (\q -> F.Free q T.Bool) qids
          quers' <- traverse funcToDecl quers
          res <- fixedpointQueryRelations quers'
          case res of
@@ -50,7 +48,7 @@ solveChc hcs = runEnvZ3 script
            _     -> Left <$> (modelToModel =<< fixedpointGetRefutation)
 
     mkQuery q n =
-      let theQuery = F.V $ F.Var T.Bool n in
+      let theQuery = F.V $ F.Free n T.Bool in
       F.app2 F.Impl (F.Apply F.Not (C.chcToForm q)) theQuery
 
     useDuality = do
@@ -191,8 +189,6 @@ runEnvZ3 ac = liftIO $ evalZ3 (evalStateT (runReaderT (getEnvZ3 ac') []) emptyEn
 formToAst :: (MonadState Env z3, MonadZ3 z3) => Form -> z3 AST
 formToAst f =
   case f of
-    F.Forall t e       -> quantify mkForallConst t e
-    -- F.Exists vs e       -> quantify mkExistsConst vs e
     F.V v               -> var v
     F.LUnit             -> undefined
     F.LBool True        -> mkTrue
@@ -206,14 +202,6 @@ formToAst f =
     gatherApp :: Form -> [Form] -> (Form, [Form])
     gatherApp (F.Apply f' a) args = gatherApp f' (a : args)
     gatherApp x args = (x, args)
-
-    quantify q t e = do
-      s <- typeToSort t
-      fd <- mkFreshFuncDecl "" [] s
-      n <- getSymbolString =<< getDeclName fd
-      let v = F.Var t n
-      a <- toApp =<< register v
-      q [] [a] =<< (formToAst $ instantiate1 (F.V v) e)
 
     register v = do
       fd <- varDec v
@@ -230,43 +218,44 @@ formToAst f =
 
 -- | Convert a function application to a Z3 formula.
 appToZ3 :: (MonadState Env z3, MonadZ3 z3) => Form -> [Form] -> z3 AST
-appToZ3 f args = case f of
-  F.V v        -> join $ mkApp <$> funcToDecl v <*> traverse formToAst args
-  F.Not        -> mkNot =<< formToAst (head args)
-  F.And        -> many mkAnd
-  F.Or         -> many mkOr
-  F.Add _      -> many mkAdd
-  F.Mul _      -> many mkMul
-  F.Sub _      -> many mkSub
-  F.Distinct _ -> many mkDistinct
-  F.Impl       -> two mkImplies
-  F.Iff        -> two mkIff
-  F.Div _      -> two mkDiv
-  F.Mod _      -> two mkMod
-  F.If _       -> join $ mkIte <$> formToAst (head args)
-                               <*> formToAst (args !! 1)
-                               <*> formToAst (args !! 2)
+appToZ3 f args = do
+  case f of
+    F.V v        -> join $ mkApp <$> funcToDecl v <*> traverse formToAst args
+    F.Not        -> mkNot =<< formToAst (head args)
+    F.And        -> many mkAnd
+    F.Or         -> many mkOr
+    F.Add _      -> many mkAdd
+    F.Mul _      -> many mkMul
+    F.Sub _      -> many mkSub
+    F.Distinct _ -> many mkDistinct
+    F.Impl       -> two mkImplies
+    F.Iff        -> two mkIff
+    F.Div _      -> two mkDiv
+    F.Mod _      -> two mkMod
+    F.If _       -> join $ mkIte <$> formToAst (head args)
+                                 <*> formToAst (args !! 1)
+                                 <*> formToAst (args !! 2)
 
-  F.Eql _      -> two mkEq
-  F.Lt _       -> two mkLt
-  F.Le _       -> two mkLe
-  F.Gt _       -> two mkGt
-  F.Ge _       -> two mkGe
+    F.Eql _      -> two mkEq
+    F.Lt _       -> two mkLt
+    F.Le _       -> two mkLe
+    F.Gt _       -> two mkGt
+    F.Ge _       -> two mkGe
 
-  F.LUnit      -> undefined
-  F.LBool _    -> undefined
-  F.LInt _     -> undefined
-  F.LReal _    -> undefined
-  F.Apply{}    -> undefined
-  F.Forall _ _ -> undefined
-  F.Exists _ _ -> undefined
+    F.LUnit      -> undefined
+    F.LBool b    -> mkBool b
+    F.LInt _     -> undefined
+    F.LReal _    -> undefined
+    F.Apply{}    -> undefined
 
   where
     many o = o =<< traverse formToAst args
     two o = join $ o <$> formToAst (head args) <*> formToAst (args !! 1)
 
 funcToDecl :: (MonadState Env z3, MonadZ3 z3) => F.Var -> z3 FuncDecl
-funcToDecl r@(F.Var t n) = do
+funcToDecl r = do
+  let t = T.typeOf r
+  let n = F.varName r
   env <- gets funs
   case M.lookup r env of
     Nothing -> do
@@ -283,7 +272,7 @@ formFromApp name args range
   | name == "true"     = return $ F.LBool True
   | name == "false"    = return $ F.LBool False
   -- The 'app' is just a variable
-  | null args          = F.V <$> (F.Var <$> sortToType range <*> pure name)
+  | null args          = F.V <$> (F.Free name <$> sortToType range)
   | name == "ite" || name == "if" = do
     c <- astToForm (head args)
     e1 <- astToForm (args !! 1)
@@ -312,7 +301,7 @@ formFromApp name args range
     args' <- traverse astToForm args
     domain <- traverse getType args
     range' <- sortToType range
-    let f = F.Var (T.curryType domain range') name
+    let f = F.Free name (T.curryType domain range')
     return $ F.appMany (F.V f) args'
   where lift2 f = F.app2 f <$> astToForm (head args) <*> astToForm (args !! 1)
         liftMany f = F.appMany f <$> traverse astToForm args
@@ -342,7 +331,7 @@ modelToModel m = do
       name <- declName fd
       domain <- traverse sortToType =<< getDomain fd
       range  <- sortToType =<< getRange fd
-      return $ F.Var (T.curryType domain range) name
+      return $ F.Free name (T.curryType domain range)
 
 -- | Convert the Z3 internal representation of a formula to the AST representation.
 astToForm :: (MonadReader DeBrujin z3, MonadZ3 z3) => AST -> z3 Form
@@ -370,21 +359,11 @@ astToForm arg = do
          idx <- getIndexValue arg
          n <- lookupDeBrujin idx
          return $ F.V $ case n of
-           Nothing -> F.Var typ (show idx)
-           Just n' -> F.Var typ n'
+           Nothing -> F.Bound idx typ
+           Just n' -> F.Free n' typ
 
-    Z3_QUANTIFIER_AST ->
-      do binds <- getQuantifierBindings arg
-         body  <- getQuantifierBody arg
-         isFA  <- isQuantifierForall arg
-
-         names <- traverse getSymbolString (map fst binds)
-         vs <- traverse (uncurry bind) binds
-         body' <- local (reverse names ++) (astToForm body)
-
-         if isFA
-         then return $ F.manyForall vs body'
-         else return $ F.manyExists vs body'
+    Z3_QUANTIFIER_AST -> do liftIO $ putStrLn "quantifier!"
+                            undefined
 
     Z3_SORT_AST -> do liftIO $ putStrLn "sort!"
                       undefined
@@ -400,11 +379,6 @@ astToForm arg = do
       return $ if i >= length listing
                then Nothing
                else Just $ listing !! i
-
-    bind sym s = do
-      n <- getSymbolString sym
-      t <- sortToType s
-      return $ F.Var t n
 
 typeToSort :: MonadZ3 z3 => Type -> z3 Sort
 typeToSort = \case
@@ -439,6 +413,8 @@ declName :: MonadZ3 z3 => FuncDecl -> z3 String
 declName = getDeclName >=> getSymbolString
 
 varDec :: MonadZ3 z3 => F.Var -> z3 FuncDecl
-varDec (F.Var t n) = do
+varDec v = do
+  let t = T.typeOf v
+  let n = F.varName v
   sym <- mkStringSymbol n
   mkFuncDecl sym [] =<< typeToSort t

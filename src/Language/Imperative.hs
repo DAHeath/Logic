@@ -5,7 +5,6 @@ import           Logic.Type as T
 import           Logic.Formula
 
 import           Data.Data (Data)
-import           Data.List (sort)
 import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Monoid ((<>))
@@ -17,8 +16,6 @@ import           Data.Graph.Inductive.Graph
 
 import           Text.PrettyPrint.HughesPJClass ((<+>), Pretty, pPrint)
 import qualified Text.PrettyPrint.HughesPJClass as PP
-
-import Data.Graph.Inductive.Extras
 
 type Lbl = Int
 

@@ -2,11 +2,14 @@
 module Logic.Chc where
 
 import           Logic.Formula
+import           Logic.Model
 
 import           Control.Lens
 
 import           Data.Data (Data)
 import           Data.Monoid ((<>))
+import qualified Data.Map as M
+import qualified Data.Set as S
 
 import           Text.PrettyPrint.HughesPJClass (Pretty, pPrint)
 import qualified Text.PrettyPrint.HughesPJClass as PP
@@ -16,8 +19,22 @@ data Chc
   | Query [App] Form Form
   deriving (Show, Eq, Ord, Data)
 
+instance Variadic Chc where
+  vars = \case
+    Rule as f a -> S.unions (map vars as ++ [vars f, vars a])
+    Query as f q -> S.unions (map vars as ++ [vars f, vars q])
+  subst m = \case
+    Rule as f a -> Rule (map (subst m) as) (subst m f) (subst m a)
+    Query as f q -> Query (map (subst m) as) (subst m f) (subst m q)
+
 data App = App { appOperator :: Var, appOperands :: [Var] }
   deriving (Show, Eq, Ord, Data)
+
+instance Variadic App where
+  vars (App _ as) = S.fromList as
+  subst m (App f as) = App f (map search as)
+    where
+      search v = M.findWithDefault v v m
 
 chcBody :: Lens' Chc Form
 chcBody = lens getter setter
@@ -75,3 +92,7 @@ substituteApps :: (App -> Form) -> Chc -> Form
 substituteApps f = \case
   Rule  as b h -> app2 Impl (mkAnd (b : map f as)) (f h)
   Query as b h -> app2 Impl (mkAnd (b : map f as)) h
+
+applyModelToApp :: Model -> App -> Form
+applyModelToApp (Model m) (App fun vs) =
+  instantiate vs ((\f -> M.findWithDefault (LBool False) f m) fun)

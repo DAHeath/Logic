@@ -1,7 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Logic.Formula.Parser where
 
-import           Bound hiding (Var)
 import           Data.Data (Data)
 import           Data.Functor.Identity
 
@@ -56,17 +55,12 @@ atom = try app <|> nonapp
       <|> (res "or"       >> mkOr                     <$> many1 nonapp)
       <|> (res "add"      >> appMany (Add T.Int)      <$> many1 nonapp)
       <|> (res "mul"      >> appMany (Mul T.Int)      <$> many1 nonapp)
-      <|> (res "forall"   >> do
-        vs <- parens (many var)
-        a <- nonapp
-        return $ foldr (\v f -> Forall T.Int $ abstract1 v f) a vs)
-      -- <|> (res "exists"   >> Exists                <$> parens (many var) <*> nonapp)
       <|> (do n <- ident
               op ":"
               t <- typ
               args <- many1 nonapp
               let ts = map T.typeOf args
-              return $ appMany (V $ Var (T.curryType ts t) n) args)
+              return $ appMany (V $ Free n (T.curryType ts t)) args)
 
 bool :: CharParser st Form
 bool = const (LBool True)  <$> res "true"
@@ -83,7 +77,7 @@ var = do
   i <- ident
   op ":"
   t <- typ
-  return $ Var t i
+  return $ Free i t
 
 impop, compareop, mulop, addop :: CharParser st (Form -> Form -> Form)
 
@@ -129,7 +123,7 @@ parseChc = many parseChc'
     app = braces $ do n <- ident
                       args <- many var
                       let ts = map T.typeOf args
-                      return $ App (Var (T.curryType ts T.Bool) n) args
+                      return $ App (Free n (T.curryType ts T.Bool)) args
 
 promote :: Monad m => CharParser () a -> (String, Int, Int) -> String -> m a
 promote par (file, line, col) s =

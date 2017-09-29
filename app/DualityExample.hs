@@ -2,6 +2,7 @@
 
 import Logic.Chc
 import Logic.Solver.Z3
+import Logic.Solver.Duality
 import Logic.Formula.Parser
 import Text.PrettyPrint.HughesPJClass (prettyShow)
 
@@ -14,10 +15,18 @@ test t = do
     Right m -> do putStrLn "solution"
                   putStrLn (prettyShow m)
 
+testDuality :: [Chc] -> IO ()
+testDuality t = do
+  sol <- duality t
+  case sol of
+    Left f -> do putStrLn "counterexample"
+                 putStrLn (prettyShow f)
+    Right m -> do putStrLn "solution"
+                  putStrLn (prettyShow m)
+
 main :: IO ()
 main = do
-  test test1
-  test test2
+  testDuality test2
 
 test1, test2 :: [Chc]
 test1 = [chc| i:Int = 0 => {r i:Int}

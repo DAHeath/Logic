@@ -21,7 +21,7 @@ apply (Model m) = rewrite (\case
   _ -> Nothing)
 
 instance Pretty Model where
-  pPrint (Model m) = PP.sep vars
-    where vars = map (\(v, f) -> PP.fsep [pPrint v, PP.text "==>", pPrint f]) $
-                   M.toList m
+  pPrint (Model m) = PP.sep vs
+    where
+      vs = map (\(v, f) -> PP.fsep [pPrint v, PP.text "==>", pPrint f]) $ M.toList m
 
