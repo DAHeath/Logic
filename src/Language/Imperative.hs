@@ -99,77 +99,57 @@ commGraph :: Comm -> Gr () SemAct
 commGraph comm =
   evalState (do
     i <- initial
-    f <- commGraph' comm
-    terminate (f i)) (0, M.empty)
+    f <- commGraph' comm i
+    terminate f) (0, M.empty)
   where
-    commGraph' :: Comm -> State (Lbl, Map Int Lbl) (PartGraph -> PartGraph)
-    commGraph' comm'
-      | isSimple comm' = return $ \(PartGraph g n s) -> PartGraph g n (semSeq (commSem comm') s)
+    commGraph' :: Comm -> PartGraph -> State (Lbl, Map Int Lbl) PartGraph
+    commGraph' comm' pg@(PartGraph g n s)
+      | isSimple comm' = return $ PartGraph g n (semSeq (commSem comm') s)
       | otherwise = case comm' of
-        Seq c1 c2 -> do
-          f1 <- commGraph' c1
-          f2 <- commGraph' c2
-          return (f1 . f2)
+        Seq c1 c2 -> commGraph' c2 pg >>= commGraph' c1
         Case e c1 c2 -> do
-          f1 <- commGraph' c1
-          f2 <- commGraph' c2
+          (PartGraph g1 n1 s1) <- commGraph' c1 pg
+          (PartGraph g2 n2 s2) <- commGraph' c2 pg
           h <- vert
-          return $ \pg ->
-            let (PartGraph g1 n1 s1) = f1 pg
-                (PartGraph g2 n2 s2) = f2 pg
-                g = G.insEdge (h, n1, semSeq (SemPredicate e) s1)
-                  $ G.insEdge (h, n2, semSeq (SemPredicate (Apply Not e)) s2)
-                  $ G.insNode (h, ())
-                  $ overlay g1 g2
-            in PartGraph g h SemSkip
+          let g' = G.insEdge (h, n1, semSeq (SemPredicate e) s1)
+                 $ G.insEdge (h, n2, semSeq (SemPredicate (Apply Not e)) s2)
+                 $ G.insNode (h, ())
+                 $ overlay g1 g2
+          return $ PartGraph g' h SemSkip
         Loop e c -> do
           h <- vert
-          f <- commGraph' c
-          return $ \(PartGraph g en s) ->
-            let PartGraph g' en' s' = f (PartGraph (G.insNode (h, ()) G.empty) h SemSkip)
-                g'' = G.insEdge (h, en', semSeq (SemPredicate e) s') g'
-            in PartGraph
-              ( G.insEdge (h, en, semSeq (SemPredicate (Apply Not e)) s)
+          (PartGraph g' en' s') <- commGraph' c (PartGraph (G.insNode (h, ()) G.empty) h SemSkip)
+          let g'' = G.insEdge (h, en', semSeq (SemPredicate e) s') g'
+          return $ PartGraph
+              ( G.insEdge (h, n, semSeq (SemPredicate (Apply Not e)) s)
               $ overlay g g'')
               h SemSkip
-        Skip -> return id
-        Jump l -> do
-          v <- lblVert l
-          return $ \(PartGraph g _ _) ->
-            PartGraph (G.insNode (v, ()) g) v SemSkip
+        Skip -> return pg
+        Jump l -> skipTo g <$> lblVert l
         Lbl l c -> do
           v <- lblVert l
-          f <- commGraph' c
-          return $ \g ->
-            let PartGraph g' en s = f g
-            in PartGraph ( G.insEdge (v, en, s)
-                         $ G.insNode (v, ())
-                         $ g'
-                         ) v SemSkip
-        _ -> return $ \(PartGraph g n s) -> PartGraph g n (SemSeq (commSem comm') s)
+          (PartGraph g' en s') <- commGraph' c pg
+          return $ PartGraph ( G.insEdge (v, en, s')
+                             $ G.insNode (v, ())
+                             $ g'
+                             ) v SemSkip
+        _ -> return $ PartGraph g n (semSeq (commSem comm') s)
     lblVert l = do
       m <- snd <$> get
       case M.lookup l m of
         Just v -> return v
         Nothing -> do
           v <- vert
-          let m' = M.insert l v m
-          modify (\(v', _) -> (v', m'))
+          modify (\(v', _) -> (v', M.insert l v m))
           return v
-    vert = do
-      v <- fst <$> get
-      modify (\(_, m) -> (v+1, m))
-      return v
-    initial = do
-      v <- vert
-      return (PartGraph (G.insNode (v, ()) G.empty) v SemSkip)
+    vert = state (\(v, m) -> (v, (v+1, m)))
+    initial = skipTo G.empty <$> vert
+    skipTo g n = (PartGraph (G.insNode (n, ()) g) n SemSkip)
     terminate (PartGraph g en s) = do
       if s == SemSkip then return g
       else do
         v <- vert
-        return $ G.insEdge (v, en, s)
-               $ G.insNode (v, ())
-               $ g
+        return $ G.insEdge (v, en, s) $ G.insNode (v, ()) $ g
 
 instance Pretty Comm where
   pPrint = \case
