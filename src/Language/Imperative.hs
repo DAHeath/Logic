@@ -1,106 +1,204 @@
-{-# LANGUAGE DeriveDataTypeable, LambdaCase #-}
+{-# LANGUAGE LambdaCase, DeriveDataTypeable, FlexibleContexts #-}
 module Language.Imperative where
 
 import           Logic.Type as T
 import           Logic.Formula
+import           Logic.Chc
+
+import           Control.Monad.State
 
 import           Data.Data (Data)
 import           Data.Set (Set)
 import qualified Data.Set as S
-import           Data.Monoid ((<>))
+import           Data.Map (Map)
+import qualified Data.Map as M
+
+import qualified Data.Graph.Inductive.Graph as G
+import           Data.Graph.Inductive.PatriciaTree
+import           Data.Graph.Inductive.Extras
+
+import           Text.PrettyPrint.HughesPJClass
 import qualified Data.GraphViz as GV
 import qualified Data.Text.Lazy.IO as TIO
 
-import           Data.Graph.Inductive.PatriciaTree
-import           Data.Graph.Inductive.Graph
-
-import           Text.PrettyPrint.HughesPJClass ((<+>), Pretty, pPrint)
-import qualified Text.PrettyPrint.HughesPJClass as PP
-
-type Lbl = Int
-
-data Command
-  = Var := RHS
-  | Jump Lbl
-  | Branch Form Lbl
+-- | The space of imperative programs are represented as inductively constructed
+-- commands.
+data Comm
+  = Seq Comm Comm
+  | Case Form Comm Comm
+  | Loop Form Comm
+  | Ass Var RHS
+  | Skip
+  | Lbl Int Comm
+  | Jump Int
   deriving (Show, Eq, Ord, Data)
 
-instance Pretty Command where
-  pPrint (v := r) = PP.sep [PP.pPrint v, PP.text ":=", PP.pPrint r]
-  pPrint (Jump l) = PP.text "jump" <+> PP.pPrint l
-  pPrint (Branch c l) = PP.text "br" <+> PP.pPrint c <+> PP.pPrint l
-
+-- | The right hand side of an assignment.
 data RHS
   = Expr Form
   | Arbitrary Type
   deriving (Show, Eq, Ord, Data)
 
-instance Pretty RHS where
-  pPrint (Expr f) = PP.pPrint f
-  pPrint (Arbitrary t) = PP.text "any_" <> PP.pPrint t
+commChc :: Comm -> [Chc]
+commChc = undefined
 
-type Proc = [Command]
+type Lbl = Int
 
-type BasicBlock = [(Var, RHS)]
+-- | Semantic actions of a program which can be represented as a single logical
+-- formula. This is limited to combinations of conditionals and assignments.
+data SemAct
+  = SemSeq SemAct SemAct
+  | SemAss Var RHS
+  | SemCase Form SemAct SemAct
+  | SemSkip
+  | SemPredicate Form
+  deriving (Show, Eq, Ord, Data)
 
-data Body = Cond Form | Assign Var RHS
-  deriving (Show, Eq, Ord)
+semSeq :: SemAct -> SemAct -> SemAct
+semSeq SemSkip s = s
+semSeq s SemSkip = s
+semSeq s1 s2 = SemSeq s1 s2
 
-instance Pretty Body where
+-- | `simple` commands are those which can appear directly as a semantic
+-- action.
+isSimple :: Comm -> Bool
+isSimple = \case
+  Seq c1 c2    -> isSimple c1 && isSimple c2
+  Case _ c1 c2 -> isSimple c1 && isSimple c2
+  Loop _ _     -> False
+  Lbl _ _      -> False
+  Jump _       -> False
+  Ass _ _      -> True
+  Skip         -> True
+
+-- | Convert a command to a semantic action. Only a subset of commands are
+-- convertible to semantic actions, any in general full commands should be
+-- converted to structured actions.
+commSem :: Comm -> SemAct
+commSem = \case
+  Seq c1 c2    -> semSeq (commSem c1) (commSem c2)
+  Case e c1 c2 -> SemCase e (commSem c1) (commSem c2)
+  Ass v e      -> SemAss v e
+  Loop _ _     -> SemSkip
+  Lbl _ _      -> SemSkip
+  Jump _       -> SemSkip
+  Skip         -> SemSkip
+
+-- | A flow graph presents the semantic actions of the program as vertices with
+-- transition formulas on the edges. The semantic actions are labelled with the
+-- variables that are live at the end of the semantic action.
+data FlowGr = FlowGr
+  { getFlowGr :: Gr (Set Var) SemAct
+  , entrance :: G.Node
+  , exit :: G.Node
+  }
+
+data PartGraph = PartGraph (Gr () SemAct) G.Node SemAct
+
+commGraph :: Comm -> Gr () SemAct
+commGraph comm =
+  evalState (do
+    i <- initial
+    f <- commGraph' comm
+    terminate (f i)) (0, M.empty)
+  where
+    commGraph' :: Comm -> State (Lbl, Map Int Lbl) (PartGraph -> PartGraph)
+    commGraph' comm'
+      | isSimple comm' = return $ \(PartGraph g n s) -> PartGraph g n (semSeq (commSem comm') s)
+      | otherwise = case comm' of
+        Seq c1 c2 -> do
+          f1 <- commGraph' c1
+          f2 <- commGraph' c2
+          return (f1 . f2)
+        Case e c1 c2 -> do
+          f1 <- commGraph' c1
+          f2 <- commGraph' c2
+          h <- vert
+          return $ \pg ->
+            let (PartGraph g1 n1 s1) = f1 pg
+                (PartGraph g2 n2 s2) = f2 pg
+                g = G.insEdge (h, n1, semSeq (SemPredicate e) s1)
+                  $ G.insEdge (h, n2, semSeq (SemPredicate (Apply Not e)) s2)
+                  $ G.insNode (h, ())
+                  $ overlay g1 g2
+            in PartGraph g h SemSkip
+        Loop e c -> do
+          h <- vert
+          f <- commGraph' c
+          return $ \(PartGraph g en s) ->
+            let PartGraph g' en' s' = f (PartGraph (G.insNode (h, ()) G.empty) h SemSkip)
+                g'' = G.insEdge (h, en', semSeq (SemPredicate e) s') g'
+            in PartGraph
+              ( G.insEdge (h, en, semSeq (SemPredicate (Apply Not e)) s)
+              $ overlay g g'')
+              h SemSkip
+        Skip -> return id
+        Jump l -> do
+          v <- lblVert l
+          return $ \(PartGraph g _ _) ->
+            PartGraph (G.insNode (v, ()) g) v SemSkip
+        Lbl l c -> do
+          v <- lblVert l
+          f <- commGraph' c
+          return $ \g ->
+            let PartGraph g' en s = f g
+            in PartGraph ( G.insEdge (v, en, s)
+                         $ G.insNode (v, ())
+                         $ g'
+                         ) v SemSkip
+        _ -> return $ \(PartGraph g n s) -> PartGraph g n (SemSeq (commSem comm') s)
+    lblVert l = do
+      m <- snd <$> get
+      case M.lookup l m of
+        Just v -> return v
+        Nothing -> do
+          v <- vert
+          let m' = M.insert l v m
+          modify (\(v', _) -> (v', m'))
+          return v
+    vert = do
+      v <- fst <$> get
+      modify (\(_, m) -> (v+1, m))
+      return v
+    initial = do
+      v <- vert
+      return (PartGraph (G.insNode (v, ()) G.empty) v SemSkip)
+    terminate (PartGraph g en s) = do
+      if s == SemSkip then return g
+      else do
+        v <- vert
+        return $ G.insEdge (v, en, s)
+               $ G.insNode (v, ())
+               $ g
+
+instance Pretty Comm where
   pPrint = \case
-    Cond f -> PP.pPrint f
-    Assign v r -> PP.pPrint v <+> PP.text ":=" <+> PP.pPrint r
+    Seq c1 c2    -> pPrint c1 $+$ pPrint c2
+    Case e c1 c2 -> (text "IF" <+> pPrint e) $+$ nest 2 (pPrint c1) $+$
+                    text "ELSE" $+$ nest 2 (pPrint c2)
+    Loop e c     -> (text "WHILE" <+> pPrint e) $+$ nest 2 (pPrint c)
+    Ass v r      -> hsep [pPrint v, text ":=", pPrint r]
+    Skip         -> text "SKIP"
+    Lbl l c      -> text ("LABEL: " ++ show l) $+$ pPrint c
+    Jump l       -> text ("JUMP: " ++ show l)
 
-data FlowGraph = FlowGraph
-  { getFlowGraph :: Gr BasicBlock Body
-  , initial :: Node
-  , terminal :: Node
-  } deriving (Show, Eq)
+instance Pretty RHS where
+  pPrint = \case
+    Expr f -> pPrint f
+    Arbitrary t -> text "ANY" <+> pPrint t
 
-graph :: Proc -> FlowGraph
-graph instrs =
-  let hs = S.toList $ headers instrs
-      cs = separate 0 (tail hs) instrs
-      term = length instrs
-      ns = zip hs (map block cs) ++ [(term, [])]
-      es = concatMap cOut (zip3 hs (tail hs) cs)
-      in FlowGraph { getFlowGraph = foldr insEdge (foldr insNode empty ns) es
-                   , initial = 0
-                   , terminal = term
-                   }
-  where
-    block :: [Command] -> [(Var, RHS)]
-    block = \case
-      [] -> []
-      cs -> concatMap commToAssign $ init cs
+instance Pretty SemAct where
+  pPrint = \case
+    SemSeq a1 a2    -> pPrint a1 <> text ";" $+$ pPrint a2
+    SemAss v r      -> hsep [pPrint v, text ":=", pPrint r]
+    SemPredicate e  -> pPrint e
+    SemCase e c1 c2 -> (text "IF" <+> pPrint e) $+$ nest 2 (pPrint c1) $+$
+                       text "ELSE" $+$ nest 2 (pPrint c2)
+    SemSkip         -> text "SKIP"
 
-    commToAssign :: Command -> [(Var, RHS)]
-    commToAssign = \case
-      v := rhs -> [(v, rhs)]
-      _ -> []
-    cOut (here, next, comms') = case comms' of
-      [] -> [(here, next, Cond $ LBool True)]
-      cs -> case last cs of
-        Branch f lbl -> [(here, lbl, Cond f), (here, next, Cond $ Apply Not f)]
-        Jump lbl -> [(here, lbl, Cond $ LBool True)]
-        v := e -> [(here, next, Assign v e)]
-
-separate :: Lbl -> [Lbl] -> [Command] -> [[Command]]
-separate _ [] is = [is]
-separate idx (h : hs) is = take (h - idx) is : separate h hs (drop (h - idx) is)
-
-headers :: [Command] -> Set Lbl
-headers instrs = S.union (S.fromList [0, length instrs])
-                         (S.fromList $ concatMap iHeaders (zip [0..] instrs))
-  where
-    iHeaders (here, i) = case i of
-      _ := _ -> []
-      Jump there -> [there]
-      Branch _ there -> [here+1, there]
-
-display :: FilePath -> FlowGraph -> IO ()
+display :: FilePath -> Gr () SemAct -> IO ()
 display fn g =
-  let g' = nmap PP.prettyShow $ emap PP.prettyShow (getFlowGraph g)
+  let g' = G.nmap prettyShow $ G.emap prettyShow g
       params = GV.nonClusteredParams { GV.fmtNode = \ (n,l)  -> [GV.toLabel (show n ++ ": " ++ l)]
                                      , GV.fmtEdge = \ (_, _, l) -> [GV.toLabel l]
                                      }
