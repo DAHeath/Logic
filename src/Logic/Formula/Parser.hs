@@ -1,8 +1,11 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, TemplateHaskell #-}
 module Logic.Formula.Parser where
 
 import           Data.Data (Data)
 import           Data.Functor.Identity
+import           Data.Set (Set)
+import qualified Data.Set as S
+import           Data.Generics (extQ)
 
 import           Text.Parsec
 import           Text.ParserCombinators.Parsec.Char
@@ -163,10 +166,16 @@ thPos = do loc <- TH.location
                   )
 
 
-quoteFormExp :: Data a => CharParser () a -> String -> TH.ExpQ
+quoteFormExp :: (Variadic a, Data a) => CharParser () a -> String -> TH.ExpQ
 quoteFormExp par s = do pos <- thPos
                         ex <- promote par pos s
-                        dataToExpQ (const Nothing) ex
+                        dataToExpQ (const Nothing `extQ` metaExp) ex
+
+metaExp :: Form -> Maybe TH.ExpQ
+metaExp (V (Free x t))
+  | head x == '$' = Just [| $(TH.varE (TH.mkName (tail x))) |]
+  | head x == '@' = Just [| V $ $(TH.varE (TH.mkName (tail x))) |]
+metaExp _ = Nothing
 
 quoteFormPat :: Data a => CharParser () a -> String -> TH.PatQ
 quoteFormPat par s = do pos <- thPos
@@ -205,10 +214,19 @@ res :: String -> CharParser st ()
 res    = T.reserved lexer
 
 ident :: CharParser st String
-ident  = T.identifier lexer
+ident  = (do s <- symbol "$"
+             i <- T.identifier lexer
+             return (s ++ i))
+     <|> (do s <- symbol "@"
+             i <- T.identifier lexer
+             return (s ++ i))
+     <|> T.identifier lexer
 
 op :: String -> CharParser st ()
 op = T.reservedOp lexer
+
+symbol :: String -> CharParser st String
+symbol = T.symbol lexer
 
 commaSep :: CharParser st a -> CharParser st [a]
 commaSep = T.commaSep lexer

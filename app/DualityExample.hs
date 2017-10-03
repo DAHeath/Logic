@@ -1,5 +1,6 @@
 {-# LANGUAGE QuasiQuotes #-}
 
+import Logic.Formula
 import Logic.Chc
 import Logic.Solver.Z3
 import Logic.Solver.Duality

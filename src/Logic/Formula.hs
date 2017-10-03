@@ -91,6 +91,10 @@ instance Variadic Form where
     (\case V v -> V $ M.findWithDefault v v m
            f   -> f)
 
+instance Variadic a => Variadic [a] where
+  vars = S.unions . map vars
+  subst m = map (subst m)
+
 abstract :: Variadic a => [Var] -> a -> a
 abstract vs f =
   let m = foldl (\(n, m') v -> (n + 1, M.insert v (Bound n (T.typeOf v)) m')) (0, M.empty) vs
