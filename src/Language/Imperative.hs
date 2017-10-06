@@ -8,6 +8,7 @@ import           Logic.Chc
 import           Control.Monad.State
 
 import           Data.Data (Data)
+import           Data.Tuple (swap)
 import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Map (Map)
@@ -54,6 +55,53 @@ data SemAct
   | SemPredicate Form
   deriving (Show, Eq, Ord, Data)
 
+semantics :: SemAct -> (Form, Var -> Var)
+semantics ac = let (f, (m, _)) = runState (sem ac) (M.empty, S.empty)
+               in (f, subst m)
+  where
+    sem = \case
+      SemSeq a1 a2    -> app2 And <$> sem a1 <*> sem a2
+      SemAss v rhs    -> do
+        (m, s) <- get
+        let v' = fresh s v
+        e <- case rhs of
+          Arbitrary _ -> return (LBool True)
+          Expr e' -> do
+            let e'' = subst m e'
+            return (app2 (Eql $ typeOf v') (V v') e'')
+        put (M.insert v v' m, S.insert v' s)
+        return e
+      SemCase e a1 a2 -> do
+        (m, s) <- get
+        let e' = subst m e
+        sem1 <- sem a1
+        (m1, s1) <- get
+        put (m, s)
+        sem2 <- sem a2
+        (m2, s2) <- get
+        let (m1', as1) = mergeBranch s2 s1 m2 m1
+        let sem1' = app2 And sem1 as1
+        let (_  , as2) = mergeBranch s1 s2 m1 m2
+        let sem2' = app2 And sem2 as2
+        put (m1', S.union s1 s2)
+        return (appMany (If T.Bool) [e', sem1', sem2'])
+      SemSkip         -> return (LBool True)
+      SemPredicate e  -> do
+        (m, _) <- get
+        return $ subst m e
+
+    -- | On if branches, one branch might alias a variable more than the other.
+    -- To account for this, we decide how to update the variables after the
+    -- semantic action of the branch.
+    mergeBranch s1 s2 m1 m2 =
+      let updateNeeded = S.toList $ s1 S.\\ s2
+          invM1 = M.fromList $ map swap $ M.toList m1
+          originals = map (subst invM1) updateNeeded
+          branched = map (subst m2) originals
+          eqs = zipWith (\v1 v2 -> app2 (Eql (typeOf v1)) (V v1) (V v2)) updateNeeded branched
+          m1' = foldr (\(v1, v2) m -> M.insert v1 v2 m) m1 (zip originals branched)
+      in (m1', mkAnd eqs)
+
 semSeq :: SemAct -> SemAct -> SemAct
 semSeq SemSkip s = s
 semSeq s SemSkip = s
@@ -97,7 +145,7 @@ data PartGraph = PartGraph (Gr () SemAct) G.Node SemAct
 
 commGraph :: Comm -> Gr () SemAct
 commGraph comm =
-  evalState (do
+  renumber $ evalState (do
     i <- initial
     f <- commGraph' comm i
     terminate f) (0, M.empty)
@@ -130,8 +178,7 @@ commGraph comm =
           v <- lblVert l
           (PartGraph g' en s') <- commGraph' c pg
           return $ PartGraph ( G.insEdge (v, en, s')
-                             $ G.insNode (v, ())
-                             $ g'
+                             $ G.insNode (v, ()) g'
                              ) v SemSkip
         _ -> return $ PartGraph g n (semSeq (commSem comm') s)
     lblVert l = do
@@ -144,12 +191,20 @@ commGraph comm =
           return v
     vert = state (\(v, m) -> (v, (v+1, m)))
     initial = skipTo G.empty <$> vert
-    skipTo g n = (PartGraph (G.insNode (n, ()) g) n SemSkip)
-    terminate (PartGraph g en s) = do
+    skipTo g n = PartGraph (G.insNode (n, ()) g) n SemSkip
+    terminate (PartGraph g en s) =
       if s == SemSkip then return g
       else do
         v <- vert
-        return $ G.insEdge (v, en, s) $ G.insNode (v, ()) $ g
+        return $ G.insEdge (v, en, s) $ G.insNode (v, ()) g
+    renumber :: Gr () a -> Gr () a
+    renumber g =
+      let n = G.noNodes g
+          ren = M.fromList (zip [n-1,n-2..0] [0..n-1])
+          adj (b, n') = (b, M.findWithDefault (-1) n' ren)
+      in
+      G.gmap (\(bef, n', a, aft) ->
+        (map adj bef, M.findWithDefault (-1) n' ren, a, map adj aft)) g
 
 instance Pretty Comm where
   pPrint = \case
@@ -176,7 +231,7 @@ instance Pretty SemAct where
                        text "ELSE" $+$ nest 2 (pPrint c2)
     SemSkip         -> text "SKIP"
 
-display :: FilePath -> Gr () SemAct -> IO ()
+display :: Pretty e => FilePath -> Gr () e -> IO ()
 display fn g =
   let g' = G.nmap prettyShow $ G.emap prettyShow g
       params = GV.nonClusteredParams { GV.fmtNode = \ (n,l)  -> [GV.toLabel (show n ++ ": " ++ l)]

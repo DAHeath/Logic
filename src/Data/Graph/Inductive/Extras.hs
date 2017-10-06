@@ -9,6 +9,7 @@ import qualified Data.Map as M
 import           Data.Graph.Inductive.PatriciaTree
 import           Data.Graph.Inductive.Graph
 import           Data.Graph.Inductive.Basic
+import           Data.Graph.Inductive.Query.DFS
 import           Data.Graph.Inductive.Query.BFS
 
 -- | A node is a duplicate of another if it is created by an unfolding. The
@@ -63,7 +64,7 @@ relabelWithRespectTo toRelabel toRespect =
   let ns = nodes toRelabel
       m = M.fromList (zip ns (newNodes (order toRelabel) toRespect))
       dup = M.fromList (zip (newNodes (order toRelabel) toRespect) ns)
-  in (\n -> M.findWithDefault undefined n m, dup)
+  in (\n -> M.findWithDefault n n m, dup)
 
 relabel :: DynGraph gr => (Node -> Node) -> gr n e -> gr n e
 relabel rel g =
@@ -76,7 +77,10 @@ removeBackedges :: Gr n e -> Gr n e
 removeBackedges = efilter (\(l1, l2, _) -> l1 < l2)
 
 backEdges :: Gr n e -> [LEdge e]
-backEdges = filter (\(l1, l2, _) -> l2 < l1) . labEdges
+backEdges = filter (\(l1, l2, _) -> l2 <= l1) . labEdges
 
 removeReaching :: DynGraph gr => Node -> gr n e -> gr n e
 removeReaching l = efilter (\(_, l2, _) -> l2 /= l)
+
+reverseReached :: DynGraph gr => Node -> gr n e -> gr n e
+reverseReached n g = nfilter (`elem` (reachable n (grev g))) g

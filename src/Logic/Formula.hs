@@ -85,6 +85,10 @@ class Variadic a where
   vars :: a -> Set Var
   subst :: Map Var Var -> a -> a
 
+instance Variadic Var where
+  vars = S.singleton
+  subst m v = M.findWithDefault v v m
+
 instance Variadic Form where
   vars f = f ^.. biplate & S.fromList
   subst m = transform
@@ -94,6 +98,20 @@ instance Variadic Form where
 instance Variadic a => Variadic [a] where
   vars = S.unions . map vars
   subst m = map (subst m)
+
+fresh :: Set Var -> Var -> Var
+fresh s = \case
+  Free n t -> tryFree n 0 t
+  Bound n t -> tryBound n t
+  where
+    tryFree :: Name -> Int -> Type -> Var
+    tryFree n c t = let v' = Free (n ++ show c) t
+                    in if v' `elem` s then tryFree n (c+1) t
+                       else v'
+    tryBound :: Int -> Type -> Var
+    tryBound n t = let v' = Bound n t
+                   in if v' `elem` s then tryBound (n+1) t
+                      else v'
 
 abstract :: Variadic a => [Var] -> a -> a
 abstract vs f =
