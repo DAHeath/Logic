@@ -12,6 +12,11 @@ import           Data.Graph.Inductive.Basic
 import           Data.Graph.Inductive.Query.DFS
 import           Data.Graph.Inductive.Query.BFS
 
+import qualified Data.GraphViz as GV
+import qualified Data.Text.Lazy.IO as TIO
+
+import           Text.PrettyPrint.HughesPJClass (Pretty, prettyShow)
+
 -- | A node is a duplicate of another if it is created by an unfolding. The
 -- duplication map indicates what node the current node is a duplicate of.
 type DuplicationMap = Map Node Node
@@ -67,14 +72,14 @@ relabelWithRespectTo toRelabel toRespect =
   in (\n -> M.findWithDefault n n m, dup)
 
 relabel :: DynGraph gr => (Node -> Node) -> gr n e -> gr n e
-relabel rel g =
+relabel rel =
   gmap (\(adjl, l, n, adjr) -> ( map (second rel) adjl
                                , rel l
                                , n
-                               , map (second rel) adjr)) g
+                               , map (second rel) adjr))
 
 removeBackedges :: Gr n e -> Gr n e
-removeBackedges = efilter (\(l1, l2, _) -> l1 < l2)
+removeBackedges = efilter (\(l1, l2, _) -> l1 <= l2)
 
 backEdges :: Gr n e -> [LEdge e]
 backEdges = filter (\(l1, l2, _) -> l2 <= l1) . labEdges
@@ -83,4 +88,36 @@ removeReaching :: DynGraph gr => Node -> gr n e -> gr n e
 removeReaching l = efilter (\(_, l2, _) -> l2 /= l)
 
 reverseReached :: DynGraph gr => Node -> gr n e -> gr n e
-reverseReached n g = nfilter (`elem` (reachable n (grev g))) g
+reverseReached n g = nfilter (`elem` reachable n (grev g)) g
+
+cartesianProduct :: (Graph gr, DynGraph gr')
+                 => (a -> b -> c) -> gr a e -> gr b e -> gr' c e
+cartesianProduct f g1 g2 =
+  if order g2 == 0 then empty else
+    let ns1 = labNodes g1
+        ns2 = labNodes g2
+        high = maximum (map fst ns2)+1
+        ns = do
+          (n1, l1) <- ns1
+          (n2, l2) <- ns2
+          return (n1*high + n2, f l1 l2)
+        ls1 = labEdges g1
+        ls2 = labEdges g2
+        ls1' = do
+          (n2, _) <- ns2
+          (n1, n1', l) <- ls1
+          return (n1*high + n2, n1'*high + n2, l)
+        ls2' = do
+          (n1, _) <- ns1
+          (n2, n2', l) <- ls2
+          return (n1*high + n2, n1*high + n2', l)
+    in foldr insEdge (foldr insNode empty ns) (ls1' ++ ls2')
+
+display :: (Pretty n, Pretty e) => FilePath -> Gr n e -> IO ()
+display fn g =
+  let g' = nmap prettyShow $ emap prettyShow g
+      params = GV.nonClusteredParams { GV.fmtNode = \ (n,l)  -> [GV.toLabel (show n ++ ": " ++ l)]
+                                     , GV.fmtEdge = \ (_, _, l) -> [GV.toLabel l]
+                                     }
+      dot = GV.graphToDot params g'
+  in TIO.writeFile fn (GV.printDotGraph dot)

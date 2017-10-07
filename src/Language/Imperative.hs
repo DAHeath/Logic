@@ -19,8 +19,6 @@ import           Data.Graph.Inductive.PatriciaTree
 import           Data.Graph.Inductive.Extras
 
 import           Text.PrettyPrint.HughesPJClass
-import qualified Data.GraphViz as GV
-import qualified Data.Text.Lazy.IO as TIO
 
 -- | The space of imperative programs are represented as inductively constructed
 -- commands.
@@ -230,12 +228,3 @@ instance Pretty SemAct where
     SemCase e c1 c2 -> (text "IF" <+> pPrint e) $+$ nest 2 (pPrint c1) $+$
                        text "ELSE" $+$ nest 2 (pPrint c2)
     SemSkip         -> text "SKIP"
-
-display :: Pretty e => FilePath -> Gr () e -> IO ()
-display fn g =
-  let g' = G.nmap prettyShow $ G.emap prettyShow g
-      params = GV.nonClusteredParams { GV.fmtNode = \ (n,l)  -> [GV.toLabel (show n ++ ": " ++ l)]
-                                     , GV.fmtEdge = \ (_, _, l) -> [GV.toLabel l]
-                                     }
-      dot = GV.graphToDot params g'
-  in TIO.writeFile fn (GV.printDotGraph dot)
