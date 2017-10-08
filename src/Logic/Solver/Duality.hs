@@ -17,12 +17,14 @@ import           Data.Foldable (traverse_)
 import           Data.Maybe (fromJust)
 import           Data.Graph.Inductive.Graph
 import           Data.Graph.Inductive.PatriciaTree
+import           Data.Graph.Inductive.Extras
 import qualified Data.Map as M
 import           Data.Map (Map)
-import qualified Data.Tree as T
 import qualified Data.Set as S
 import           Data.Set (Set)
+import qualified Data.Tree as T
 import           Data.Tree (Tree)
+import           Data.Tree.Extras
 import           Data.Random
 
 -- TODO
@@ -148,9 +150,6 @@ updateGraph =
       let v' = v { instanceDefinition = mappend f (instanceDefinition v) }
       instanceGraph %= setVertex idx v'
 
-vertex :: Graph gr => Node -> gr a b -> a
-vertex n g = fromJust (lab g n)
-
 setVertex :: Node -> a -> Gr a b -> Gr a b
 setVertex n x = gmap
   (\(bf, n', y, af) -> if n == n' then (bf, n, x, af) else (bf, n', y, af))
@@ -179,10 +178,3 @@ instancesOf v = do
 
 pick :: MonadIO m => [a] -> m a
 pick xs = liftIO $ runRVar (randomElement xs) StdRandom
-
-zipTree :: (a -> b -> c) -> Tree a -> Tree b -> Tree c
-zipTree f (T.Node a as) (T.Node b bs) = T.Node (f a b) (zipWith (zipTree f) as bs)
-
-treeFrom :: Node -> Gr a b -> Tree (Node, a)
-treeFrom idx dag =
-  T.Node (idx, vertex idx dag) (map (`treeFrom` dag) (suc dag idx))

@@ -34,6 +34,7 @@ library
                      , fgl              >= 5.5
                      , tardis
                      , graphviz
+                     , fixed-vector
                      , lens             >= 4.15
                      , mtl              >= 2.2
                      , extra

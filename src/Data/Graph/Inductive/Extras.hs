@@ -6,6 +6,9 @@ import           Control.Monad.State
 import           Data.Bifunctor (second)
 import           Data.Map (Map)
 import qualified Data.Map as M
+import qualified Data.Tree as T
+import           Data.Tree (Tree)
+import           Data.Maybe (fromJust)
 import           Data.Graph.Inductive.PatriciaTree
 import           Data.Graph.Inductive.Graph
 import           Data.Graph.Inductive.Basic
@@ -112,6 +115,13 @@ cartesianProduct f g1 g2 =
           (n2, n2', l) <- ls2
           return (n1*high + n2, n1*high + n2', l)
     in foldr insEdge (foldr insNode empty ns) (ls1' ++ ls2')
+
+treeFrom :: Node -> Gr a b -> Tree (Node, a)
+treeFrom idx dag =
+  T.Node (idx, vertex idx dag) (map (`treeFrom` dag) (suc dag idx))
+
+vertex :: Graph gr => Node -> gr a b -> a
+vertex n g = fromJust (lab g n)
 
 display :: (Pretty n, Pretty e) => FilePath -> Gr n e -> IO ()
 display fn g =
