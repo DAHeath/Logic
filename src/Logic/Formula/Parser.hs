@@ -29,10 +29,10 @@ ex1 :: CharParser st Form
 ex1 = ex2 `chainl1` impop
 
 ex2 :: CharParser st Form
-ex2 = ex3 `chainl1` (op "||" >> return (\x y -> mkOr [x, y]))
+ex2 = ex3 `chainl1` (op "||" >> return (\x y -> manyOr [x, y]))
 
 ex3 :: CharParser st Form
-ex3 = ex4 `chainl1` (op "&&" >> return (\x y -> mkAnd [x, y]))
+ex3 = ex4 `chainl1` (op "&&" >> return (\x y -> manyAnd [x, y]))
 
 ex4 :: CharParser st Form
 ex4 = ex6 `chainl1` compareop
@@ -53,8 +53,8 @@ atom = try app <|> nonapp
     app = (res "not"      >> Apply Not                <$> nonapp)
       <|> (res "if"       >> appMany (If T.Int)       <$> sequence [nonapp, nonapp, nonapp])
       <|> (res "distinct" >> appMany (Distinct T.Int) <$> many1 nonapp)
-      <|> (res "and"      >> mkAnd                    <$> many1 nonapp)
-      <|> (res "or"       >> mkOr                     <$> many1 nonapp)
+      <|> (res "and"      >> manyAnd                  <$> many1 nonapp)
+      <|> (res "or"       >> manyOr                   <$> many1 nonapp)
       <|> (res "add"      >> appMany (Add T.Int)      <$> many1 nonapp)
       <|> (res "mul"      >> appMany (Mul T.Int)      <$> many1 nonapp)
       <|> (do n <- ident
@@ -91,7 +91,7 @@ compareop = (op ">=" >> return (app2 $ Ge T.Int))
         <|> (op ">"  >> return (app2 $ Gt T.Int))
         <|> (op "<=" >> return (app2 $ Le T.Int))
         <|> (op "<"  >> return (app2 $ Lt T.Int))
-        <|> (op "="  >> return (app2 $ Eql T.Int))
+        <|> (op "="  >> return (mkEql T.Int))
 
 mulop = (op "*" >> return (app2 $ Mul T.Int))
     <|> (op "/" >> return (app2 $ Div T.Int))
@@ -165,7 +165,7 @@ thPos = do loc <- TH.location
                   )
 
 
-quoteFormExp :: (Variadic a, Data a) => CharParser () a -> String -> TH.ExpQ
+quoteFormExp :: Data a => CharParser () a -> String -> TH.ExpQ
 quoteFormExp par s = do pos <- thPos
                         ex <- promote par pos s
                         dataToExpQ (const Nothing `extQ` metaExp) ex

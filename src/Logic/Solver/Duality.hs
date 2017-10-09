@@ -96,7 +96,7 @@ model = do
   prs <- use preds
   (Model . M.fromList) <$> traverse
     (\p -> do fs <- map instanceDefinition <$> instancesOf p
-              return (p, if null fs then LBool False else mkOr fs)) prs
+              return (p, if null fs then LBool False else manyOr fs)) prs
 
 -- In adding a new instance to the graph, we have to select which children
 -- to use. We must take care not to reproduce an instance which already exists.

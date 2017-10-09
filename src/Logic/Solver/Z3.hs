@@ -295,7 +295,7 @@ formFromApp name args range
   | name == "<="       = lift2 (F.Le T.Int)
   | name == ">"        = lift2 (F.Gt T.Int)
   | name == ">="       = lift2 (F.Ge T.Int)
-  | name == "="        = lift2 (F.Eql T.Int)
+  | name == "="        = F.mkEql T.Int <$> astToForm (head args) <*> astToForm (args !! 1)
   | name == "not"      = F.Apply F.Not <$> astToForm (head args)
   | name == "-"        = if length args == 1
                          then F.app2 (F.Sub T.Int) (F.LInt 0) <$> astToForm (head args)

@@ -4,6 +4,7 @@ module Logic.Var where
 import           Control.Lens
 
 import           Data.Data (Data)
+import           Data.Data.Lens (biplate)
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Set (Set)
@@ -34,23 +35,13 @@ instance Pretty Var
   where pPrint (Bound n _) = PP.text ("!" ++ show n ++ ":")
         pPrint (Free  n _) = PP.text (n ++ ":")
 
--- | A structure which contains variables is `variadic`. This allows finding
--- the variables in the structure and substituting them for others.
-class Variadic a where
-  vars :: Traversal' a Var
+vars :: Data a => Traversal' a Var
+vars = biplate
 
--- | A variable is trivially variadic.
-instance Variadic Var where
-  vars _ = pure
-
--- | A list of variadic elements is variadic.
-instance Variadic a => Variadic [a] where
-  vars = traverse . vars
-
-subst :: Variadic a => Map Var Var -> a -> a
+subst :: Data a => Map Var Var -> a -> a
 subst m = over vars (\v -> M.findWithDefault v v m)
 
-getVars :: Variadic a => a -> Set Var
+getVars :: Data a => a -> Set Var
 getVars x = S.fromList (x ^.. vars)
 
 -- | Given a set of used variables and a target variable, generate a new variable
@@ -71,13 +62,13 @@ fresh s = \case
                       else v'
 
 -- | Replace the variables in the structure by bound variables if they are in the list.
-abstract :: Variadic a => [Var] -> a -> a
+abstract :: Data a => [Var] -> a -> a
 abstract vs f =
   let m = foldl (\(n, m') v -> (n + 1, M.insert v (Bound n (T.typeOf v)) m')) (0, M.empty) vs
   in subst (snd m) f
 
 -- | Replace bound variables in the structure by those in the list.
-instantiate :: Variadic a => [Var] -> a -> a
+instantiate :: Data a => [Var] -> a -> a
 instantiate vs f =
   let m = foldl (\(n, m') v -> (n + 1, M.insert (Bound n (T.typeOf v)) v m')) (0, M.empty) vs
   in subst (snd m) f

@@ -11,9 +11,8 @@ module Logic.Formula where
 import           Control.Lens
 
 import           Data.Data (Data)
-import           Data.Data.Lens (biplate, uniplate)
-import qualified Data.Map as M
-import qualified Data.Set as S
+import           Data.Data.Lens (uniplate)
+import           Data.List (sort)
 
 import           Logic.Type (Type((:=>)), Typed)
 import qualified Logic.Type as T
@@ -54,7 +53,6 @@ data Form
   deriving (Show, Read, Eq, Ord, Data)
 
 instance Plated Form where plate = uniplate
-instance Variadic Form where vars = biplate
 
 app2 :: Form -> Form -> Form -> Form
 app2 f x = Apply (Apply f x)
@@ -62,12 +60,31 @@ app2 f x = Apply (Apply f x)
 appMany :: Form -> [Form] -> Form
 appMany = foldl Apply
 
-mkAnd, mkOr :: Foldable f => f Form -> Form
-mkAnd = foldr (app2 And) (LBool True)
-mkOr  = foldr (app2 Or) (LBool False)
+mkAnd :: Form -> Form -> Form
+mkAnd x y
+  | x == LBool True = y
+  | y == LBool True = x
+  | x == y          = x
+  | otherwise       = app2 And x y
+
+mkOr :: Form -> Form -> Form
+mkOr x y
+  | x == LBool False = y
+  | y == LBool False = x
+  | x == y           = x
+  | otherwise        = app2 Or x y 
+
+mkEql :: Type -> Form -> Form -> Form
+mkEql t x y
+  | x == y = LBool True
+  | otherwise = let [x', y'] = sort [x, y] in app2 (Eql t) x' y'
+
+manyAnd, manyOr :: Foldable f => f Form -> Form
+manyAnd = foldr mkAnd (LBool True)
+manyOr  = foldr mkOr (LBool False)
 
 instance Monoid Form where
-  mappend = app2 And
+  mappend = mkAnd
   mempty = LBool True
 
 instance Typed Form where
