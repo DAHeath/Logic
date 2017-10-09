@@ -29,21 +29,28 @@ instance Typed Var
         typeOf (Free _ t) = t
 
 instance Pretty Var
-  where pPrint (Bound n t) = PP.text (show n ++ ":") <> PP.pPrint t
-        pPrint (Free  n t) = PP.text (n ++ ":") <> PP.pPrint t
+  where pPrint (Bound n _) = PP.text ("!" ++ show n ++ ":")
+        pPrint (Free  n _) = PP.text (n ++ ":")
 
+-- | A structure which contains variables is `variadic`. This allows finding
+-- the variables in the structure and substituting them for others.
 class Variadic a where
   vars :: a -> Set Var
   subst :: Map Var Var -> a -> a
 
+-- | A variable is trivially variadic.
 instance Variadic Var where
   vars = S.singleton
   subst m v = M.findWithDefault v v m
 
+-- | A list of variadic elements is variadic.
 instance Variadic a => Variadic [a] where
   vars = S.unions . map vars
   subst m = map (subst m)
 
+-- | Given a set of used variables and a target variable, generate a new variable
+-- which is not in the set and which resembles the target by appending a natural
+-- number which is as close to 0 as possible.
 fresh :: Set Var -> Var -> Var
 fresh s = \case
   Free n t -> tryFree n 0 t
@@ -58,11 +65,13 @@ fresh s = \case
                    in if v' `elem` s then tryBound (n+1) t
                       else v'
 
+-- | Replace the variables in the structure by bound variables if they are in the list.
 abstract :: Variadic a => [Var] -> a -> a
 abstract vs f =
   let m = foldl (\(n, m') v -> (n + 1, M.insert v (Bound n (T.typeOf v)) m')) (0, M.empty) vs
   in subst (snd m) f
 
+-- | Replace bound variables in the structure by those in the list.
 instantiate :: Variadic a => [Var] -> a -> a
 instantiate vs f =
   let m = foldl (\(n, m') v -> (n + 1, M.insert (Bound n (T.typeOf v)) v m')) (0, M.empty) vs

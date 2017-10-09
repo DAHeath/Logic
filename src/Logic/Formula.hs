@@ -16,10 +16,7 @@ import           Control.Lens
 
 import           Data.Data (Data)
 import           Data.Data.Lens (biplate, uniplate)
-import           Data.Monoid ((<>))
-import           Data.Map (Map)
 import qualified Data.Map as M
-import           Data.Set (Set)
 import qualified Data.Set as S
 
 import           Text.PrettyPrint.HughesPJClass ((<+>), Pretty, pPrint)
@@ -64,14 +61,6 @@ instance Variadic Form where
   subst m = transform
     (\case V v -> V $ M.findWithDefault v v m
            f   -> f)
-
-substForm :: Map Var Var -> Form -> Form
-substForm m = transform
-  (\case V v -> V $ M.findWithDefault v v m
-         f   -> f)
-
-formVars :: Form -> Set Var
-formVars f = f ^.. biplate & S.fromList
 
 app2 :: Form -> Form -> Form -> Form
 app2 f x = Apply (Apply f x)
@@ -120,15 +109,31 @@ instance Typed Form where
     LInt _      -> T.Int
     LReal _     -> T.Real
 
+isLit :: Form -> Bool
+isLit = \case
+  LUnit   -> True
+  LBool _ -> True
+  LInt _  -> True
+  LReal _ -> True
+  _       -> False
+
+isVar :: Form -> Bool
+isVar = \case
+  V _ -> True
+  _   -> False
+
 instance Pretty Form where
   pPrint = \case
+    Apply (Apply f x) y ->
+      if isBinaryInfix f
+      then PP.hsep [binArg x, pPrint f, binArg y]
+      else PP.parens (inlinePrint f x <+> pPrint y)
     V v          -> PP.pPrint v
-    Apply (Apply f x) y -> PP.parens (inlinePrint f x <+> pPrint y)
     Apply f x    -> PP.parens (pPrint f <+> pPrint x)
 
-    If t         -> PP.text "if_" <> pPrint t
+    If _         -> PP.text "if"
 
-    Distinct t   -> PP.text "distinct_" <> pPrint t
+    Distinct _   -> PP.text "distinct"
 
     And          -> PP.text "&&"
     Or           -> PP.text "||"
@@ -136,23 +141,43 @@ instance Pretty Form where
     Iff          -> PP.text "<->"
     Not          -> PP.text "not"
 
-    Add t        -> PP.text "+"  <> pPrint t
-    Mul t        -> PP.text "*"  <> pPrint t
-    Sub t        -> PP.text "-"  <> pPrint t
-    Div t        -> PP.text "/"  <> pPrint t
-    Mod t        -> PP.text "%"  <> pPrint t
+    Add _        -> PP.text "+"
+    Mul _        -> PP.text "*"
+    Sub _        -> PP.text "-"
+    Div _        -> PP.text "/"
+    Mod _        -> PP.text "%"
 
-    Eql t        -> PP.text "="  <> pPrint t
-    Lt t         -> PP.text "<"  <> pPrint t
-    Le t         -> PP.text "<=" <> pPrint t
-    Gt t         -> PP.text ">"  <> pPrint t
-    Ge t         -> PP.text ">=" <> pPrint t
+    Eql _        -> PP.text "="
+    Lt _         -> PP.text "<"
+    Le _         -> PP.text "<="
+    Gt _         -> PP.text ">"
+    Ge _         -> PP.text ">="
 
     LUnit         -> PP.text "()"
     LBool b       -> pPrint b
-    LInt i        -> PP.text "#" <> pPrint i
+    LInt i        -> pPrint i
     LReal r       -> pPrint r
     where
+      binArg f = if isLit f || isVar f then pPrint f else PP.parens (pPrint f)
+
       inlinePrint f x = case f of
         Apply f' y -> inlinePrint f' y <+> pPrint x
         f' -> pPrint f' <+> pPrint x
+
+      isBinaryInfix :: Form -> Bool
+      isBinaryInfix = \case
+          And   -> True
+          Or    -> True
+          Impl  -> True
+          Iff   -> True
+          Add _ -> True
+          Mul _ -> True
+          Sub _ -> True
+          Div _ -> True
+          Mod _ -> True
+          Eql _ -> True
+          Lt _  -> True
+          Le _  -> True
+          Gt _  -> True
+          Ge _  -> True
+          _     -> False
