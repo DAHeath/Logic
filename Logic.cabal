@@ -27,9 +27,9 @@ library
                      , Data.Graph.Inductive.Extras
                      , Data.Tree.Extras
 
-  other-extensions:    LambdaCase
-                     , GeneralizedNewtypeDeriving
+  default-extensions:  LambdaCase
                      , DeriveDataTypeable
+  other-extensions:    GeneralizedNewtypeDeriving
                      , TemplateHaskell
 
   build-depends:       base             >= 4.8

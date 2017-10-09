@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable, LambdaCase #-}
 module Logic.Chc where
 
 import           Data.Data (Data)

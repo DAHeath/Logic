@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable, LambdaCase, RankNTypes #-}
 module Logic.Var where
 
 import           Control.Lens
@@ -23,10 +22,6 @@ data Var
   | Free Name Type
   deriving (Show, Read, Eq, Ord, Data)
 
-varName :: Var -> Name
-varName (Bound i _) = show i
-varName (Free n _) = n
-
 instance Typed Var
   where typeOf (Bound _ t) = t
         typeOf (Free _ t) = t
@@ -35,14 +30,24 @@ instance Pretty Var
   where pPrint (Bound n _) = PP.text ("!" ++ show n ++ ":")
         pPrint (Free  n _) = PP.text (n ++ ":")
 
+-- | A name for the variable. If the variable is bound, it is a textual
+-- representation of the index. Otherwise, it is just the variable name.
+varName :: Var -> Name
+varName (Bound i _) = show i
+varName (Free n _) = n
+
+-- | A traversal which targets all of the variables in a given expression.
 vars :: Data a => Traversal' a Var
 vars = biplate
 
+-- | Perform substitution over the variables in the expression. If a given
+-- variable does not appear in the mapping, it is left untouched.
 subst :: Data a => Map Var Var -> a -> a
 subst m = over vars (\v -> M.findWithDefault v v m)
 
-getVars :: Data a => a -> Set Var
-getVars x = S.fromList (x ^.. vars)
+-- | The set of all variables in the expression.
+varSet :: Data a => a -> Set Var
+varSet x = S.fromList (x ^.. vars)
 
 -- | Given a set of used variables and a target variable, generate a new variable
 -- which is not in the set and which resembles the target by appending a natural

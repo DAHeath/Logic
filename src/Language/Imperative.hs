@@ -61,8 +61,8 @@ semantics ac = let (f, (m, _)) = runState (sem ac) (M.empty, S.empty)
                in (f, m)
   where
     sem = \case
-      SemSeq a1 a2    -> app2 And <$> sem a1 <*> sem a2
-      SemAss v rhs    -> do
+      SemSeq a1 a2 -> mkAnd <$> sem a1 <*> sem a2
+      SemAss v rhs -> do
         (m, s) <- get
         let v' = fresh s v
         e <- case rhs of
@@ -84,9 +84,9 @@ semantics ac = let (f, (m, _)) = runState (sem ac) (M.empty, S.empty)
         sem2 <- sem a2
         (m2, s2) <- get
         let (m1', as1) = mergeBranch s2 s1 m2 m1
-        let sem1' = app2 And sem1 as1
+        let sem1' = mkAnd sem1 as1
         let (_  , as2) = mergeBranch s1 s2 m1 m2
-        let sem2' = app2 And sem2 as2
+        let sem2' = mkAnd sem2 as2
         put (m1', S.union s1 s2)
         return (appMany (If T.Bool) [e', sem1', sem2'])
       SemSkip         -> return (LBool True)
@@ -107,7 +107,7 @@ semantics ac = let (f, (m, _)) = runState (sem ac) (M.empty, S.empty)
           branched = map (subst m2) originals
           eqs = zipWith (\v1 v2 -> app2 (Eql (typeOf v1)) (V v1) (V v2)) updateNeeded branched
           m1' = foldr (\(v1, v2) m -> M.insert v1 v2 m) m1 (zip originals branched)
-      in (m1', mkAnd eqs)
+      in (m1', manyAnd eqs)
 
 semSeq :: SemAct -> SemAct -> SemAct
 semSeq SemSkip s = s

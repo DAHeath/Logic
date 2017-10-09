@@ -1,11 +1,3 @@
-{-# LANGUAGE LambdaCase
-           , DeriveDataTypeable
-           , FlexibleContexts
-           , FlexibleInstances
-           , OverloadedStrings
-           , PatternSynonyms
-           #-}
-
 module Logic.Formula where
 
 import           Control.Lens
@@ -72,7 +64,7 @@ mkOr x y
   | x == LBool False = y
   | y == LBool False = x
   | x == y           = x
-  | otherwise        = app2 Or x y 
+  | otherwise        = app2 Or x y
 
 mkEql :: Type -> Form -> Form -> Form
 mkEql t x y
@@ -92,7 +84,7 @@ instance Typed Form where
     V v         -> T.typeOf v
     Apply v _   -> case T.typeOf v of
                      _ :=> t -> t
-                     _ -> undefined
+                     _ -> error "bad function application type"
 
     If t        -> T.Bool :=> t :=> t :=> t
 

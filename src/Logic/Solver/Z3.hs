@@ -1,8 +1,4 @@
-{-# LANGUAGE FlexibleContexts
-           , GeneralizedNewtypeDeriving
-           , LambdaCase
-           , TemplateHaskell
-           #-}
+{-# LANGUAGE FlexibleContexts, GeneralizedNewtypeDeriving, TemplateHaskell #-}
 
 module Logic.Solver.Z3 where
 

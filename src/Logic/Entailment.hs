@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase, TemplateHaskell, DeriveDataTypeable #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Logic.Entailment where
 
 import           Control.Lens hiding (Context)
