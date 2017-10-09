@@ -26,8 +26,7 @@ testDuality t = do
                   putStrLn (prettyShow m)
 
 main :: IO ()
-main = do
-  testDuality test2
+main = testDuality test2
 
 test1, test2 :: [Chc]
 test1 = [chc| i:Int = 0 => {r i:Int}

@@ -3,8 +3,6 @@ module Logic.Formula.Parser where
 
 import           Data.Data (Data)
 import           Data.Functor.Identity
-import           Data.Set (Set)
-import qualified Data.Set as S
 import           Data.Generics (extQ)
 
 import           Text.Parsec
@@ -172,7 +170,7 @@ quoteFormExp par s = do pos <- thPos
                         dataToExpQ (const Nothing `extQ` metaExp) ex
 
 metaExp :: Form -> Maybe TH.ExpQ
-metaExp (V (Free x t))
+metaExp (V (Free x _))
   | head x == '$' = Just [| $(TH.varE (TH.mkName (tail x))) |]
   | head x == '@' = Just [| V $ $(TH.varE (TH.mkName (tail x))) |]
 metaExp _ = Nothing

@@ -1,13 +1,9 @@
 {-# LANGUAGE LambdaCase
            , DeriveDataTypeable
-           , DeriveFunctor
-           , DeriveTraversable
            , FlexibleContexts
            , FlexibleInstances
            , OverloadedStrings
            , PatternSynonyms
-           , TemplateHaskell
-           , StandaloneDeriving
            #-}
 
 module Logic.Formula where
@@ -132,10 +128,10 @@ formVars :: Form -> Set Var
 formVars f = f ^.. biplate & S.fromList
 
 app2 :: Form -> Form -> Form -> Form
-app2 f x y = Apply (Apply f x) y
+app2 f x = Apply (Apply f x)
 
 appMany :: Form -> [Form] -> Form
-appMany f xs = foldl Apply f xs
+appMany = foldl Apply
 
 mkAnd, mkOr :: Foldable f => f Form -> Form
 mkAnd = foldr (app2 And) (LBool True)
@@ -178,7 +174,7 @@ instance Typed Form where
     LInt _      -> T.Int
     LReal _     -> T.Real
 
-instance Pretty (Form) where
+instance Pretty Form where
   pPrint = \case
     V v          -> PP.pPrint v
     Apply (Apply f x) y -> PP.parens (inlinePrint f x <+> pPrint y)

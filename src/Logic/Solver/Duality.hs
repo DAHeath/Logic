@@ -14,7 +14,6 @@ import           Control.Arrow (second)
 import           Control.Lens hiding (children, (&))
 
 import           Data.Foldable (traverse_)
-import           Data.Maybe (fromJust)
 import           Data.Graph.Inductive.Graph
 import           Data.Graph.Inductive.PatriciaTree
 import           Data.Graph.Inductive.Extras
@@ -84,8 +83,7 @@ action clause = case clause of
     itp <- Z3.interpolate (fmap (\(_, x, _) -> x) t)
     case itp of
       Left m -> throwError m
-      Right itp' -> do
-        updateGraph (zipTree abstractNode t itp')
+      Right itp' -> updateGraph (zipTree abstractNode t itp')
 
 -- The instance definitions are meant to be stored in abstract form.
 abstractNode :: (Node, Form, [Var]) -> Form -> (Node, Form)
@@ -97,7 +95,7 @@ model = do
   prs <- use preds
   (Model . M.fromList) <$> traverse
     (\p -> do fs <- map instanceDefinition <$> instancesOf p
-              return (p, if null fs then (LBool False) else mkOr fs)) prs
+              return (p, if null fs then LBool False else mkOr fs)) prs
 
 -- In adding a new instance to the graph, we have to select which children
 -- to use. We must take care not to reproduce an instance which already exists.
@@ -122,7 +120,7 @@ derivationTree clause = do
   where
     chcTree t =
       let t' = T.Node (-1, clause) $ map (fmap (second instanceBackground)) t in
-      evalState (traverse (\(i, cla) -> (i,) <$> relabel cla) t') 0
+      evalState (traverse (\(i, cla) -> (i,) <$> relabelChc cla) t') 0
 
     formTree (T.Node (x, chc) cs) vs =
       let chc' = subst (M.fromList $ zip (chcBindings chc) vs) chc
@@ -154,9 +152,9 @@ setVertex :: Node -> a -> Gr a b -> Gr a b
 setVertex n x = gmap
   (\(bf, n', y, af) -> if n == n' then (bf, n, x, af) else (bf, n', y, af))
 
-relabel :: MonadState Int m => Chc -> m Chc
-relabel q@Query{} = return q
-relabel r =
+relabelChc :: MonadState Int m => Chc -> m Chc
+relabelChc q@Query{} = return q
+relabelChc r =
   let bound = S.fromList $ chcBindings r
       vs = vars r
       free = vs S.\\ bound

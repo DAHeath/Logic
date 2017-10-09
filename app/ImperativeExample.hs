@@ -39,8 +39,7 @@ loop =
   Loop cond (
     -- Seq
     --   jumpy
-    (Seq
-      assS assS))
+    Seq assS assS)
 
 test :: Comm
 test =

@@ -40,7 +40,7 @@ solveChc hcs = runEnvZ3 script
          rids' <- traverse mkStringSymbol rids
          zipWithM_ fixedpointAddRule forms rids'
 
-         let quers = map (\q -> F.Free q T.Bool) qids
+         let quers = map (`F.Free` T.Bool) qids
          quers' <- traverse funcToDecl quers
          res <- fixedpointQueryRelations quers'
          case res of
@@ -218,7 +218,7 @@ formToAst f =
 
 -- | Convert a function application to a Z3 formula.
 appToZ3 :: (MonadState Env z3, MonadZ3 z3) => Form -> [Form] -> z3 AST
-appToZ3 f args = do
+appToZ3 f args =
   case f of
     F.V v        -> join $ mkApp <$> funcToDecl v <*> traverse formToAst args
     F.Not        -> mkNot =<< formToAst (head args)
@@ -310,8 +310,7 @@ formFromApp name args range
 modelToModel :: ( MonadState Env z3
                 , MonadZ3 z3
                 , MonadReader DeBrujin z3) => Model -> z3 M.Model
-modelToModel m = do
-  M.Model <$> (M.union <$> functions <*> constants)
+modelToModel m = M.Model <$> (M.union <$> functions <*> constants)
   where
     functions = do
       fds <- modelGetFuncDecls m
