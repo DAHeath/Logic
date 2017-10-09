@@ -248,3 +248,6 @@ solve g = do
   case sol of
     Left m -> return (Left m)
     Right m -> return (Right $ applyModel m g)
+
+-- isInductive :: Entailment -> Bool
+-- isInductive = 

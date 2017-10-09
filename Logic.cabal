@@ -41,6 +41,7 @@ library
                      , fixed-vector
                      , lens             >= 4.15
                      , mtl              >= 2.2
+                     , monad-loops
                      , extra
                      , random-fu
                      , parsec           >= 3.1

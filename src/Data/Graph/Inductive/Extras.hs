@@ -1,11 +1,16 @@
 {-# LANGUAGE LambdaCase, OverloadedStrings #-}
 module Data.Graph.Inductive.Extras where
 
+import           Control.Lens hiding (pre)
+import           Control.Monad (forM_, when)
+import           Control.Monad.Loops (whileM_)
 import           Control.Monad.State
 
 import           Data.Bifunctor (second)
 import           Data.Map (Map)
 import qualified Data.Map as M
+import           Data.Set (Set)
+import qualified Data.Set as S
 import qualified Data.Tree as T
 import           Data.Tree (Tree)
 import           Data.Maybe (fromJust)
@@ -118,7 +123,27 @@ cartesianProduct f g1 g2 =
           return (n1*high + n2, n1*high + n2', l)
     in foldr insEdge (foldr insNode empty ns) (ls1' ++ ls2')
 
-treeFrom :: Node -> Gr a b -> Tree (Node, a)
+
+-- | Perform a topological sort over the nodes in the graph.
+topOrder :: DynGraph gr => gr a b -> Maybe [Node]
+topOrder g =
+  let terms = S.fromList $ filter (null . pre g) (nodes g)
+      (l, _, g') = execState top ([], terms, g)
+  in if null (edges g')
+     then Just $ reverse l
+     else Nothing
+  where
+    top :: DynGraph gr => State ([Node], Set Node, gr a b) ()
+    top = whileM_ (not . null <$> use _2) $ do
+            n <- S.findMin <$> use _2
+            _2 %= S.delete n
+            _1 %= (n:)
+            ms <- suc <$> use _3 <*> pure n
+            forM_ ms (\m -> do
+              gr <- _3 <%= delEdge (n, m)
+              when (null $ pre gr m) (_2 %= S.insert m))
+
+treeFrom :: Graph gr => Node -> gr a b -> Tree (Node, a)
 treeFrom idx dag =
   T.Node (idx, vertex idx dag) (map (`treeFrom` dag) (suc dag idx))
 
