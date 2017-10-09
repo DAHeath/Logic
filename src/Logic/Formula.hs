@@ -48,36 +48,6 @@ infixl 9 :@
 
 instance Plated Form where plate = uniplate
 
--- | Apply a function to two arguments.
-app2 :: Form -> Form -> Form -> Form
-app2 f x y = f :@ x :@ y
-
-appMany :: Form -> [Form] -> Form
-appMany = foldl (:@)
-
-mkAnd :: Form -> Form -> Form
-mkAnd x y
-  | x == LBool True = y
-  | y == LBool True = x
-  | x == y          = x
-  | otherwise       = app2 And x y
-
-mkOr :: Form -> Form -> Form
-mkOr x y
-  | x == LBool False = y
-  | y == LBool False = x
-  | x == y           = x
-  | otherwise        = app2 Or x y
-
-mkEql :: Type -> Form -> Form -> Form
-mkEql t x y
-  | x == y = LBool True
-  | otherwise = let [x', y'] = sort [x, y] in app2 (Eql t) x' y'
-
-manyAnd, manyOr :: Foldable f => f Form -> Form
-manyAnd = foldr mkAnd (LBool True)
-manyOr  = foldr mkOr (LBool False)
-
 instance Monoid Form where
   mappend = mkAnd
   mempty = LBool True
@@ -114,43 +84,6 @@ instance Typed Form where
     LBool _     -> T.Bool
     LInt _      -> T.Int
     LReal _     -> T.Real
-
-class Formulaic a where
-  toForm :: a -> Form
-
-instance Formulaic Form where
-  toForm = id
-
-isLit :: Form -> Bool
-isLit = \case
-  LUnit   -> True
-  LBool _ -> True
-  LInt _  -> True
-  LReal _ -> True
-  _       -> False
-
-isVar :: Form -> Bool
-isVar = \case
-  V _ -> True
-  _   -> False
-
-isBinaryInfix :: Form -> Bool
-isBinaryInfix = \case
-    And   -> True
-    Or    -> True
-    Impl  -> True
-    Iff   -> True
-    Add _ -> True
-    Mul _ -> True
-    Sub _ -> True
-    Div _ -> True
-    Mod _ -> True
-    Eql _ -> True
-    Lt _  -> True
-    Le _  -> True
-    Gt _  -> True
-    Ge _  -> True
-    _     -> False
 
 instance Pretty Form where
   pPrint = \case
@@ -193,3 +126,73 @@ instance Pretty Form where
       inlinePrint f x = case f of
         f' :@ y -> inlinePrint f' y <+> pPrint x
         f' -> pPrint f' <+> pPrint x
+
+class Formulaic a where
+  toForm :: a -> Form
+
+instance Formulaic Form where
+  toForm = id
+
+-- | Apply a function to two arguments.
+app2 :: Form -> Form -> Form -> Form
+app2 f x y = f :@ x :@ y
+
+appMany :: Form -> [Form] -> Form
+appMany = foldl (:@)
+
+mkAnd :: Form -> Form -> Form
+mkAnd x y
+  | x == LBool True = y
+  | y == LBool True = x
+  | x == y          = x
+  | otherwise       = app2 And x y
+
+mkOr :: Form -> Form -> Form
+mkOr x y
+  | x == LBool False = y
+  | y == LBool False = x
+  | x == y           = x
+  | otherwise        = app2 Or x y
+
+mkEql :: Type -> Form -> Form -> Form
+mkEql t x y
+  | x == y = LBool True
+  | otherwise = let [x', y'] = sort [x, y] in app2 (Eql t) x' y'
+
+manyAnd, manyOr :: Foldable f => f Form -> Form
+manyAnd = foldr mkAnd (LBool True)
+manyOr  = foldr mkOr (LBool False)
+
+-- | Is the formula a literal?
+isLit :: Form -> Bool
+isLit = \case
+  LUnit   -> True
+  LBool _ -> True
+  LInt _  -> True
+  LReal _ -> True
+  _       -> False
+
+-- | Is the formula simply a variable?
+isVar :: Form -> Bool
+isVar = \case
+  V _ -> True
+  _   -> False
+
+-- | Is the formula an infix operator?
+isBinaryInfix :: Form -> Bool
+isBinaryInfix = \case
+    And   -> True
+    Or    -> True
+    Impl  -> True
+    Iff   -> True
+    Add _ -> True
+    Mul _ -> True
+    Sub _ -> True
+    Div _ -> True
+    Mod _ -> True
+    Eql _ -> True
+    Lt _  -> True
+    Le _  -> True
+    Gt _  -> True
+    Ge _  -> True
+    _     -> False
