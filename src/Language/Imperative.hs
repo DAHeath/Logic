@@ -169,7 +169,7 @@ commGraph comm =
           (PartGraph g2 n2 s2) <- commGraph' c2 pg
           h <- vert
           let g' = G.insEdge (h, n1, semSeq (SemPredicate e) s1)
-                 $ G.insEdge (h, n2, semSeq (SemPredicate (Apply Not e)) s2)
+                 $ G.insEdge (h, n2, semSeq (SemPredicate (Not :@ e)) s2)
                  $ G.insNode (h, ())
                  $ overlay g1 g2
           return $ PartGraph g' h SemSkip
@@ -178,7 +178,7 @@ commGraph comm =
           (PartGraph g' en' s') <- commGraph' c (PartGraph (G.insNode (h, ()) G.empty) h SemSkip)
           let g'' = G.insEdge (h, en', semSeq (SemPredicate e) s') g'
           return $ PartGraph
-              ( G.insEdge (h, n, semSeq (SemPredicate (Apply Not e)) s)
+              ( G.insEdge (h, n, semSeq (SemPredicate (Not :@ e)) s)
               $ overlay g g'')
               h SemSkip
         Skip -> return pg

@@ -15,7 +15,7 @@ import           Data.Tree (Tree)
 
 import           Logic.Chc (Chc)
 import qualified Logic.Chc as C
-import           Logic.Formula (Form)
+import           Logic.Formula (Form((:@)))
 import qualified Logic.Formula as F
 import           Logic.Var
 import           Logic.Type (Type((:=>)))
@@ -54,7 +54,7 @@ solveChc hcs = runEnvZ3 script
 
     mkQuery q n =
       let theQuery = F.V $ Free n T.Bool in
-      F.app2 F.Impl (F.Apply F.Not (F.toForm q)) theQuery
+      F.app2 F.Impl (F.Not :@ F.toForm q) theQuery
 
     useDuality = do
       pars <- mkParams
@@ -114,7 +114,7 @@ isValid f = do
     Unsat -> return True
     _     -> return False
 
-  where sc = (assert =<< formToAst (F.Apply F.Not f)) >> check
+  where sc = (assert =<< formToAst (F.Not :@ f)) >> check
 
 -- | Is `f -> g` a valid formula?
 entails :: MonadIO m => Form -> Form -> m Bool
@@ -196,12 +196,12 @@ formToAst f =
     F.LBool False       -> mkFalse
     F.LInt l            -> mkInteger l
     F.LReal _           -> undefined
-    F.Apply f' a        -> let (f'', as) = gatherApp f' [a]
+    f' :@ a             -> let (f'', as) = gatherApp f' [a]
                            in appToZ3 f'' as
     _ -> undefined
   where
     gatherApp :: Form -> [Form] -> (Form, [Form])
-    gatherApp (F.Apply f' a) args = gatherApp f' (a : args)
+    gatherApp (f' :@ a) args = gatherApp f' (a : args)
     gatherApp x args = (x, args)
 
     register v = do
@@ -247,7 +247,7 @@ appToZ3 f args =
     F.LBool b    -> mkBool b
     F.LInt _     -> undefined
     F.LReal _    -> undefined
-    F.Apply{}    -> undefined
+    _ :@ _       -> undefined
 
   where
     many o = o =<< traverse formToAst args
@@ -292,7 +292,7 @@ formFromApp name args range
   | name == ">"        = lift2 (F.Gt T.Int)
   | name == ">="       = lift2 (F.Ge T.Int)
   | name == "="        = F.mkEql T.Int <$> astToForm (head args) <*> astToForm (args !! 1)
-  | name == "not"      = F.Apply F.Not <$> astToForm (head args)
+  | name == "not"      = (:@) F.Not <$> astToForm (head args)
   | name == "-"        = if length args == 1
                          then F.app2 (F.Sub T.Int) (F.LInt 0) <$> astToForm (head args)
                          else lift2 (F.Sub T.Int)

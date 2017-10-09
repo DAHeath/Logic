@@ -14,7 +14,7 @@ import           Text.PrettyPrint.HughesPJClass ((<+>), Pretty, pPrint)
 import qualified Text.PrettyPrint.HughesPJClass as PP
 
 data Form
-  = Apply Form Form
+  = Form :@ Form
   | V Var
 
   | If Type
@@ -44,13 +44,16 @@ data Form
   | LReal Double
   deriving (Show, Read, Eq, Ord, Data)
 
+infixl 9 :@
+
 instance Plated Form where plate = uniplate
 
+-- | Apply a function to two arguments.
 app2 :: Form -> Form -> Form -> Form
-app2 f x = Apply (Apply f x)
+app2 f x y = f :@ x :@ y
 
 appMany :: Form -> [Form] -> Form
-appMany = foldl Apply
+appMany = foldl (:@)
 
 mkAnd :: Form -> Form -> Form
 mkAnd x y
@@ -82,7 +85,7 @@ instance Monoid Form where
 instance Typed Form where
   typeOf = \case
     V v         -> T.typeOf v
-    Apply v _   -> case T.typeOf v of
+    v :@ _      -> case T.typeOf v of
                      _ :=> t -> t
                      _ -> error "bad function application type"
 
@@ -151,12 +154,12 @@ isBinaryInfix = \case
 
 instance Pretty Form where
   pPrint = \case
-    Apply (Apply f x) y ->
+    f :@ x :@ y ->
       if isBinaryInfix f
       then PP.hsep [binArg x, pPrint f, binArg y]
       else PP.parens (inlinePrint f x <+> pPrint y)
     V v          -> PP.pPrint v
-    Apply f x    -> PP.parens (pPrint f <+> pPrint x)
+    f :@ x       -> PP.parens (pPrint f <+> pPrint x)
 
     If _         -> PP.text "if"
 
@@ -188,5 +191,5 @@ instance Pretty Form where
       binArg f = if isLit f || isVar f then pPrint f else PP.parens (pPrint f)
 
       inlinePrint f x = case f of
-        Apply f' y -> inlinePrint f' y <+> pPrint x
+        f' :@ y -> inlinePrint f' y <+> pPrint x
         f' -> pPrint f' <+> pPrint x

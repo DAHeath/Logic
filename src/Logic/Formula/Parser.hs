@@ -50,7 +50,7 @@ atom :: CharParser st Form
 atom = try app <|> nonapp
   where
     nonapp = parens parseForm <|> (V <$> try var) <|> bool <|> integer
-    app = (res "not"      >> Apply Not                <$> nonapp)
+    app = (res "not"      >> (:@) Not                 <$> nonapp)
       <|> (res "if"       >> appMany (If T.Int)       <$> sequence [nonapp, nonapp, nonapp])
       <|> (res "distinct" >> appMany (Distinct T.Int) <$> many1 nonapp)
       <|> (res "and"      >> manyAnd                  <$> many1 nonapp)
