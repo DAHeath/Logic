@@ -1,13 +1,14 @@
 {-# LANGUAGE DeriveDataTypeable, LambdaCase #-}
 module Logic.Model where
 
-import           Logic.Formula
-
 import           Control.Lens
 
 import           Data.Data (Data)
 import           Data.Map (Map)
 import qualified Data.Map as M
+
+import           Logic.Var
+import           Logic.Formula
 
 import           Text.PrettyPrint.HughesPJClass (Pretty, pPrint)
 import qualified Text.PrettyPrint.HughesPJClass as PP

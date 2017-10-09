@@ -4,20 +4,21 @@ module Logic.Entailment where
 import           Control.Lens hiding (Context)
 import           Control.Monad.State
 
+import           Data.Data (Data)
 import           Data.Graph.Inductive.Basic
 import           Data.Graph.Inductive.Graph
 import           Data.Graph.Inductive.PatriciaTree
 import           Data.Graph.Inductive.Extras
-import           Data.Data (Data)
-import qualified Data.Set as S
 import           Data.Set (Set)
-import qualified Data.Map as M
+import qualified Data.Set as S
 import           Data.Map (Map)
-import qualified Data.Tree as T
+import qualified Data.Map as M
 import           Data.Tree (Tree)
+import qualified Data.Tree as T
 import           Data.Maybe (mapMaybe)
 import           Data.Foldable (foldrM)
 
+import           Logic.Var
 import           Logic.Formula
 
 import           Text.PrettyPrint.HughesPJClass as PP

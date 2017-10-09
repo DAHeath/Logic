@@ -1,14 +1,16 @@
 {-# LANGUAGE FlexibleContexts
            , GeneralizedNewtypeDeriving
            , LambdaCase
+           , TemplateHaskell
            #-}
 
 module Logic.Solver.Z3 where
 
+import           Control.Lens
 import           Control.Monad.State
 import           Control.Monad.Reader
 
-import           Data.List (partition, uncons)
+import           Data.List (partition)
 import           Data.Maybe
 import qualified Data.Map as M
 import           Data.Map (Map)
@@ -19,11 +21,18 @@ import           Logic.Chc (Chc)
 import qualified Logic.Chc as C
 import           Logic.Formula (Form)
 import qualified Logic.Formula as F
+import           Logic.Var
 import           Logic.Type (Type((:=>)))
 import qualified Logic.Type as T
 import qualified Logic.Model as M
 
 import           Z3.Monad hiding (local)
+
+data Env = Env { _envVars :: Map Var AST
+               , _envFuns :: Map Var FuncDecl
+               } deriving (Show, Eq, Ord)
+
+makeLenses ''Env
 
 -- | Invoke `duality` to solve the relational post fixed-point problem.
 solveChc :: MonadIO m => [Chc] -> m (Either M.Model M.Model)
@@ -40,7 +49,7 @@ solveChc hcs = runEnvZ3 script
          rids' <- traverse mkStringSymbol rids
          zipWithM_ fixedpointAddRule forms rids'
 
-         let quers = map (`F.Free` T.Bool) qids
+         let quers = map (`Free` T.Bool) qids
          quers' <- traverse funcToDecl quers
          res <- fixedpointQueryRelations quers'
          case res of
@@ -48,7 +57,7 @@ solveChc hcs = runEnvZ3 script
            _     -> Left <$> (modelToModel =<< fixedpointGetRefutation)
 
     mkQuery q n =
-      let theQuery = F.V $ F.Free n T.Bool in
+      let theQuery = F.V $ Free n T.Bool in
       F.app2 F.Impl (F.Apply F.Not (C.chcToForm q)) theQuery
 
     useDuality = do
@@ -73,13 +82,13 @@ unsatCore = fixedM z3Core
       lbls <- traverse (\l -> join $ mkConst <$> mkStringSymbol l <*> mkBoolSort) labels
       fs' <- traverse formToAst fs
 
-      let mapping = zip lbls fs
+      let m = zip lbls fs
 
       zipWithM_ solverAssertAndTrack fs' lbls
       res <- solverCheck
       case res of
         Unsat -> do lbls' <- solverGetUnsatCore
-                    return $ Just $ mapMaybe (`lookup` mapping) lbls'
+                    return $ Just $ mapMaybe (`lookup` m) lbls'
         _ -> return Nothing
 
 -- | Find a satisfying model of an input formula (if one exists).
@@ -166,10 +175,6 @@ newtype EnvZ3 a = EnvZ3 { getEnvZ3 :: ReaderT DeBrujin (StateT Env Z3) a }
            , MonadIO
            )
 
-data Env = Env { vars :: Map F.Var AST
-               , funs :: Map F.Var FuncDecl
-               } deriving (Show, Eq, Ord)
-
 -- | The list of variable names ordered by their DeBrujin index. This list is
 -- maintained by quantifier instantiations.
 type DeBrujin = [String]
@@ -207,11 +212,11 @@ formToAst f =
       fd <- varDec v
       fixedpointRegisterVariable fd
       v' <- mkApp fd []
-      modify (\e -> e { vars = M.insert v v' (vars e) })
+      envVars %= M.insert v v'
       return v'
 
     var v = do
-      env <- gets vars
+      env <- use envVars
       case M.lookup v env of
         Nothing -> register v
         Just v' -> return v'
@@ -252,18 +257,18 @@ appToZ3 f args =
     many o = o =<< traverse formToAst args
     two o = join $ o <$> formToAst (head args) <*> formToAst (args !! 1)
 
-funcToDecl :: (MonadState Env z3, MonadZ3 z3) => F.Var -> z3 FuncDecl
+funcToDecl :: (MonadState Env z3, MonadZ3 z3) => Var -> z3 FuncDecl
 funcToDecl r = do
   let t = T.typeOf r
-  let n = F.varName r
-  env <- gets funs
+  let n = varName r
+  env <- use envFuns
   case M.lookup r env of
     Nothing -> do
       sorts <- traverse typeToSort (T.domain t)
       sym <- mkStringSymbol n
       r' <- mkFuncDecl sym sorts =<< typeToSort (T.range t)
       fixedpointRegisterRelation r'
-      modify (\e -> e { funs = M.insert r r' (funs e) })
+      envFuns %= M.insert r r'
       return r'
     Just r' -> return r'
 
@@ -272,7 +277,7 @@ formFromApp name args range
   | name == "true"     = return $ F.LBool True
   | name == "false"    = return $ F.LBool False
   -- The 'app' is just a variable
-  | null args          = F.V <$> (F.Free name <$> sortToType range)
+  | null args          = F.V <$> (Free name <$> sortToType range)
   | name == "ite" || name == "if" = do
     c <- astToForm (head args)
     e1 <- astToForm (args !! 1)
@@ -301,7 +306,7 @@ formFromApp name args range
     args' <- traverse astToForm args
     domain <- traverse getType args
     range' <- sortToType range
-    let f = F.Free name (T.curryType domain range')
+    let f = Free name (T.curryType domain range')
     return $ F.appMany (F.V f) args'
   where lift2 f = F.app2 f <$> astToForm (head args) <*> astToForm (args !! 1)
         liftMany f = F.appMany f <$> traverse astToForm args
@@ -330,7 +335,7 @@ modelToModel m = M.Model <$> (M.union <$> functions <*> constants)
       name <- declName fd
       domain <- traverse sortToType =<< getDomain fd
       range  <- sortToType =<< getRange fd
-      return $ F.Free name (T.curryType domain range)
+      return $ Free name (T.curryType domain range)
 
 -- | Convert the Z3 internal representation of a formula to the AST representation.
 astToForm :: (MonadReader DeBrujin z3, MonadZ3 z3) => AST -> z3 Form
@@ -358,8 +363,8 @@ astToForm arg = do
          idx <- getIndexValue arg
          n <- lookupDeBrujin idx
          return $ F.V $ case n of
-           Nothing -> F.Bound idx typ
-           Just n' -> F.Free n' typ
+           Nothing -> Bound idx typ
+           Just n' -> Free n' typ
 
     Z3_QUANTIFIER_AST -> do liftIO $ putStrLn "quantifier!"
                             undefined
@@ -411,9 +416,9 @@ getType = getSort >=> sortToType
 declName :: MonadZ3 z3 => FuncDecl -> z3 String
 declName = getDeclName >=> getSymbolString
 
-varDec :: MonadZ3 z3 => F.Var -> z3 FuncDecl
+varDec :: MonadZ3 z3 => Var -> z3 FuncDecl
 varDec v = do
   let t = T.typeOf v
-  let n = F.varName v
+  let n = varName v
   sym <- mkStringSymbol n
   mkFuncDecl sym [] =<< typeToSort t

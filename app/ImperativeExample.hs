@@ -1,13 +1,15 @@
 {-# LANGUAGE QuasiQuotes #-}
-import qualified Logic.Type as T
-import           Logic.Formula
-import           Logic.Formula.Parser
-import           Language.Imperative
-
 import           Control.Monad.State
+
 import qualified Data.Map as M
 import           Data.Graph.Inductive.Extras
 import           Data.Graph.Inductive.Graph
+
+import qualified Logic.Type as T
+import           Logic.Formula
+import           Logic.Formula.Parser
+import           Logic.Var
+import           Language.Imperative
 
 x, s :: Var
 x = Free "x" T.Int

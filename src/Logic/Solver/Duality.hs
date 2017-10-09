@@ -1,12 +1,6 @@
 {-# LANGUAGE FlexibleContexts, RankNTypes, TemplateHaskell, TupleSections #-}
 module Logic.Solver.Duality where
 
-import           Logic.Type
-import           Logic.Formula
-import           Logic.Model
-import           Logic.Chc
-import qualified Logic.Solver.Z3 as Z3
-
 import           Control.Monad.State
 import           Control.Monad.Except
 import           Control.Monad.Extra (ifM)
@@ -17,14 +11,21 @@ import           Data.Foldable (traverse_)
 import           Data.Graph.Inductive.Graph
 import           Data.Graph.Inductive.PatriciaTree
 import           Data.Graph.Inductive.Extras
-import qualified Data.Map as M
 import           Data.Map (Map)
-import qualified Data.Set as S
+import qualified Data.Map as M
 import           Data.Set (Set)
-import qualified Data.Tree as T
+import qualified Data.Set as S
 import           Data.Tree (Tree)
+import qualified Data.Tree as T
 import           Data.Tree.Extras
 import           Data.Random
+
+import           Logic.Type
+import           Logic.Formula
+import           Logic.Var
+import           Logic.Model
+import           Logic.Chc
+import qualified Logic.Solver.Z3 as Z3
 
 -- TODO
 -- rapid convergence via generalization

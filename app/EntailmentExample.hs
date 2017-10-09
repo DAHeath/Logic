@@ -1,10 +1,4 @@
 {-# LANGUAGE QuasiQuotes #-}
-import           Logic.Entailment
-
-import qualified Logic.Type as T
-import           Logic.Formula
-import           Logic.Formula.Parser
-import           Logic.Solver.Z3
 
 import qualified Data.Graph.Inductive.Graph as G
 import qualified Data.Graph.Inductive.PatriciaTree as G
@@ -15,6 +9,13 @@ import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Tree (Tree)
 import qualified Data.Tree as T
+
+import           Logic.Entailment
+import qualified Logic.Type as T
+import           Logic.Formula
+import           Logic.Formula.Parser
+import           Logic.Var
+import           Logic.Solver.Z3
 
 import           Text.PrettyPrint.HughesPJClass
 

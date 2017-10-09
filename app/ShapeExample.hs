@@ -1,9 +1,4 @@
 {-# LANGUAGE QuasiQuotes #-}
-import qualified Logic.Type as T
-import           Logic.Formula
-import           Logic.Formula.Parser
-import           Language.Imperative
--- import           Language.Imperative.Shape
 
 import           Control.Monad.State
 
@@ -15,7 +10,12 @@ import qualified Data.Map as M
 import           Data.Set (Set)
 import qualified Data.Set as S
 
-import Debug.Trace
+import qualified Logic.Type as T
+import           Logic.Formula
+import           Logic.Formula.Parser
+import           Logic.Var
+import           Language.Imperative
+-- import           Language.Imperative.Shape
 
 h, t, i, c, n :: Var
 h = Free "h" T.Int

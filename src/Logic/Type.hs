@@ -18,6 +18,9 @@ data Type
 
 infixr 0 :=>
 
+class Typed a where
+  typeOf :: a -> Type
+
 curryType :: [Type] -> Type -> Type
 curryType [] ran = ran
 curryType dom ran = foldr (:=>) ran dom
@@ -38,6 +41,3 @@ instance Pretty Type where
     Real     -> PP.text "Real"
     t :=> t' -> pPrint t <+> PP.text "->" <+> pPrint t'
     List t   -> PP.text "List<" <> PP.pPrint t <> PP.text ">"
-
-class Typed a where
-  typeOf :: a -> Type

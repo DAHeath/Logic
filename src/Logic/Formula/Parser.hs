@@ -16,6 +16,7 @@ import           Language.Haskell.TH.Quote
 import           Logic.Type (Type)
 import qualified Logic.Type as T
 import           Logic.Formula
+import           Logic.Var
 import           Logic.Chc
 
 lexeme :: Stream s m Char => ParsecT s u m b -> ParsecT s u m b

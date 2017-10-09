@@ -1,15 +1,16 @@
 {-# LANGUAGE DeriveDataTypeable, LambdaCase #-}
 module Logic.Chc where
 
-import           Logic.Formula
-import           Logic.Model
-
 import           Control.Lens
 
 import           Data.Data (Data)
 import           Data.Monoid ((<>))
 import qualified Data.Map as M
 import qualified Data.Set as S
+
+import           Logic.Formula
+import           Logic.Model
+import           Logic.Var
 
 import           Text.PrettyPrint.HughesPJClass (Pretty, pPrint)
 import qualified Text.PrettyPrint.HughesPJClass as PP

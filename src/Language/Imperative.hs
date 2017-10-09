@@ -1,22 +1,22 @@
 {-# LANGUAGE LambdaCase, DeriveDataTypeable, FlexibleContexts #-}
 module Language.Imperative where
 
-import           Logic.Type as T
-import           Logic.Formula
-import           Logic.Chc
-
 import           Control.Monad.State
 
 import           Data.Data (Data)
 import           Data.Tuple (swap)
+import qualified Data.Graph.Inductive.Graph as G
+import           Data.Graph.Inductive.PatriciaTree
+import           Data.Graph.Inductive.Extras
 import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Map (Map)
 import qualified Data.Map as M
 
-import qualified Data.Graph.Inductive.Graph as G
-import           Data.Graph.Inductive.PatriciaTree
-import           Data.Graph.Inductive.Extras
+import           Logic.Type as T
+import           Logic.Formula
+import           Logic.Var
+import           Logic.Chc
 
 import           Text.PrettyPrint.HughesPJClass
 
