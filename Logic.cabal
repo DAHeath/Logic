@@ -37,6 +37,7 @@ library
                      , fgl              >= 5.5
                      , tardis
                      , graphviz
+                     , turtle
                      , fixed-vector
                      , lens             >= 4.15
                      , mtl              >= 2.2
@@ -49,6 +50,7 @@ library
                      , text             >= 1.2
                      , transformers     >= 0.5
                      , z3               >= 4.1
+                     , split
   default-language:    Haskell2010
 
 executable DualityExample

@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase, OverloadedStrings #-}
 module Data.Graph.Inductive.Extras where
 
 import           Control.Monad.State
@@ -14,8 +14,10 @@ import           Data.Graph.Inductive.Graph
 import           Data.Graph.Inductive.Basic
 import           Data.Graph.Inductive.Query.DFS
 import           Data.Graph.Inductive.Query.BFS
+import           Data.Monoid ((<>))
 
 import qualified Data.GraphViz as GV
+import qualified Turtle
 import qualified Data.Text.Lazy.IO as TIO
 
 import           Text.PrettyPrint.HughesPJClass (Pretty, prettyShow)
@@ -130,4 +132,9 @@ display fn g =
                                      , GV.fmtEdge = \ (_, _, l) -> [GV.toLabel l]
                                      }
       dot = GV.graphToDot params g'
-  in TIO.writeFile fn (GV.printDotGraph dot)
+  in do
+    TIO.writeFile fn (GV.printDotGraph dot)
+    let fn' = Turtle.fromString fn
+    Turtle.shell ("dot -Tpdf " <> fn' <> "> " <> fn' <> ".pdf") Turtle.empty
+    Turtle.shell ("open " <> fn' <> ".pdf") Turtle.empty
+    return ()

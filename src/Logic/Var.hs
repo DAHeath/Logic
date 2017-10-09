@@ -27,13 +27,12 @@ instance Typed Var
         typeOf (Free _ t) = t
 
 instance Pretty Var
-  where pPrint (Bound n _) = PP.text ("!" ++ show n ++ ":")
-        pPrint (Free  n _) = PP.text (n ++ ":")
+  where pPrint = PP.text . varName
 
 -- | A name for the variable. If the variable is bound, it is a textual
 -- representation of the index. Otherwise, it is just the variable name.
 varName :: Var -> Name
-varName (Bound i _) = show i
+varName (Bound i _) = "!" ++ show i
 varName (Free n _) = n
 
 -- | A traversal which targets all of the variables in a given expression.

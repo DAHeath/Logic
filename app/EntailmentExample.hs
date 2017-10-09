@@ -1,5 +1,6 @@
 {-# LANGUAGE QuasiQuotes #-}
 
+import qualified Data.Graph.Inductive.Basic as G
 import qualified Data.Graph.Inductive.Graph as G
 import qualified Data.Graph.Inductive.PatriciaTree as G
 import qualified Data.Graph.Inductive.Extras as G
@@ -24,8 +25,8 @@ i  = Free "i"  T.Int
 i' = Free "i'" T.Int
 n  = Free "n"  T.Int
 
-s :: Set Var
-s = S.fromList [i, n]
+s :: [Var]
+s = [i, n]
 
 g :: Entailment
 g =
@@ -41,19 +42,12 @@ g =
 b :: [G.LEdge EntailmentEdge]
 b = backEdges [3] g
 
-tree1 :: Tree Form
-tree1 =
-  T.Node [form|not (i:Int = 41)|]
-  [ T.Node [form|i:Int >= n:Int|]
-    [ T.Node [form|i':Int = i:Int+2 && i:Int < n:Int|]
-      [ T.Node [form|i:Int = 0|] []
-      ]
-    ]
-  , T.Node [form|i:Int >= n:Int|] [T.Node [form|i:Int = 0|] []]
-  ]
+g' :: Entailment
+g' = G.efilter (`notElem` b) g
 
 main :: IO ()
 main = do
-  Right t <- interpolate tree1
-  let t' = fmap prettyShow t
-  putStrLn (T.drawTree t')
+  sol <- solve g'
+  case sol of
+    Left m -> putStrLn $ prettyShow m
+    Right g'' -> G.display "test" g''
