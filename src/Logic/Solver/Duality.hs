@@ -157,7 +157,7 @@ relabelChc :: MonadState Int m => Chc -> m Chc
 relabelChc q@Query{} = return q
 relabelChc r =
   let bound = S.fromList $ chcBindings r
-      vs = vars r
+      vs = getVars r
       free = vs S.\\ bound
   in do
     fc <- get

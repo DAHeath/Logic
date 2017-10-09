@@ -41,7 +41,7 @@ solveChc hcs = runEnvZ3 script
     script =
       let (queries, rules) = partition C.isQuery hcs
           qids = map (\n -> "q" ++ show n) [0..length queries-1]
-          satForms = map C.chcToForm rules ++ zipWith mkQuery queries qids
+          satForms = map F.toForm rules ++ zipWith mkQuery queries qids
           rids = map (\n -> "RULE" ++ show n) [0..length hcs-1]
       in do
          useDuality
@@ -58,7 +58,7 @@ solveChc hcs = runEnvZ3 script
 
     mkQuery q n =
       let theQuery = F.V $ Free n T.Bool in
-      F.app2 F.Impl (F.Apply F.Not (C.chcToForm q)) theQuery
+      F.app2 F.Impl (F.Apply F.Not (F.toForm q)) theQuery
 
     useDuality = do
       pars <- mkParams

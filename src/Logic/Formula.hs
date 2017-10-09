@@ -8,16 +8,16 @@
 
 module Logic.Formula where
 
-import           Logic.Type (Type((:=>)), Typed)
-import qualified Logic.Type as T
-import           Logic.Var
-
 import           Control.Lens
 
 import           Data.Data (Data)
 import           Data.Data.Lens (biplate, uniplate)
 import qualified Data.Map as M
 import qualified Data.Set as S
+
+import           Logic.Type (Type((:=>)), Typed)
+import qualified Logic.Type as T
+import           Logic.Var
 
 import           Text.PrettyPrint.HughesPJClass ((<+>), Pretty, pPrint)
 import qualified Text.PrettyPrint.HughesPJClass as PP
@@ -53,14 +53,8 @@ data Form
   | LReal Double
   deriving (Show, Read, Eq, Ord, Data)
 
-instance Plated Form where
-  plate = uniplate
-
-instance Variadic Form where
-  vars f = f ^.. biplate & S.fromList
-  subst m = transform
-    (\case V v -> V $ M.findWithDefault v v m
-           f   -> f)
+instance Plated Form where plate = uniplate
+instance Variadic Form where vars = biplate
 
 app2 :: Form -> Form -> Form -> Form
 app2 f x = Apply (Apply f x)
@@ -109,6 +103,12 @@ instance Typed Form where
     LInt _      -> T.Int
     LReal _     -> T.Real
 
+class Formulaic a where
+  toForm :: a -> Form
+
+instance Formulaic Form where
+  toForm = id
+
 isLit :: Form -> Bool
 isLit = \case
   LUnit   -> True
@@ -121,6 +121,24 @@ isVar :: Form -> Bool
 isVar = \case
   V _ -> True
   _   -> False
+
+isBinaryInfix :: Form -> Bool
+isBinaryInfix = \case
+    And   -> True
+    Or    -> True
+    Impl  -> True
+    Iff   -> True
+    Add _ -> True
+    Mul _ -> True
+    Sub _ -> True
+    Div _ -> True
+    Mod _ -> True
+    Eql _ -> True
+    Lt _  -> True
+    Le _  -> True
+    Gt _  -> True
+    Ge _  -> True
+    _     -> False
 
 instance Pretty Form where
   pPrint = \case
@@ -163,21 +181,3 @@ instance Pretty Form where
       inlinePrint f x = case f of
         Apply f' y -> inlinePrint f' y <+> pPrint x
         f' -> pPrint f' <+> pPrint x
-
-      isBinaryInfix :: Form -> Bool
-      isBinaryInfix = \case
-          And   -> True
-          Or    -> True
-          Impl  -> True
-          Iff   -> True
-          Add _ -> True
-          Mul _ -> True
-          Sub _ -> True
-          Div _ -> True
-          Mod _ -> True
-          Eql _ -> True
-          Lt _  -> True
-          Le _  -> True
-          Gt _  -> True
-          Ge _  -> True
-          _     -> False

@@ -1,5 +1,7 @@
-{-# LANGUAGE DeriveDataTypeable, LambdaCase #-}
+{-# LANGUAGE DeriveDataTypeable, LambdaCase, RankNTypes #-}
 module Logic.Var where
+
+import           Control.Lens
 
 import           Data.Data (Data)
 import           Data.Map (Map)
@@ -10,7 +12,7 @@ import qualified Data.Set as S
 import           Logic.Type (Type, Typed)
 import qualified Logic.Type as T
 
-import           Text.PrettyPrint.HughesPJClass (Pretty, (<>), pPrint)
+import           Text.PrettyPrint.HughesPJClass (Pretty, pPrint)
 import qualified Text.PrettyPrint.HughesPJClass as PP
 
 type Name = String
@@ -35,18 +37,21 @@ instance Pretty Var
 -- | A structure which contains variables is `variadic`. This allows finding
 -- the variables in the structure and substituting them for others.
 class Variadic a where
-  vars :: a -> Set Var
-  subst :: Map Var Var -> a -> a
+  vars :: Traversal' a Var
 
 -- | A variable is trivially variadic.
 instance Variadic Var where
-  vars = S.singleton
-  subst m v = M.findWithDefault v v m
+  vars _ = pure
 
 -- | A list of variadic elements is variadic.
 instance Variadic a => Variadic [a] where
-  vars = S.unions . map vars
-  subst m = map (subst m)
+  vars = traverse . vars
+
+subst :: Variadic a => Map Var Var -> a -> a
+subst m = over vars (\v -> M.findWithDefault v v m)
+
+getVars :: Variadic a => a -> Set Var
+getVars x = S.fromList (x ^.. vars)
 
 -- | Given a set of used variables and a target variable, generate a new variable
 -- which is not in the set and which resembles the target by appending a natural
