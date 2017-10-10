@@ -31,14 +31,8 @@ import           Text.PrettyPrint.HughesPJClass (Pretty, prettyShow)
 -- duplication map indicates what node the current node is a duplicate of.
 type DuplicationMap = Map Node Node
 
-dupLookup :: DuplicationMap -> Node -> Node
-dupLookup m n =
-  case M.lookup n m of
-    Nothing -> n
-    Just n' -> dupLookup m n'
-
 -- | Unfold the graph with respect to a given backedge.
-unfold :: Eq e => LEdge e -> Gr n e -> State DuplicationMap (Gr n e)
+unfold :: Eq e => LEdge e -> Gr n e -> Gr n e
 unfold (l1, l2, b) g =
   let g' = subgraphBetween l1 l2 g
       ns = nodes g'
@@ -47,7 +41,7 @@ unfold (l1, l2, b) g =
       outgoing = filter (\(l1', l2', _) -> l1' `elem` ns && l2' `notElem` ns) (labEdges g)
       incomingRemoved = efilter (`notElem` incoming) g
       -- relabel the subgraph
-      (rel, dup) = relabelWithRespectTo g' g
+      rel = relabelWithRespectTo g' g
       relabelled = relabel rel g'
       merged = overlay incomingRemoved relabelled
       connected = insEdge (rel l1, l2, b) merged
@@ -56,9 +50,7 @@ unfold (l1, l2, b) g =
       outDuplicated = foldr (\(l1', l2', b') gr -> insEdge (rel l1', l2', b') gr)
                             incRerouted outgoing
 
-  in do
-    modify (M.union dup)
-    return outDuplicated
+  in outDuplicated
 
 -- | Combine two graphs
 overlay :: DynGraph gr => gr n e -> gr n e -> gr n e
@@ -74,12 +66,11 @@ subgraphBetween l1 l2 g =
                              ls -> head ls == l2 && last ls == l1) allPs
   in subgraph ps simpl
 
-relabelWithRespectTo :: DynGraph gr => gr n e -> gr n e -> (Node -> Node, DuplicationMap)
+relabelWithRespectTo :: DynGraph gr => gr n e -> gr n e -> Node -> Node
 relabelWithRespectTo toRelabel toRespect =
   let ns = nodes toRelabel
       m = M.fromList (zip ns (newNodes (order toRelabel) toRespect))
-      dup = M.fromList (zip (newNodes (order toRelabel) toRespect) ns)
-  in (\n -> M.findWithDefault n n m, dup)
+  in (\n -> M.findWithDefault n n m)
 
 relabel :: DynGraph gr => (Node -> Node) -> gr n e -> gr n e
 relabel rel =
@@ -99,6 +90,9 @@ removeReaching l = efilter (\(_, l2, _) -> l2 /= l)
 
 reverseReached :: DynGraph gr => Node -> gr n e -> gr n e
 reverseReached n g = nfilter (`elem` reachable n (grev g)) g
+
+ancestors :: DynGraph gr => gr n e -> Node -> [Node]
+ancestors g n = filter (/= n) $ nodes $ reverseReached n g
 
 cartesianProduct :: (Graph gr, DynGraph gr')
                  => (a -> b -> c) -> gr a e -> gr b e -> gr' c e
@@ -123,26 +117,6 @@ cartesianProduct f g1 g2 =
           return (n1*high + n2, n1*high + n2', l)
     in foldr insEdge (foldr insNode empty ns) (ls1' ++ ls2')
 
-
--- | Perform a topological sort over the nodes in the graph (Kahn's Algorithm).
-topOrder :: DynGraph gr => gr a b -> Maybe [Node]
-topOrder g =
-  let terms = S.fromList $ filter (null . pre g) (nodes g)
-      (l, _, g') = execState top ([], terms, g)
-  in if null (edges g')
-     then Just $ reverse l
-     else Nothing
-  where
-    top :: DynGraph gr => State ([Node], Set Node, gr a b) ()
-    top = whileM_ (not . null <$> use _2) $ do
-            n <- S.findMin <$> use _2
-            _2 %= S.delete n
-            _1 %= (n:)
-            ms <- suc <$> use _3 <*> pure n
-            forM_ ms (\m -> do
-              gr <- _3 <%= delEdge (n, m)
-              when (null $ pre gr m) (_2 %= S.insert m))
-
 treeFrom :: Graph gr => Node -> gr a b -> Tree (Node, a)
 treeFrom idx dag =
   T.Node (idx, vertex idx dag) (map (`treeFrom` dag) (suc dag idx))
@@ -160,8 +134,8 @@ display fn g =
   in do
     TIO.writeFile fn (GV.printDotGraph dot)
     let fn' = Turtle.fromString fn
-    Turtle.shell ("dot -Tpdf " <> fn' <> "> " <> fn' <> ".pdf") Turtle.empty
-    Turtle.shell ("open " <> fn' <> ".pdf") Turtle.empty
+    _ <- Turtle.shell ("dot -Tpdf " <> fn' <> "> " <> fn' <> ".pdf") Turtle.empty
+    _ <-Turtle.shell ("open " <> fn' <> ".pdf") Turtle.empty
     return ()
 
 type instance Index (Gr n e) = Node
@@ -170,5 +144,6 @@ instance Ixed (Gr n e) where
 instance At (Gr n e) where
   at n f g = f mv <&> \r -> case r of
     Nothing -> maybe g (const (delNode n g)) mv
-    Just v' -> insNode (n, v') g
+    Just v' -> gmap (\(bef, n', v, aft) -> if n == n' then (bef, n', v', aft)
+                                                      else (bef, n', v, aft)) g
     where mv = lab g n

@@ -14,7 +14,7 @@ import qualified Text.PrettyPrint.HughesPJClass as PP
 
 -- | A model is an assignment of variables to formulas.
 newtype Model = Model (Map Var Form)
-  deriving (Show, Eq, Ord, Data)
+  deriving (Show, Read, Eq, Ord, Data)
 
 instance Pretty Model where
   pPrint (Model m) = PP.sep vs

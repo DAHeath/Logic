@@ -41,7 +41,7 @@ example = Seq
 
 g, g' :: Gr () SemAct
 g = commGraph example
-g' = efilter (`notElem` b) $ evalState (unfold (b !! 1) =<< unfold (head b) g) M.empty
+g' = efilter (`notElem` b) $ unfold (b !! 1) (unfold (head b) g)
 
 b :: [LEdge SemAct]
 b = backEdges g
