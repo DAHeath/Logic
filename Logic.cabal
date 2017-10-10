@@ -22,7 +22,8 @@ library
                      , Logic.Chc
                      , Logic.ImplicationGraph
                      , Logic.ImplicationGraph.Type
-                     , Logic.ImplicationGraph.Solve
+                     , Logic.ImplicationGraph.Interpolate
+                     , Logic.ImplicationGraph.Induction
                      , Logic.Solver.Z3
                      , Logic.Solver.Duality
                      , Language.Imperative
@@ -36,7 +37,7 @@ library
 
   build-depends:       base             >= 4.8
                      , containers       >= 0.5
-                     , fgl              >= 5.5
+                     , fgl              >= 5.5.3.1
                      , tardis
                      , graphviz
                      , turtle
@@ -72,6 +73,7 @@ executable ImplicationGraphExample
   ghc-options:
   build-depends:       base
                      , text             >= 1.2
+                     , mtl
                      , pretty           >= 1.1.3
                      , containers
                      , fgl

@@ -39,12 +39,12 @@ example = Seq
     (Ass h (Select "next" (V h))))
 
 
-g, g' :: Gr () SemAct
-g = commGraph example
-g' = efilter (`notElem` b) $ unfold (b !! 1) (unfold (head b) g)
+-- g, g' :: Gr () SemAct
+-- g = commGraph example
+-- g' = efilter (`notElem` b) $ unfold (b !! 1) (unfold (head b) g)
 
-b :: [LEdge SemAct]
-b = backEdges g
+-- b :: [LEdge SemAct]
+-- b = backEdges g
 
 hasStore :: SemAct -> Bool
 hasStore SemStore{} = True
@@ -62,6 +62,7 @@ storePositions = ufold (\ctx ns -> S.union (ctxStores ctx) ns) S.empty
       in S.union nStore inStore
 
 main :: IO ()
-main = do
-  display "shape" g
-  display "shape-u1" g'
+main = undefined
+  -- do
+  -- display "shape" g
+  -- display "shape-u1" g'

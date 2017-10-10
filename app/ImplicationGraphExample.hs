@@ -1,21 +1,25 @@
 {-# LANGUAGE QuasiQuotes #-}
-
 import           Control.Monad.State
 import           Control.Monad.Except
 
-import qualified Data.Graph.Inductive.PatriciaTree as G
 import qualified Data.Graph.Inductive.Graph as G
 import qualified Data.Graph.Inductive.Extras as G
 import qualified Data.Map as M
 
 import           Logic.ImplicationGraph
 import           Logic.ImplicationGraph.Type
-import           Logic.ImplicationGraph.Solve
 import qualified Logic.Type as T
 import           Logic.Formula.Parser
 import           Logic.Var
 
 import           Text.PrettyPrint.HughesPJClass
+
+main :: IO ()
+main = do
+  sol <- solve [3] g
+  case sol of
+    Left m -> putStrLn (prettyShow m)
+    Right r -> G.display "test" r
 
 i, i', n :: Var
 i  = Free "i"  T.Int
@@ -35,28 +39,8 @@ g =
   G.insNode (0, InstanceNode (mkInstance [0] [])) $
   G.insNode (1, InstanceNode (mkInstance [1] s)) $
   G.insNode (2, InstanceNode (mkInstance [2] s)) $
-  G.insNode (3, QueryNode [form|not (i:Int = 3)|])
+  G.insNode (3, QueryNode [form|not (i:Int = 41)|])
   G.empty
 
-bs :: [G.LEdge ImplGrEdge]
 bs = backEdges [3] g
-
-g' :: ImplGr
 g' = foldBackedges bs g
-
-g1 :: G.Gr Int Char
-g1 = G.insEdge (0, 1, 'x') $ G.insNode (1, 1) $ G.insNode (0, 0) G.empty
-
-main :: IO ()
-main = do
-  sol <- evalStateT (runExceptT (
-    do g <- step bs g'
-       g <- step bs g
-       g <- step bs g
-       g <- step bs g
-       return g
-    )) M.empty
-  case sol of
-    Left (Failed m) -> print m
-    Left (Complete g) -> G.display "test" g
-    Right g -> G.display "test" g

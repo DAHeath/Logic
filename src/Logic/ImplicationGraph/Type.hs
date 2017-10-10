@@ -52,7 +52,8 @@ mkInstance ids vs = Instance ids 0 vs (LBool True) UnknownIfInductive
 
 data ImplGrNode
   = AndNode Inductive
-  | OrNode Inductive
+  | OrInputNode Inductive
+  | OrOutputNode Inductive
   | InstanceNode Instance
   | QueryNode Form
   | FoldedNode Node
@@ -63,7 +64,8 @@ makePrisms ''ImplGrNode
 instance Pretty ImplGrNode where
   pPrint = \case
     AndNode i -> text "AND" <+> pPrint i
-    OrNode i -> text "OR" <+> pPrint i
+    OrInputNode i -> text "OR-IN" <+> pPrint i
+    OrOutputNode i -> text "OR-OUT" <+> pPrint i
     InstanceNode i -> pPrint i
     QueryNode f -> pPrint f
     FoldedNode n -> text "FOLDED" <+> pPrint n

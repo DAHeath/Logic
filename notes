@@ -1,0 +1,7 @@
+# Optimizations
++ Halt inductive check after finding inductive
++ Only perform induction checks on those nodes which need it (intersect with order)
++ Better ancestor tracing
+
+# Equivalence
++ Refine Or Node (how does an or node have multiple exits?)
