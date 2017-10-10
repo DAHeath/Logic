@@ -1,22 +1,13 @@
 {-# LANGUAGE QuasiQuotes #-}
 
-import qualified Data.Graph.Inductive.Basic as G
 import qualified Data.Graph.Inductive.Graph as G
-import qualified Data.Graph.Inductive.PatriciaTree as G
 import qualified Data.Graph.Inductive.Extras as G
-import           Data.Set (Set)
-import qualified Data.Set as S
-import           Data.Map (Map)
 import qualified Data.Map as M
-import           Data.Tree (Tree)
-import qualified Data.Tree as T
 
 import           Logic.Entailment
 import qualified Logic.Type as T
-import           Logic.Formula
 import           Logic.Formula.Parser
 import           Logic.Var
-import           Logic.Solver.Z3
 
 import           Text.PrettyPrint.HughesPJClass
 
@@ -39,11 +30,8 @@ g =
   G.insNode (2, QueryNode [form|not (i:Int = 41)|])
   G.empty
 
-b :: [G.LEdge EntailmentEdge]
-b = backEdges [3] g
-
 g' :: Entailment
-g' = G.efilter (`notElem` b) g
+g' = foldBackedges [3] g
 
 main :: IO ()
 main = do

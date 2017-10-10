@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase, OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies, OverloadedStrings #-}
 module Data.Graph.Inductive.Extras where
 
 import           Control.Lens hiding (pre)
@@ -124,7 +124,7 @@ cartesianProduct f g1 g2 =
     in foldr insEdge (foldr insNode empty ns) (ls1' ++ ls2')
 
 
--- | Perform a topological sort over the nodes in the graph.
+-- | Perform a topological sort over the nodes in the graph (Kahn's Algorithm).
 topOrder :: DynGraph gr => gr a b -> Maybe [Node]
 topOrder g =
   let terms = S.fromList $ filter (null . pre g) (nodes g)
@@ -163,3 +163,12 @@ display fn g =
     Turtle.shell ("dot -Tpdf " <> fn' <> "> " <> fn' <> ".pdf") Turtle.empty
     Turtle.shell ("open " <> fn' <> ".pdf") Turtle.empty
     return ()
+
+type instance Index (Gr n e) = Node
+type instance IxValue (Gr n e) = n
+instance Ixed (Gr n e) where
+instance At (Gr n e) where
+  at n f g = f mv <&> \r -> case r of
+    Nothing -> maybe g (const (delNode n g)) mv
+    Just v' -> insNode (n, v') g
+    where mv = lab g n
