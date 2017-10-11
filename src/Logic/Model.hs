@@ -13,7 +13,7 @@ import           Text.PrettyPrint.HughesPJClass (Pretty, pPrint)
 import qualified Text.PrettyPrint.HughesPJClass as PP
 
 -- | A model is an assignment of variables to formulas.
-newtype Model = Model (Map Var Form)
+newtype Model = Model { getModel :: Map Var Form }
   deriving (Show, Read, Eq, Ord, Data)
 
 instance Pretty Model where

@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase, DeriveDataTypeable, FlexibleContexts #-}
 module Language.Imperative where
 
 import           Control.Monad.State

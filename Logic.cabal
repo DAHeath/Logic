@@ -32,8 +32,10 @@ library
 
   default-extensions:  LambdaCase
                      , DeriveDataTypeable
-  other-extensions:    GeneralizedNewtypeDeriving
-                     , TemplateHaskell
+                     , GeneralizedNewtypeDeriving
+                     , RankNTypes
+                     , FlexibleContexts
+  other-extensions:    TemplateHaskell
 
   build-depends:       base             >= 4.8
                      , containers       >= 0.5

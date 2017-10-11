@@ -39,7 +39,7 @@ g =
   G.insNode (0, InstanceNode (mkInstance [0] [])) $
   G.insNode (1, InstanceNode (mkInstance [1] s)) $
   G.insNode (2, InstanceNode (mkInstance [2] s)) $
-  G.insNode (3, QueryNode [form|not (i:Int = 41)|])
+  G.insNode (3, QueryNode [form|not (i:Int = 3)|])
   G.empty
 
 bs = backEdges [3] g

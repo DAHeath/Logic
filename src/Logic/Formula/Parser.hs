@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Logic.Formula.Parser where
 
 import           Data.Data (Data)

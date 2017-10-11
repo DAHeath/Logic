@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase, FlexibleContexts, QuasiQuotes, TemplateHaskell #-}
+{-# LANGUAGE LambdaCase, QuasiQuotes, TemplateHaskell #-}
 module Language.Imperative.Concurrent where
 
 import           Language.Imperative

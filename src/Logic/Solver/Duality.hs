@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, RankNTypes, TemplateHaskell, TupleSections #-}
+{-# LANGUAGE TemplateHaskell, TupleSections #-}
 module Logic.Solver.Duality where
 
 import           Control.Monad.State

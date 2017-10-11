@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 module Logic.ImplicationGraph.Induction where
 
 import           Control.Lens hiding (Context)

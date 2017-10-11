@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 module Logic.ImplicationGraph where
 
 import           Control.Lens hiding (Context)
@@ -16,7 +16,6 @@ import           Data.Maybe (mapMaybe)
 import           Data.Foldable (foldrM)
 
 import           Logic.Model
-import           Logic.Formula
 import           Logic.ImplicationGraph.Type
 import           Logic.ImplicationGraph.Interpolate
 import           Logic.ImplicationGraph.Induction
