@@ -32,7 +32,7 @@ isInductive g = do
         OrOutputNode _ -> indSucc allM _OrOutputNode n
         InstanceNode i -> do
           indSucc allM (_InstanceNode . inductive) n
-          whenM (not <$> liftIO (isSat (i ^. formula)))
+          when (i ^. formula == LBool False)
             (instanceInductive n .= InductiveFalse)
           ancs <- ancestorInstances n (i ^. identity)
           void $ anyM (covers n i) ancs
