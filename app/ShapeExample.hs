@@ -1,67 +1,82 @@
 {-# LANGUAGE QuasiQuotes #-}
 
 import           Control.Monad.State
+import           Control.Monad.Except
 
-import           Data.Graph.Inductive.PatriciaTree
-import           Data.Graph.Inductive.Basic
-import           Data.Graph.Inductive.Graph
-import           Data.Graph.Inductive.Extras
+import qualified Data.Graph.Inductive.Graph as G
+import qualified Data.Graph.Inductive.Extras as G
 import qualified Data.Map as M
-import           Data.Set (Set)
-import qualified Data.Set as S
 
 import qualified Logic.Type as T
-import           Logic.Formula
 import           Logic.Formula.Parser
 import           Logic.Var
-import           Language.Imperative
--- import           Language.Imperative.Shape
+import           Logic.ImplicationGraph
+import           Logic.ImplicationGraph.Type
+import           Text.PrettyPrint.HughesPJClass
 
-h, t, i, c, n :: Var
-h = Free "h" T.Int
-t = Free "t" T.Int
-i = Free "i" T.Int
-c = Free "c" T.Int
-n = Free "n" T.Int
+h, h', t, t', i, i', c, c', n, next, next' :: Var
+h  = Free "h"  T.Int
+h' = Free "h'" T.Int
+t  = Free "t"  T.Int
+t' = Free "t'" T.Int
+i  = Free "i"  T.Int
+i' = Free "i'" T.Int
+c  = Free "c"  T.Int
+c' = Free "c'" T.Int
+n  = Free "n" T.Int
+next  = Free "next" (T.Array T.Int T.Int)
+next' = Free "next" (T.Array T.Int T.Int)
 
-example :: Comm
-example = Seq
-  (Ass h (Expr [form|1|])) $ Seq
-  (Ass t (Expr (V h))) $ Seq
-  (Ass i (Expr [form|2|])) $ Seq
-  (Ass c (Expr [form|0|])) $ Seq
-  (Loop [form|c:Int < n:Int|] $ Seq
-    (Save "next" (V t) (V i)) $ Seq
-    (Ass t (Expr (V i)))
-    (Ass i (Expr [form|i:Int + 1|]))) $ Seq
-  (Ass c (Expr [form|0|]))
-  (Loop [form|c:Int < n:Int|]
-    (Ass h (Load "next" (V h))))
+s :: [Var]
+s = [h, t, i, c, n, next]
 
+-- example :: Comm
+-- example = Seq
+--   (Ass h (Expr [form|1|])) $ Seq
+--   (Ass t (Expr (V h))) $ Seq
+--   (Ass i (Expr [form|2|])) $ Seq
+--   (Ass c (Expr [form|0|])) $ Seq
+--   (Loop [form|c:Int < n:Int|] $ Seq
+--     (Save "next" (V t) (V i)) $ Seq
+--     (Ass t (Expr (V i)))
+--     (Ass i (Expr [form|i:Int + 1|]))) $ Seq
+--   (Ass c (Expr [form|0|]))
+--   (Loop [form|c:Int < n:Int|]
+--     (Ass h (Load "next" (V h))))
 
-g, g' :: Gr () SemAct
-g = commGraph example
-g' = efilter (`notElem` b) $ unfold (b !! 1) (unfold (head b) g)
-
-b :: [LEdge SemAct]
-b = backEdges g
-
-hasStore :: SemAct -> Bool
-hasStore SemSave{} = True
-hasStore (SemSeq s1 s2) = hasStore s1 || hasStore s2
-hasStore _ = False
-
-storePositions :: Gr a SemAct -> Set Node
-storePositions = ufold (\ctx ns -> S.union (ctxStores ctx) ns) S.empty
-  where
-    ctxStores :: Context a SemAct -> Set Node
-    ctxStores (bef, n, _, aft) =
-      let nStore = if any (hasStore.fst) aft then S.singleton n else S.empty
-          inStore = S.unions $
-             map (\(ac, n') -> if hasStore ac then S.singleton n' else S.empty) bef
-      in S.union nStore inStore
+g :: ImplGr
+g =
+  G.insEdge (0, 1, ImplGrEdge [form| h:Int = 1
+                                  && t:Int = 1
+                                  && i:Int = 2
+                                  && c:Int = 0|]
+                              M.empty) $
+  G.insEdge (1, 1, ImplGrEdge [form| c:Int < n:Int
+                                  && next':Arr{Int,Int} = store next:Arr{Int,Int} t:Int i:Int
+                                  && t':Int = i:Int
+                                  && i':Int = i:Int + 1
+                                  && c':Int = c:Int + 1|]
+                              (M.fromList [(next, next'), (t, t'), (i, i'), (c, c')])) $
+  G.insEdge (1, 2, ImplGrEdge [form| c:Int >= n:Int && c':Int = 0|]
+                              (M.singleton c c')) $
+  G.insEdge (2, 2, ImplGrEdge [form| c:Int < n:Int
+                                  && c':Int = c:Int + 1
+                                  && h':Int = select next:Arr{Int,Int} h:Int |]
+                              (M.fromList [(h, h'), (c, c')])) $
+  G.insEdge (2, 3, ImplGrEdge [form|c:Int >= n:Int|] M.empty) $
+  G.insNode (0, InstanceNode (mkInstance [0, 0] [])) $
+  G.insNode (1, InstanceNode (mkInstance [1, 1] s)) $
+  G.insNode (2, InstanceNode (mkInstance [2, 2] s)) $
+  G.insNode (3, QueryNode [form|h:Int = t:Int|])
+  G.empty
 
 main :: IO ()
 main = do
-  display "shape" g
-  display "shape-u1" g'
+  G.display "shape" g
+  sol <- evalStateT (runExceptT $ step [4] g) emptySolveState
+  case sol of
+    Left (Failed m) -> putStrLn $ prettyShow m
+    Left (Complete g') -> do
+      putStrLn "Done!"
+      G.display "shape-2" g'
+    Right g' -> G.display "shape-2" g'

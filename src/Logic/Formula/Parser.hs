@@ -50,13 +50,15 @@ atom :: CharParser st Form
 atom = try app <|> nonapp
   where
     nonapp = parens parseForm <|> (V <$> try var) <|> bool <|> integer
-    app = (res "not"      >> (:@) Not                 <$> nonapp)
-      <|> (res "if"       >> appMany (If T.Int)       <$> sequence [nonapp, nonapp, nonapp])
-      <|> (res "distinct" >> appMany (Distinct T.Int) <$> many1 nonapp)
-      <|> (res "and"      >> manyAnd                  <$> many1 nonapp)
-      <|> (res "or"       >> manyOr                   <$> many1 nonapp)
-      <|> (res "add"      >> appMany (Add T.Int)      <$> many1 nonapp)
-      <|> (res "mul"      >> appMany (Mul T.Int)      <$> many1 nonapp)
+    app = (res "not"      >> (:@) Not                    <$> nonapp)
+      <|> (res "if"       >> appMany (If T.Int)          <$> sequence [nonapp, nonapp, nonapp])
+      <|> (res "store"    >> appMany (Store T.Int T.Int) <$> sequence [nonapp, nonapp, nonapp])
+      <|> (res "select"   >> appMany (Select T.Int T.Int)<$> sequence [nonapp, nonapp])
+      <|> (res "distinct" >> appMany (Distinct T.Int)    <$> many1 nonapp)
+      <|> (res "and"      >> manyAnd                     <$> many1 nonapp)
+      <|> (res "or"       >> manyOr                      <$> many1 nonapp)
+      <|> (res "add"      >> appMany (Add T.Int)         <$> many1 nonapp)
+      <|> (res "mul"      >> appMany (Mul T.Int)         <$> many1 nonapp)
       <|> (do n <- ident
               op ":"
               t <- typ
@@ -69,7 +71,14 @@ bool = const (LBool True)  <$> res "true"
    <|> const (LBool False) <$> res "false"
 
 typ :: CharParser st Type
-typ = (res "Bool" >> return T.Bool)
+typ = (do res "Arr"
+          _ <- symbol "{"
+          t1 <- typ
+          _ <- symbol ","
+          t2 <- typ
+          _ <- symbol "}"
+          return (T.Array t1 t2))
+  <|> (res "Bool" >> return T.Bool)
   <|> (res "Int"  >> return T.Int)
   <|> (res "Real" >> return T.Real)
   <|> (res "Unit" >> return T.Unit)
@@ -206,6 +215,7 @@ lexer = T.makeTokenParser (emptyDef { T.identStart = letter <|> char '_' <|> cha
                                                         , "cond"
                                                         , "return"
                                                         , "assert"
+                                                        , "Int", "Bool", "Real", "Arr"
                                                         ]
                                     })
 

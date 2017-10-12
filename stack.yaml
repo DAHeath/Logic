@@ -4,7 +4,7 @@ packages:
 - '.'
 - location:
     git: https://github.com/DAHeath/z3-haskell
-    commit: b2deeb30f1ac1a8da57fe53f63985d300043b1d0
+    commit: 03b02396c09b659ca8355e2290d3ebfcbd969a2b
   extra-dep: true
 extra-deps:
 - safepath-0.1.0.0

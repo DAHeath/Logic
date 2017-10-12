@@ -412,7 +412,10 @@ sortToType s = do
     Z3_INT_SORT            -> return T.Int
     Z3_REAL_SORT           -> return T.Real
     Z3_BV_SORT             -> error "unsupported sort kind"
-    Z3_ARRAY_SORT          -> error "unsupported sort kind"
+    Z3_ARRAY_SORT          -> do
+      d <- sortToType =<< getArraySortDomain s
+      r <- sortToType =<< getArraySortRange s
+      return (T.Array d r)
     Z3_DATATYPE_SORT       -> error "unsupported sort kind"
     Z3_RELATION_SORT       -> error "unsupported sort kind"
     Z3_FINITE_DOMAIN_SORT  -> error "unsupported sort kind"
