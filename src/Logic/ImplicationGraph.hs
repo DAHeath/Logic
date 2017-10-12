@@ -20,7 +20,6 @@ import           Logic.Model
 import           Logic.ImplicationGraph.Type
 import           Logic.ImplicationGraph.Interpolate
 import           Logic.ImplicationGraph.Induction
-import           Logic.Solver.Z3 hiding (interpolate)
 
 data Result
   = Failed Model

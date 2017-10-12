@@ -17,20 +17,6 @@ import           Text.PrettyPrint.HughesPJClass as PP
 type InstanceId = Int
 type Lbl = Int
 
-data Inductive
-  = NotInductive
-  | InductiveSucc
-  | InductiveFalse
-  | InductiveCover
-  deriving (Show, Read, Eq, Ord, Data)
-
-instance Pretty Inductive where
-  pPrint = \case
-    NotInductive -> text "NOT-IND"
-    InductiveSucc -> text "IND-BY-SUCC"
-    InductiveFalse -> text "IND-BY-FALSE"
-    InductiveCover -> text "COVERED"
-
 data Instance = Instance
   { _identity :: [Lbl]
   , _instanceId :: InstanceId

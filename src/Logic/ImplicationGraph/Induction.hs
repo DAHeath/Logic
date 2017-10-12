@@ -2,16 +2,14 @@
 module Logic.ImplicationGraph.Induction where
 
 import           Control.Lens hiding (Context)
-import           Control.Monad.Loops (allM, anyM)
-import           Control.Monad.Extra (whenM)
+import           Control.Monad.Loops (allM, anyM, orM)
 import           Control.Monad.State
 
 import           Data.Graph.Inductive.Graph hiding ((&))
 import           Data.Graph.Inductive.Extras hiding (backEdges)
-import           Data.Graph.Inductive.Query.DFS (topsort)
 import           Data.Maybe (fromJust)
-import           Data.Map (Map)
-import qualified Data.Map as M
+import           Data.IntMap (IntMap)
+import qualified Data.IntMap as M
 
 import           Logic.Solver.Z3
 import           Logic.Formula
@@ -21,43 +19,25 @@ import           Logic.ImplicationGraph.Type
 isInductive :: ImplGr -> IO Bool
 isInductive g = evalStateT (ind 0) M.empty
   where
-    ind :: Node -> StateT (Map Node Inductive) IO Bool
-    ind n = do
-      i <- M.lookup n <$> get
-      case i of
-        Just i' -> return $ isInd i'
-        Nothing -> computeInd n
+    ind :: Node -> StateT (IntMap Bool) IO Bool
+    ind n = maybe (computeInd n) return . M.lookup n =<< get
 
-    computeInd :: Node -> StateT (Map Node Inductive) IO Bool
-    computeInd n =
+    computeInd :: Node -> StateT (IntMap Bool) IO Bool
+    computeInd n = do
       let node = look n
-      in case node of
-        AndNode -> indSucc allM n
-        OrInputNode -> indSucc anyM n
-        OrOutputNode -> indSucc allM n
+      b <- case node of
+        AndNode      -> allM ind (suc g n)
+        OrInputNode  -> anyM ind (suc g n)
+        OrOutputNode -> allM ind (suc g n)
+        QueryNode _  -> return True
+        FoldedNode _ -> return False
         InstanceNode i -> do
           let ancs = manyOr $ ancestorInstances n (i ^. identity)
-          b <- covers n i ancs
-          if b then return True
-          else if i ^. formula == LBool False
-            then do
-              modify (M.insert n InductiveFalse)
-              return False
-            else
-              indSucc allM n
-        QueryNode _ -> return True
-        FoldedNode _ -> return False
-
-    indSucc f n = do
-      b <- f ind (suc g n)
-      if b then do
-        modify (M.insert n InductiveSucc)
-        return True
-      else return False
-
-    covers n i f = do
-      b <- liftIO $ entails (i ^. formula) f
-      when b (modify (M.insert n InductiveCover))
+          orM [ return $ i ^. formula == LBool False
+              , liftIO $ entails (i ^. formula) ancs
+              , allM ind (suc g n)
+              ]
+      modify (M.insert n b)
       return b
 
     ancestorInstances :: Node -> [Lbl] -> [Form]
@@ -71,11 +51,3 @@ isInductive g = evalStateT (ind 0) M.empty
 
     look :: Node -> ImplGrNode
     look n = fromJust $ g ^. at n
-
--- | Check if the inductive label indicates it is inductive.
-isInd :: Inductive -> Bool
-isInd = \case
-  NotInductive   -> False
-  InductiveSucc  -> True
-  InductiveFalse -> True
-  InductiveCover -> True
