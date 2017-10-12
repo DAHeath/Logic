@@ -93,14 +93,14 @@ entailmentChc g =
 connect :: ((Node, ImplGrNode), ImplGrEdge, (Node, ImplGrNode)) -> State ChcState ()
 connect ((n1, l1), e, (n2, l2)) =
   case (l1, l2) of
-    (_              , FoldedNode _  ) -> return ()
-    (InstanceNode i1, AndNode _     ) -> update andClauses n2 ([i1], Last Nothing)
-    (InstanceNode i1, OrInputNode _ ) -> update orInputs   n2 (Last (Just i1), [])
-    (OrInputNode _  , OrOutputNode _) -> update orInputs   n1 (Last Nothing, [n2])
-    (OrOutputNode _ , rhs           ) -> update orOutputs  n1 [(e, (rhsNode rhs))]
-    (AndNode _      , rhs           ) -> update andClauses n1 ([], Last (Just (e, rhsNode rhs)))
-    (InstanceNode i1, rhs           ) -> linearClauses %= (:) (LinClause i1 e (rhsNode rhs))
-    (_ , _ ) -> error ("found invalid connection " ++ show l1 ++ " -> " ++ show l2)
+    (_              , FoldedNode _ ) -> return ()
+    (InstanceNode i1, AndNode      ) -> update andClauses n2 ([i1], Last Nothing)
+    (InstanceNode i1, OrInputNode  ) -> update orInputs   n2 (Last (Just i1), [])
+    (OrInputNode    , OrOutputNode ) -> update orInputs   n1 (Last Nothing, [n2])
+    (OrOutputNode   , rhs          ) -> update orOutputs  n1 [(e, rhsNode rhs)]
+    (AndNode        , rhs          ) -> update andClauses n1 ([], Last (Just (e, rhsNode rhs)))
+    (InstanceNode i1, rhs          ) -> linearClauses %= (:) (LinClause i1 e (rhsNode rhs))
+    (_ , _) -> error ("found invalid connection " ++ show l1 ++ " -> " ++ show l2)
   where
     update :: Monoid a => Lens' ChcState (Map Node a) -> Node -> a -> State ChcState ()
     update len n v = len %= M.insertWith mappend n v
@@ -119,7 +119,7 @@ chcFromState st =
   where
     -- | Construct a linear Horn Clause.
     lin :: Instance -> ImplGrEdge -> EntryRhs -> Chc
-    lin i1 (ImplGrEdge f m) r = case (subst m r) of
+    lin i1 (ImplGrEdge f m) r = case subst m r of
       RhsInstance i2 -> Rule [instanceApp i1] f (instanceApp i2)
       RhsQuery q -> Query [instanceApp i1] f q
 
@@ -128,7 +128,7 @@ chcFromState st =
     andMapChc :: Map Node ([Instance], Last (ImplGrEdge, EntryRhs)) -> [Chc]
     andMapChc m = do
       (is, Last (Just (ImplGrEdge f m', r))) <- M.elems m
-      return $ case (subst m' r) of
+      return $ case subst m' r of
         RhsInstance i' -> Rule (map instanceApp is) f (instanceApp i')
         RhsQuery q -> Query (map instanceApp is) f q
 

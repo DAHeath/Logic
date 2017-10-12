@@ -96,7 +96,7 @@ executable GraphExample
 executable ImperativeExample
   hs-source-dirs:      app
   main-is:             ImperativeExample.hs
-  ghc-options:
+  ghc-options:        -prof -fprof-auto -rtsopts
   build-depends:       base
                      , text             >= 1.2
                      , pretty           >= 1.1.3

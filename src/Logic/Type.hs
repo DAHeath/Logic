@@ -10,6 +10,7 @@ data Type
   | Real
   | Type :=> Type
   | List Type
+  | Array Type Type
   deriving (Show, Read, Eq, Ord, Data)
 
 infixr 0 :=>

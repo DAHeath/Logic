@@ -35,11 +35,9 @@ g =
   G.insEdge (1, 1, ImplGrEdge [form|i':Int = i:Int + 2 && i:Int < n:Int|]
                                   (M.singleton i i')) $
   G.insEdge (1, 2, ImplGrEdge [form|i:Int >= n:Int|] M.empty) $
-  G.insEdge (2, 3, ImplGrEdge [form|true|] M.empty) $
   G.insNode (0, InstanceNode (mkInstance [0] [])) $
   G.insNode (1, InstanceNode (mkInstance [1] s)) $
-  G.insNode (2, InstanceNode (mkInstance [2] s)) $
-  G.insNode (3, QueryNode [form|not (i:Int = 27)|])
+  G.insNode (2, QueryNode [form|not (i:Int = 41)|])
   G.empty
 
 bs = backEdges [3] g

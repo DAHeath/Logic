@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, ConstraintKinds #-}
 
 module Logic.Solver.Z3 where
 
@@ -23,6 +23,7 @@ import qualified Logic.Type as T
 import qualified Logic.Model as M
 
 import           Z3.Monad hiding (local)
+import qualified Text.PrettyPrint.HughesPJClass as PP
 
 data Env = Env { _envVars :: Map Var AST
                , _envFuns :: Map Var FuncDecl
@@ -30,27 +31,31 @@ data Env = Env { _envVars :: Map Var AST
 
 makeLenses ''Env
 
+type SMT m = (MonadState Env m, MonadZ3 m, MonadReader DeBrujin m)
+
 -- | Invoke `duality` to solve the relational post fixed-point problem.
 solveChc :: MonadIO m => [Chc] -> m (Either M.Model M.Model)
-solveChc hcs = runEnvZ3 script
+solveChc hcs = runEnvZ3 sc
   where
-    script =
+    sc =
       let (queries, rules) = partition C.isQuery hcs
-          qids = map (\n -> "q" ++ show n) [0..length queries-1]
-          satForms = map F.toForm rules ++ zipWith mkQuery queries qids
+          qids = map (const "q") queries -- map (\n -> "q" ++ show n) [0..length queries-1]
+          qs = zipWith mkQuery queries qids
+          satForms = map F.toForm rules ++ qs
           rids = map (\n -> "RULE" ++ show n) [0..length hcs-1]
       in do
-         useDuality
-         forms <- traverse formToAst satForms
-         rids' <- traverse mkStringSymbol rids
-         zipWithM_ fixedpointAddRule forms rids'
+        useDuality
+        forms <- traverse formToAst satForms
+        rids' <- traverse mkStringSymbol rids
+        zipWithM_ fixedpointAddRule forms rids'
 
-         let quers = map (`Free` T.Bool) qids
-         quers' <- traverse funcToDecl quers
-         res <- fixedpointQueryRelations quers'
-         case res of
-           Unsat -> Right <$> (modelToModel =<< fixedpointGetModel)
-           _     -> Left <$> (modelToModel =<< fixedpointGetRefutation)
+        -- let quers = map (`Free` T.Bool) qids
+        let quers = [Free "q" T.Bool]
+        quers' <- traverse funcToDecl quers
+        res <- fixedpointQueryRelations quers'
+        case res of
+          Unsat -> Right <$> (modelToModel =<< fixedpointGetModel)
+          _     -> Left <$> (modelToModel =<< fixedpointGetRefutation)
 
     mkQuery q n =
       let theQuery = F.V $ Free n T.Bool in
@@ -108,12 +113,11 @@ isSat f = do
 
 -- | Test the validity of the input formula.
 isValid :: MonadIO m => Form -> m Bool
-isValid f = do
-  sol <- runEnvZ3 sc
+isValid f = runEnvZ3 $ do
+  sol <- sc
   case sol of
     Unsat -> return True
     _     -> return False
-
   where sc = (assert =<< formToAst (F.Not :@ f)) >> check
 
 -- | Is `f -> g` a valid formula?
@@ -187,7 +191,7 @@ runEnvZ3 ac = liftIO $ evalZ3 (evalStateT (runReaderT (getEnvZ3 ac') []) emptyEn
     emptyEnv = Env M.empty M.empty
 
 -- | Convert the ADT formula to a Z3 formula.
-formToAst :: (MonadState Env z3, MonadZ3 z3) => Form -> z3 AST
+formToAst :: SMT m => Form -> m AST
 formToAst f =
   case f of
     F.V v               -> var v
@@ -218,7 +222,7 @@ formToAst f =
         Just v' -> return v'
 
 -- | Convert a function application to a Z3 formula.
-appToZ3 :: (MonadState Env z3, MonadZ3 z3) => Form -> [Form] -> z3 AST
+appToZ3 :: SMT m => Form -> [Form] -> m AST
 appToZ3 f args =
   case f of
     F.V v        -> join $ mkApp <$> funcToDecl v <*> traverse formToAst args
@@ -233,15 +237,16 @@ appToZ3 f args =
     F.Iff        -> two mkIff
     F.Div _      -> two mkDiv
     F.Mod _      -> two mkMod
-    F.If _       -> join $ mkIte <$> formToAst (head args)
-                                 <*> formToAst (args !! 1)
-                                 <*> formToAst (args !! 2)
+    F.If _       -> three mkIte
 
     F.Eql _      -> two mkEq
     F.Lt _       -> two mkLt
     F.Le _       -> two mkLe
     F.Gt _       -> two mkGt
     F.Ge _       -> two mkGe
+
+    F.Store _ _  -> three mkStore
+    F.Select _ _ -> two mkSelect
 
     F.LUnit      -> undefined
     F.LBool b    -> mkBool b
@@ -252,6 +257,9 @@ appToZ3 f args =
   where
     many o = o =<< traverse formToAst args
     two o = join $ o <$> formToAst (head args) <*> formToAst (args !! 1)
+    three o = join $ o <$> formToAst (head args)
+                       <*> formToAst (args !! 1)
+                       <*> formToAst (args !! 2)
 
 funcToDecl :: (MonadState Env z3, MonadZ3 z3) => Var -> z3 FuncDecl
 funcToDecl r = do
@@ -296,6 +304,8 @@ formFromApp name args range
   | name == "-"        = if length args == 1
                          then F.app2 (F.Sub T.Int) (F.LInt 0) <$> astToForm (head args)
                          else lift2 (F.Sub T.Int)
+  | name == "select"   = lift2 (F.Select T.Int T.Int)
+  | name == "store"    = lift3 (F.Store T.Int T.Int)
   | otherwise = do
     -- Found a function that is as of yet unknown.
     liftIO $ putStrLn ("applying: " ++ name)
@@ -305,6 +315,9 @@ formFromApp name args range
     let f = Free name (T.curryType domain range')
     return $ F.appMany (F.V f) args'
   where lift2 f = F.app2 f <$> astToForm (head args) <*> astToForm (args !! 1)
+        lift3 f = F.app3 f <$> astToForm (head args)
+                           <*> astToForm (args !! 1)
+                           <*> astToForm (args !! 2)
         liftMany f = F.appMany f <$> traverse astToForm args
 
 -- | Convert a Z3 model to the AST-based formula model.
@@ -382,12 +395,13 @@ astToForm arg = do
 
 typeToSort :: MonadZ3 z3 => Type -> z3 Sort
 typeToSort = \case
-  T.Unit    -> mkIntSort
-  T.Bool    -> mkBoolSort
-  T.Int     -> mkIntSort
-  T.Real    -> mkRealSort
-  _ :=> _   -> undefined
-  T.List _  -> undefined
+  T.Unit       -> mkIntSort
+  T.Bool       -> mkBoolSort
+  T.Int        -> mkIntSort
+  T.Real       -> mkRealSort
+  T.Array t t' -> join $ mkArraySort <$> typeToSort t <*> typeToSort t'
+  _ :=> _      -> undefined
+  T.List _     -> undefined
 
 sortToType :: MonadZ3 z3 => Sort -> z3 Type
 sortToType s = do

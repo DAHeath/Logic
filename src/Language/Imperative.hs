@@ -29,14 +29,14 @@ data Comm
   | Skip
   | Lbl Int Comm
   | Jump Int
-  | Store Name Form Form
+  | Save Name Form Form
   deriving (Show, Eq, Ord, Data)
 
 -- | The right hand side of an assignment.
 data RHS
   = Expr Form
   | Arbitrary Type
-  | Select Name Form
+  | Load Name Form
   deriving (Show, Eq, Ord, Data)
 
 commChc :: Comm -> [Chc]
@@ -52,7 +52,7 @@ data SemAct
   | SemCase Form SemAct SemAct
   | SemSkip
   | SemPredicate Form
-  | SemStore Name Form Form
+  | SemSave Name Form Form
   deriving (Show, Eq, Ord, Data)
 
 semantics :: SemAct -> (Form, Map Var Var)
@@ -69,8 +69,8 @@ semantics ac = let (f, (m, _)) = runState (sem ac) (M.empty, S.empty)
           Expr e' -> do
             let e'' = subst m e'
             return (app2 (Eql $ typeOf v') (V v') e'')
-          Select{} ->
-            -- Select statements cannot translated to formulas.
+          Load{} ->
+            -- Load statements cannot translated to formulas.
             return (LBool False)
         put (M.insert v v' m, S.insert v' s)
         return e
@@ -92,8 +92,8 @@ semantics ac = let (f, (m, _)) = runState (sem ac) (M.empty, S.empty)
       SemPredicate e  -> do
         (m, _) <- get
         return $ subst m e
-      SemStore{} ->
-        -- Store statements cannot translated to formulas.
+      SemSave{} ->
+        -- Save statements cannot translated to formulas.
         return (LBool False)
 
     -- | On if branches, one branch might alias a variable more than the other.
@@ -124,7 +124,7 @@ isSimple = \case
   Jump _       -> False
   Ass _ _      -> True
   Skip         -> True
-  Store{}      -> True
+  Save{}      -> True
 
 -- | Convert a command to a semantic action. Only a subset of commands are
 -- convertible to semantic actions, any in general full commands should be
@@ -138,7 +138,7 @@ commSem = \case
   Lbl _ _      -> SemSkip
   Jump _       -> SemSkip
   Skip         -> SemSkip
-  Store f i v  -> SemStore f i v
+  Save f i v   -> SemSave f i v
 
 -- | A flow graph presents the semantic actions of the program as vertices with
 -- transition formulas on the edges. The semantic actions are labelled with the
@@ -224,13 +224,13 @@ instance Pretty Comm where
     Skip         -> text "SKIP"
     Lbl l c      -> text ("LABEL: " ++ show l) $+$ pPrint c
     Jump l       -> text ("JUMP: " ++ show l)
-    Store f i v  -> hsep [text "STORE", text f, pPrint i, pPrint v]
+    Save f i v   -> hsep [text "SAVE", text f, pPrint i, pPrint v]
 
 instance Pretty RHS where
   pPrint = \case
     Expr f -> pPrint f
     Arbitrary t -> text "ANY" <+> pPrint t
-    Select f i -> hsep [text "SELECT", text f, pPrint i]
+    Load f i -> hsep [text "LOAD", text f, pPrint i]
 
 instance Pretty SemAct where
   pPrint = \case
@@ -240,4 +240,4 @@ instance Pretty SemAct where
     SemCase e c1 c2 -> (text "IF" <+> pPrint e) $+$ nest 2 (pPrint c1) $+$
                        text "ELSE" $+$ nest 2 (pPrint c2)
     SemSkip         -> text "SKIP"
-    SemStore f i v  -> hsep [text "STORE", text f, pPrint i, pPrint v]
+    SemSave f i v  -> hsep [text "SAVE", text f, pPrint i, pPrint v]

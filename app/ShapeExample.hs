@@ -31,23 +31,23 @@ example = Seq
   (Ass i (Expr [form|2|])) $ Seq
   (Ass c (Expr [form|0|])) $ Seq
   (Loop [form|c:Int < n:Int|] $ Seq
-    (Store "next" (V t) (V i)) $ Seq
+    (Save "next" (V t) (V i)) $ Seq
     (Ass t (Expr (V i)))
     (Ass i (Expr [form|i:Int + 1|]))) $ Seq
   (Ass c (Expr [form|0|]))
   (Loop [form|c:Int < n:Int|]
-    (Ass h (Select "next" (V h))))
+    (Ass h (Load "next" (V h))))
 
 
--- g, g' :: Gr () SemAct
--- g = commGraph example
--- g' = efilter (`notElem` b) $ unfold (b !! 1) (unfold (head b) g)
+g, g' :: Gr () SemAct
+g = commGraph example
+g' = efilter (`notElem` b) $ unfold (b !! 1) (unfold (head b) g)
 
--- b :: [LEdge SemAct]
--- b = backEdges g
+b :: [LEdge SemAct]
+b = backEdges g
 
 hasStore :: SemAct -> Bool
-hasStore SemStore{} = True
+hasStore SemSave{} = True
 hasStore (SemSeq s1 s2) = hasStore s1 || hasStore s2
 hasStore _ = False
 
@@ -62,7 +62,6 @@ storePositions = ufold (\ctx ns -> S.union (ctxStores ctx) ns) S.empty
       in S.union nStore inStore
 
 main :: IO ()
-main = undefined
-  -- do
-  -- display "shape" g
-  -- display "shape-u1" g'
+main = do
+  display "shape" g
+  display "shape-u1" g'

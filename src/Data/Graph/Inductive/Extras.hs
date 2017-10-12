@@ -50,8 +50,11 @@ backEdges = filter (\(l1, l2, _) -> l2 <= l1) . labEdges
 removeReaching :: DynGraph gr => Node -> gr n e -> gr n e
 removeReaching l = efilter (\(_, l2, _) -> l2 /= l)
 
+reached :: DynGraph gr => Node -> gr n e -> gr n e
+reached n g = nfilter (`elem` reachable n g) g
+
 reverseReached :: DynGraph gr => Node -> gr n e -> gr n e
-reverseReached n g = nfilter (`elem` reachable n (grev g)) g
+reverseReached n g = reached n (grev g)
 
 ancestors :: DynGraph gr => gr n e -> Node -> [Node]
 ancestors g n = filter (/= n) $ nodes $ reverseReached n g
@@ -79,10 +82,22 @@ cartesianProduct f g1 g2 =
           return (n1*high + n2, n1*high + n2', l)
     in foldr insEdge (foldr insNode empty ns) (ls1' ++ ls2')
 
--- | Unfold the graph with respect to a given backedge.
--- unfold :: (LEdge ImplGrEdge) -> ImplGr -> ImplGr
 unfold :: Eq b => LEdge b -> Gr a b -> Gr a b
 unfold (l1, l2, b) g =
+  let g' = reached l2 g
+      -- relabel the subgraph
+      diff = order g - l2 + 1
+      relabelled = rebuildFrom diff g'
+
+      merged = overlay g relabelled
+      connected = insEdge (l1, l2 + diff, b) merged
+      loopMoved = delEdge (l1, l2) $ insEdge (l1+diff, l2+diff, b) connected
+  in loopMoved
+
+-- | Unfold the graph with respect to a given backedge.
+-- unfold :: (LEdge ImplGrEdge) -> ImplGr -> ImplGr
+unfold' :: Eq b => LEdge b -> Gr a b -> Gr a b
+unfold' (l1, l2, b) g =
   let g' = subgraphBetween l1 l2 g
       ns = nodes g'
       -- remove the edges which enter the expanded subgraph

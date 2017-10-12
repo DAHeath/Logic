@@ -1,10 +1,11 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, TemplateHaskell #-}
 module Logic.ImplicationGraph where
 
 import           Control.Lens hiding (Context)
 import           Control.Monad.State
 import           Control.Monad.Except
 
+import           Data.Data
 import           Data.Graph.Inductive.Graph hiding ((&))
 import           Data.Graph.Inductive.Basic
 import           Data.Graph.Inductive.Extras hiding (backEdges)
@@ -19,39 +20,53 @@ import           Logic.Model
 import           Logic.ImplicationGraph.Type
 import           Logic.ImplicationGraph.Interpolate
 import           Logic.ImplicationGraph.Induction
+import           Logic.Solver.Z3 hiding (interpolate)
 
 data Result
   = Failed Model
   | Complete ImplGr
   deriving (Show, Read, Eq)
 
+data SolveState = SolveState
+  { _finishedQueries :: [Node]
+  , _instanceMap :: Map [Lbl] InstanceId
+  } deriving (Show, Read, Eq, Ord, Data)
+
+makeLenses ''SolveState
+
+emptySolveState :: SolveState
+emptySolveState = SolveState [] M.empty
+
 solve :: [Int] -> ImplGr -> IO (Either Model ImplGr)
 solve dim g = do
-  let g' = foldBackedges bs g
-  sol <- evalStateT (runExceptT (loop g')) M.empty
+  sol <- evalStateT (runExceptT (loop g)) emptySolveState
   case sol of
     Left (Failed m) -> return (Left m)
     Left (Complete res) -> return (Right res)
     Right _ -> error "infinite loop terminated successfully?"
   where
-    bs = backEdges dim g
-    loop gr = loop =<< step bs gr
+    loop gr = loop =<< step dim gr
 
-step :: [LEdge ImplGrEdge] -> ImplGr
-     -> ExceptT Result (StateT (Map [Lbl] InstanceId) IO) ImplGr
-step bs g = do
-  sol <- liftIO $ interpolate g
+step :: [Int] -> ImplGr -> ExceptT Result (StateT SolveState IO) ImplGr
+step dim g = do
+  let bs = backEdges dim g
+  let g' = foldBackedges bs g
+  fQuers <- use finishedQueries
+  let g'' = nfilter (`notElem` fQuers) g'
+  sol <- liftIO $ interpolate g''
+  finishedQueries .= concatMap (\(n, l) -> case l of
+    QueryNode _ -> [n]
+    _ -> []) (labNodes g')
   case sol of
     Left m -> throwError $ Failed m
     Right g1 -> do
-      (b, g2) <- liftIO $ isInductive g1
-      if b then throwError $ Complete g2
+      b <- liftIO $ isInductive g1
+      if b then throwError $ Complete g1
       else do
-        let fes = foldedEdges g2
-        let g3 = foldr reconnectBackedge g2 fes
+        let fes = foldedEdges g'
+        let g3 = foldr reconnectBackedge g' fes
         let g4 = foldr unfold g3 bs
-        g5 <- relabelNewInstances g3 g4
-        return (foldBackedges bs g5)
+        relabelNewInstances g3 g4
 
   where
     relabelNewInstances g1 g2 =
@@ -61,10 +76,8 @@ step bs g = do
     relabelNode n g' = g' & at n . _Just . _InstanceNode %%~ relabelInstance
 
     relabelInstance i = do
-      m <- get
-      let inst = M.findWithDefault 0 (i ^. identity) m
-      let m' = M.insert (i ^. identity) (inst + 1) m
-      put m'
+      inst <- M.findWithDefault 0 (i ^. identity) <$> use instanceMap
+      instanceMap %= M.insert (i ^. identity) (inst + 1)
       return (i & instanceId .~ (inst + 1))
 
 reconnectBackedge :: LEdge ImplGrEdge -> ImplGr -> ImplGr
@@ -109,13 +122,13 @@ backEdges dims g = S.toList $ ufold (\c s -> s `S.union` ctxSet c) S.empty g
                 -> Set (LEdge ImplGrEdge)
     backEdgeSet e (n1, l1) (n2, l2) = case (l1, l2) of
       (InstanceNode l1', InstanceNode l2') ->
-        if (l2' ^. identity) `leq` (l1' ^. identity)
+        if (l2' ^. instanceId, l2' ^. identity) `leq` (l1' ^. instanceId, l1' ^. identity)
         then S.singleton (n1, n2, e)
         else S.empty
       _ -> S.empty
 
-    leq :: [Lbl] -> [Lbl] -> Bool
-    leq x y = loc x <= loc y
+    leq :: (Int, [Lbl]) -> (Int, [Lbl]) -> Bool
+    leq (xInst, x) (yInst, y) = xInst < yInst || (xInst == yInst && loc x <= loc y)
 
     loc :: [Lbl] -> Int
     loc = sum . zipWith dimension [0..]

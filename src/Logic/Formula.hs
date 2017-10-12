@@ -38,6 +38,9 @@ data Form
   | Gt  Type
   | Ge  Type
 
+  | Store Type Type
+  | Select Type Type
+
   | LUnit
   | LBool Bool
   | LInt Integer
@@ -80,6 +83,9 @@ instance Typed Form where
     Gt t        -> t :=> t :=> T.Bool
     Ge t        -> t :=> t :=> T.Bool
 
+    Select t t' -> T.Array t t' :=> t :=> t' :=> T.Array t t'
+    Store t t'  -> T.Array t t' :=> t :=> t'
+
     LUnit       -> T.Unit
     LBool _     -> T.Bool
     LInt _      -> T.Int
@@ -116,10 +122,13 @@ instance Pretty Form where
     Gt _         -> PP.text ">"
     Ge _         -> PP.text ">="
 
-    LUnit         -> PP.text "()"
-    LBool b       -> pPrint b
-    LInt i        -> pPrint i
-    LReal r       -> pPrint r
+    Store{}      -> PP.text "store"
+    Select{}     -> PP.text "select"
+
+    LUnit        -> PP.text "()"
+    LBool b      -> pPrint b
+    LInt i       -> pPrint i
+    LReal r      -> pPrint r
     where
       binArg f = if isLit f || isVar f then pPrint f else PP.parens (pPrint f)
 
@@ -136,6 +145,9 @@ instance Formulaic Form where
 -- | Apply a function to two arguments.
 app2 :: Form -> Form -> Form -> Form
 app2 f x y = f :@ x :@ y
+
+app3 :: Form -> Form -> Form -> Form -> Form
+app3 f x y z = f :@ x :@ y :@ z
 
 appMany :: Form -> [Form] -> Form
 appMany = foldl (:@)

@@ -19,41 +19,38 @@ type Lbl = Int
 
 data Inductive
   = NotInductive
-  | UnknownIfInductive
   | InductiveSucc
   | InductiveFalse
-  | InductiveBy Node
+  | InductiveCover
   deriving (Show, Read, Eq, Ord, Data)
 
 instance Pretty Inductive where
   pPrint = \case
     NotInductive -> text "NOT-IND"
-    UnknownIfInductive -> text "UNK-IND"
     InductiveSucc -> text "IND-BY-SUCC"
     InductiveFalse -> text "IND-BY-FALSE"
-    InductiveBy i -> text "IND-BY-ENT" <+> pPrint i
+    InductiveCover -> text "COVERED"
 
 data Instance = Instance
   { _identity :: [Lbl]
   , _instanceId :: InstanceId
   , _variables :: [Var]
   , _formula :: Form
-  , _inductive :: Inductive
   } deriving (Show, Read, Eq, Ord, Data)
 
 instance Pretty Instance where
-  pPrint (Instance ids ins vs f ind) =
-    hsep [pPrint ids, pPrint ins, pPrint vs, pPrint f, pPrint ind]
+  pPrint (Instance ids ins vs f) =
+    hsep [pPrint ids, pPrint ins, pPrint vs, pPrint f]
 
 makeLenses ''Instance
 
 mkInstance :: [Lbl] -> [Var] -> Instance
-mkInstance ids vs = Instance ids 0 vs (LBool True) UnknownIfInductive
+mkInstance ids vs = Instance ids 0 vs (LBool True)
 
 data ImplGrNode
-  = AndNode Inductive
-  | OrInputNode Inductive
-  | OrOutputNode Inductive
+  = AndNode
+  | OrInputNode
+  | OrOutputNode
   | InstanceNode Instance
   | QueryNode Form
   | FoldedNode Node
@@ -63,9 +60,9 @@ makePrisms ''ImplGrNode
 
 instance Pretty ImplGrNode where
   pPrint = \case
-    AndNode i -> text "AND" <+> pPrint i
-    OrInputNode i -> text "OR-IN" <+> pPrint i
-    OrOutputNode i -> text "OR-OUT" <+> pPrint i
+    AndNode -> text "AND"
+    OrInputNode -> text "OR-IN"
+    OrOutputNode -> text "OR-OUT"
     InstanceNode i -> pPrint i
     QueryNode f -> pPrint f
     FoldedNode n -> text "FOLDED" <+> pPrint n
