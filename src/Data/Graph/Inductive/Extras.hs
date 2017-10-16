@@ -91,7 +91,7 @@ unfold (l1, l2, b) g =
 
       merged = overlay g relabelled
       connected = insEdge (l1, l2 + diff, b) merged
-      loopMoved = delEdge (l1, l2) $ insEdge (l1+diff, l2+diff, b) connected
+      loopMoved = delEdge (l1, l2) connected
   in loopMoved
 
 -- | Unfold the graph with respect to a given backedge.
@@ -149,3 +149,4 @@ instance At (Gr n e) where
     Just v' -> gmap (\(bef, n', v, aft) -> if n == n' then (bef, n', v', aft)
                                                       else (bef, n', v, aft)) g
     where mv = lab g n
+

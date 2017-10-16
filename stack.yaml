@@ -6,6 +6,10 @@ packages:
     git: https://github.com/DAHeath/z3-haskell
     commit: 03b02396c09b659ca8355e2290d3ebfcbd969a2b
   extra-dep: true
+- location:
+    git: https://github.com/DAHeath/ord-graph
+    commit: 5f46bc1394630d3ba16b9ca096a87764b33b20e4
+  extra-dep: true
 extra-deps:
 - safepath-0.1.0.0
 - validity-0.3.3.0

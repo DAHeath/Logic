@@ -1,13 +1,16 @@
-{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE QuasiQuotes, LambdaCase #-}
 
+import           Control.Lens
 import           Control.Monad.State
 import           Control.Monad.Except
 
 import qualified Data.Graph.Inductive.Graph as G
 import qualified Data.Graph.Inductive.Extras as G
 import qualified Data.Map as M
+import           Data.Maybe
 
 import qualified Logic.Type as T
+import           Logic.Formula
 import           Logic.Formula.Parser
 import           Logic.Var
 import           Logic.ImplicationGraph
@@ -69,6 +72,31 @@ g =
   G.insNode (2, InstanceNode (mkInstance [2, 2] s)) $
   G.insNode (3, QueryNode [form|h:Int = t:Int|])
   G.empty
+
+storeEdges :: ImplGr -> [(G.Node, G.Node, ImplGrEdge)]
+storeEdges g = undefined
+
+removeStores :: Form -> Form
+removeStores = undefined
+
+storeElimination :: ImplGr -> ImplGr
+storeElimination g = foldr elim g (storeEdges g)
+
+  where
+    elim :: (G.Node, G.Node, ImplGrEdge) -> ImplGr -> ImplGr
+    elim (n1, n2, ImplGrEdge f m) g =
+      let (InstanceNode i) = G.vertex n1 g
+          f' = removeStores f
+          g' = G.insEdge (n1, n2, ImplGrEdge f' m) $ G.delEdge (n1, n2) g
+          re = G.reached n1 g
+          swpPos2 = g
+            & G.labnfilter (\(_, l) -> case l of
+                InstanceNode i' -> head (i' ^. identity) == (i' ^. identity) !! 1
+                _ -> True)
+            & G.nmap (\case
+                InstanceNode i' -> InstanceNode (i' & identity . ix 1 .~ (fromJust $ i ^? identity . ix 0))
+                n' -> n')
+      in undefined
 
 main :: IO ()
 main = do

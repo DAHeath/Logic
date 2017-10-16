@@ -2,8 +2,9 @@
 import           Control.Monad.State
 import           Control.Monad.Except
 
-import qualified Data.Graph.Inductive.Graph as G
-import qualified Data.Graph.Inductive.Extras as G
+import           Data.Ord.Graph (Graph)
+import qualified Data.Ord.Graph as G
+import qualified Data.Ord.Graph.Extras as G
 import qualified Data.Map as M
 
 import           Logic.ImplicationGraph
@@ -31,14 +32,16 @@ s = [i, n]
 
 g :: ImplGr
 g =
-  G.insEdge (0, 1, ImplGrEdge [form|i:Int = 0|] M.empty) $
-  G.insEdge (1, 1, ImplGrEdge [form|i':Int = i:Int + 2 && i:Int < n:Int|]
-                                  (M.singleton i i')) $
-  G.insEdge (1, 2, ImplGrEdge [form|i:Int >= n:Int|] M.empty) $
-  G.insNode (0, InstanceNode (mkInstance [0] [])) $
-  G.insNode (1, InstanceNode (mkInstance [1] s)) $
-  G.insNode (2, QueryNode [form|not (i:Int = 41)|])
-  G.empty
+  G.fromLists
+    [ (([0], 0), InstanceNode $ emptyInstance [])
+    , (([1], 0), InstanceNode $ emptyInstance s)
+    , (([2], 0), QueryNode [form|not (i:Int = 41)|])
+    ]
+    [ (([0], 0), ([1], 0), ImplGrEdge [form|i:Int = 0|] M.empty)
+    , (([1], 0), ([1], 0), ImplGrEdge [form|i':Int = i:Int + 2 && i:Int < n:Int|]
+                                      (M.singleton i i'))
+    , (([1], 0), ([2], 0), ImplGrEdge [form|i:Int >= n:Int|] M.empty)
+    ]
 
-bs = backEdges [3] g
-g' = foldBackedges bs g
+bs = G.backEdges g
+-- g' = foldBackedges bs g

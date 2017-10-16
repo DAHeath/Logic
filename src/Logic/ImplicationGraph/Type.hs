@@ -4,8 +4,7 @@ module Logic.ImplicationGraph.Type where
 import           Control.Lens hiding (Context)
 
 import           Data.Data (Data)
-import           Data.Graph.Inductive.Graph
-import           Data.Graph.Inductive.PatriciaTree (Gr)
+import           Data.Ord.Graph
 import           Data.Map (Map)
 import qualified Data.Map as M
 
@@ -17,21 +16,12 @@ import           Text.PrettyPrint.HughesPJClass as PP
 type InstanceId = Int
 type Lbl = Int
 
-data Instance = Instance
-  { _identity :: [Lbl]
-  , _instanceId :: InstanceId
-  , _variables :: [Var]
-  , _formula :: Form
-  } deriving (Show, Read, Eq, Ord, Data)
+type Node = ([Lbl], InstanceId)
 
-instance Pretty Instance where
-  pPrint (Instance ids ins vs f) =
-    hsep [pPrint ids, pPrint ins, pPrint vs, pPrint f]
+type Instance = ([Var], Form)
 
-makeLenses ''Instance
-
-mkInstance :: [Lbl] -> [Var] -> Instance
-mkInstance ids vs = Instance ids 0 vs (LBool True)
+emptyInstance :: [Var] -> Instance
+emptyInstance vs = (vs, LBool True)
 
 data ImplGrNode
   = AndNode
@@ -59,4 +49,4 @@ data ImplGrEdge = ImplGrEdge Form (Map Var Var)
 instance Pretty ImplGrEdge where
   pPrint (ImplGrEdge f m) = pPrint f <+> pPrint (M.toList m)
 
-type ImplGr = Gr ImplGrNode ImplGrEdge
+type ImplGr = Graph Node ImplGrEdge ImplGrNode

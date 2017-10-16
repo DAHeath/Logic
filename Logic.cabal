@@ -56,6 +56,7 @@ library
                      , text             >= 1.2
                      , transformers     >= 0.5
                      , z3               >= 4.1
+                     , ord-graph
                      , split
   default-language:    Haskell2010
 

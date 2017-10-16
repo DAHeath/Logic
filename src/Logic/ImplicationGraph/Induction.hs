@@ -5,49 +5,50 @@ import           Control.Lens hiding (Context)
 import           Control.Monad.Loops (allM, anyM, orM)
 import           Control.Monad.State
 
-import           Data.Graph.Inductive.Graph hiding ((&))
-import           Data.Graph.Inductive.Extras hiding (backEdges)
+import qualified Data.Ord.Graph as G
 import           Data.Maybe (fromJust)
-import           Data.IntMap (IntMap)
-import qualified Data.IntMap as M
+import           Data.Map (Map)
+import qualified Data.Map as M
 
 import           Logic.Solver.Z3
 import           Logic.Formula
 import           Logic.ImplicationGraph.Type
 
 -- | Is the full graph inductive?
-isInductive :: ImplGr -> IO Bool
-isInductive g = evalStateT (ind 0) M.empty
+isInductive :: Node -> ImplGr -> IO Bool
+isInductive start g = evalStateT (ind start) M.empty
   where
-    ind :: Node -> StateT (IntMap Bool) IO Bool
+    ind :: Node -> StateT (Map Node Bool) IO Bool
     ind n = maybe (computeInd n) return . M.lookup n =<< get
 
-    computeInd :: Node -> StateT (IntMap Bool) IO Bool
+    computeInd :: Node -> StateT (Map Node Bool) IO Bool
     computeInd n = do
       let node = look n
       b <- case node of
-        AndNode      -> allM ind (suc g n)
-        OrInputNode  -> anyM ind (suc g n)
-        OrOutputNode -> allM ind (suc g n)
+        AndNode      -> allM ind (G.successors n g)
+        OrInputNode  -> anyM ind (G.successors n g)
+        OrOutputNode -> allM ind (G.successors n g)
         QueryNode _  -> return True
         FoldedNode _ -> return False
-        InstanceNode i -> do
-          let ancs = manyOr $ ancestorInstances n (i ^. identity)
-          orM [ return $ i ^. formula == LBool False
-              , liftIO $ entails (i ^. formula) ancs
-              , allM ind (suc g n)
+        InstanceNode (_, f) -> do
+          let ancs = manyOr $ ancestorInstances n
+          orM [ return $ f == LBool False
+              , liftIO $ entails f ancs
+              , allM ind (G.successors n g)
               ]
       modify (M.insert n b)
       return b
 
-    ancestorInstances :: Node -> [Lbl] -> [Form]
-    ancestorInstances n iden =
-      let ns = ancestors g n
+    ancestorInstances :: Node -> [Form]
+    ancestorInstances n =
+      let ns = G.ancestors g n
       in concatMap (\n' ->
-        let anc = look n'
-        in case anc of
-          InstanceNode i -> [i ^. formula | i ^. identity == iden]
-          _ -> []) ns
+        if fst n == fst n' then
+          let anc = look n'
+          in case anc of
+            InstanceNode (_, f) -> [f]
+            _ -> []
+        else []) ns
 
     look :: Node -> ImplGrNode
     look n = fromJust $ g ^. at n
