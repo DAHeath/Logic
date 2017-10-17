@@ -43,12 +43,17 @@ isInductive start g = evalStateT (ind start) M.empty
     ancestorInstances n =
       let ns = G.ancestors g n
       in concatMap (\n' ->
-        if fst n == fst n' then
+        if idenMatch n n' then
           let anc = look n'
           in case anc of
             InstanceNode (_, f) -> [f]
             _ -> []
         else []) ns
+
+    idenMatch n1 n2 = case (fst n1, fst n2) of
+      ([x], [y]) -> x == y
+      ([x, _, x', _], [y, _, y', _]) -> x == y && x' == y'
+      _ -> False
 
     look :: Node -> ImplGrNode
     look n = fromJust $ g ^. at n

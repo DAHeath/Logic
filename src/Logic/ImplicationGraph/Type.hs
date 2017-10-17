@@ -18,10 +18,10 @@ type Lbl = Int
 
 type Node = ([Lbl], InstanceId)
 
-type Instance = ([Var], Form)
+type Instance = ([[Var]], Form)
 
 emptyInstance :: [Var] -> Instance
-emptyInstance vs = (vs, LBool True)
+emptyInstance vs = ([vs], LBool True)
 
 data ImplGrNode
   = AndNode

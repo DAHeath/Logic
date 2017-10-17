@@ -1,5 +1,7 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Logic.Type where
 
+import           Control.Lens hiding (List)
 import           Data.Data (Data)
 import           Text.PrettyPrint.HughesPJClass
 
@@ -14,6 +16,8 @@ data Type
   deriving (Show, Read, Eq, Ord, Data)
 
 infixr 0 :=>
+
+makePrisms ''Type
 
 instance Pretty Type where
   pPrint = \case

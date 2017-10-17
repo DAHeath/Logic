@@ -17,6 +17,7 @@ import           Data.Maybe (mapMaybe)
 import           Data.Foldable (foldrM)
 
 import           Logic.Model
+import           Logic.Formula
 import           Logic.ImplicationGraph.Type
 import           Logic.ImplicationGraph.Interpolate
 import           Logic.ImplicationGraph.Induction
@@ -29,16 +30,23 @@ data Result
 data SolveState = SolveState
   { _finishedQueries :: [Node]
   , _instanceMap :: Map [Lbl] InstanceId
+  , _andNode :: Node
+  , _orNode :: Node
+  , _foldedNode :: Node
   } deriving (Show, Read, Eq, Ord, Data)
 
 makeLenses ''SolveState
 
-emptySolveState :: SolveState
-emptySolveState = SolveState [] M.empty
+emptySolveState :: ImplGr -> SolveState
+emptySolveState g =
+  let andNode = S.findMax (G.idxSet g) & _1 . ix 0 +~ 1
+      orNode = andNode & _1 . ix 0 +~ 1
+      foldedNode = orNode & _1 . ix 0 +~ 1
+  in SolveState [] M.empty andNode orNode foldedNode
 
 solve :: [Int] -> ImplGr -> IO (Either Model ImplGr)
 solve dim g = do
-  sol <- evalStateT (runExceptT (loop g)) emptySolveState
+  sol <- evalStateT (runExceptT (loop g)) (emptySolveState g)
   case sol of
     Left (Failed m) -> return (Left m)
     Left (Complete res) -> return (Right res)
@@ -81,7 +89,7 @@ foldedEdges g = filter (\((_, n2), _) -> case g ^? (at n2 . _Just . _FoldedNode)
 foldBackedges :: MonadState SolveState m => [((Node, Node), ImplGrEdge)] -> ImplGr -> m ImplGr
 foldBackedges bs g = do
   let ns = map (snd . fst) bs
-  ns' <- mapM latestInstance ns
+  ns' <- mapM (const newFoldedNode) ns
   let bs' = zipWith (\((n1, _), e) n2 -> ((n1, n2), e)) bs ns'
   let fns = zipWith (\((n1, tar), _) n2 -> (n2, FoldedNode tar)) bs ns'
   if null bs
@@ -99,6 +107,19 @@ unfold ((i1, i2), b) g = do
   let merged = G.union g relabelled
   let connected = G.addEdge i1 i2' b merged
   return (G.delEdge i1 i2 connected)
+
+newAndNode :: MonadState SolveState m => m Node
+newAndNode = use andNode >>= updateInstance
+
+newFoldedNode :: MonadState SolveState m => m Node
+newFoldedNode = use foldedNode >>= updateInstance
+
+addAndNode :: MonadState SolveState m => [Node] -> Node -> ImplGrEdge -> ImplGr -> m ImplGr
+addAndNode srcs tgt e g = do
+  a <- newAndNode
+  return $
+    foldr (\n -> G.addEdge n a (ImplGrEdge (LBool True) M.empty))
+      (G.addEdge a tgt e $ G.addVert a AndNode g) srcs
 
 latestInstance :: MonadState SolveState m => Node -> m Node
 latestInstance (iden, _) = do

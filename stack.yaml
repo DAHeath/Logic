@@ -8,7 +8,7 @@ packages:
   extra-dep: true
 - location:
     git: https://github.com/DAHeath/ord-graph
-    commit: 8e4895250bda10be47797a32d58975f956062155
+    commit: 9bcc90e9f9e00de55c412950b449550772d0a586
   extra-dep: true
 extra-deps:
 - safepath-0.1.0.0

@@ -6,8 +6,14 @@ import           Control.Monad.Except
 
 import qualified Data.Ord.Graph.Extras as G
 import qualified Data.Ord.Graph as G
+import           Data.Map (Map)
 import qualified Data.Map as M
+import           Data.Set (Set)
+import qualified Data.Set as S
+import           Data.List (intercalate)
 import           Data.Maybe
+import           Data.Monoid (Any)
+import           Data.Foldable
 
 import qualified Logic.Type as T
 import           Logic.Formula
@@ -15,6 +21,8 @@ import           Logic.Formula.Parser
 import           Logic.Var
 import           Logic.ImplicationGraph
 import           Logic.ImplicationGraph.Type
+import           Logic.ImplicationGraph.Interpolate
+import           Logic.ImplicationGraph.Induction
 import           Text.PrettyPrint.HughesPJClass
 
 import Debug.Trace
@@ -31,9 +39,6 @@ c' = Free "c'" T.Int
 n  = Free "n" T.Int
 next  = Free "next" (T.Array T.Int T.Int)
 next' = Free "next" (T.Array T.Int T.Int)
-
-s :: [Var]
-s = [h, t, i, c, n, next]
 
 -- example :: Comm
 -- example = Seq
@@ -54,8 +59,8 @@ g =
 
   G.fromLists
     [ (([0], 0), InstanceNode $ emptyInstance [])
-    , (([1], 0), InstanceNode $ emptyInstance s)
-    , (([2], 0), InstanceNode $ emptyInstance s)
+    , (([1], 0), InstanceNode $ emptyInstance [h, t, i, c, n, next])
+    , (([2], 0), InstanceNode $ emptyInstance [h, t, c, n, next])
     , (([3], 0), QueryNode [form|h:Int = t:Int|])
     ]
     [ (([0], 0), ([1], 0),
@@ -83,46 +88,163 @@ g =
       ImplGrEdge [form|c:Int >= n:Int|] M.empty)
     ]
 
-noBackedges :: Ord i => G.Graph i e v -> G.Graph i e v
+noBackedges :: ImplGr -> ImplGr
 noBackedges g =
-  foldr (\(i, _) -> uncurry G.delEdge i) g (G.backEdges g)
+  foldr (\(i, _) -> uncurry G.delEdge i) g (backEdges' g)
 
-storeEdges :: ImplGr -> [((Node, Node), ImplGrEdge)]
-storeEdges g =
-  filter (\(_, ImplGrEdge f _) -> any (has _Store) $ universe f)
+edgesWithForm :: Getting Any Form a -> ImplGr -> [((Node, Node), ImplGrEdge)]
+edgesWithForm p g =
+  filter (\(_, ImplGrEdge f _) -> any (has p) $ universe f)
          (noBackedges g ^@.. G.iallEdges)
 
-removeStores :: Form -> Form
-removeStores = rewrite (\case
-  (Eql _ :@ (Store _ _ :@ _ :@ _ :@ _) :@ _) -> Just (LBool True)
-  (Eql _ :@ _ :@ (Store _ _ :@ _ :@ _ :@ _)) -> Just (LBool True)
-  _       -> Nothing)
+removeStores :: Form -> (Form, (Form, Form))
+removeStores f = runState (rewriteM (\case
+  (Eql _ :@ (Store _ _ :@ _ :@ obj :@ val) :@ _) -> put (obj, val) >> return (Just (LBool True))
+  (Eql _ :@ _ :@ (Store _ _ :@ _ :@ obj :@ val)) -> put (obj, val) >> return (Just (LBool True))
+  _       -> return Nothing) f) (LBool True, LBool True)
 
-storeElimination :: ImplGr -> ImplGr
-storeElimination g = foldr elim g (storeEdges g)
+removeSelects :: Form -> (Form, (Form, Form))
+removeSelects f = runState (rewriteM (\case
+  (Eql _ :@ (Select _ _ :@ _ :@ obj) :@ val) -> put (obj, val) >> return (Just (LBool True))
+  (Eql _ :@ val :@ (Select _ _ :@ _ :@ obj)) -> put (obj, val) >> return (Just (LBool True))
+  _       -> return Nothing) f) (LBool True, LBool True)
 
+type ShapeState = Map Node (Form, Form)
+
+storeElimination :: ImplGr -> StateT ShapeState (StateT SolveState IO) ImplGr
+storeElimination g = foldrM elim g (edgesWithForm _Store g)
   where
-    elim :: ((Node, Node), ImplGrEdge) -> ImplGr -> ImplGr
+    elim :: ((Node, Node), ImplGrEdge) -> ImplGr -> StateT ShapeState (StateT SolveState IO) ImplGr
     elim ((n1, n2), ImplGrEdge f m) g =
-      let f' = removeStores f
+      let (f', (obj, val)) = removeStores f
           g' = G.addEdge n1 n2 (ImplGrEdge f' m) g
-          swpPos2 = G.reached n2 g' & G.mapIdxs (swp2 n1)
-      in
-      traceShow n1 $ traceShow n2 $
-      G.addEdge n1 (swp2 n1 n2) (ImplGrEdge f' m) (g' `G.union` swpPos2)
+      in if isMainline n1 && isMainline n2 then
+           let swpPos2 = G.reached n2 g' & G.filterIdxs isMainline & G.mapIdxs (prod n1)
+               vs = fromMaybe [] (g' ^? ix n1 . _InstanceNode . _1 . ix 0)
+               loc = prod n1 n2
+               swpPos2' = G.mapVerts (copyStoredVars loc vs) swpPos2
+               copies = manyAnd $ map (\v -> mkEql (T.typeOf v) (V v) (V (storedVar loc v))) vs
+           in do
+             modify (M.insert (prod n1 n2) (storedForm loc obj, storedForm loc val))
+             return $ G.addEdge n1 (prod n1 n2) (ImplGrEdge (mkAnd copies f') m) (g' `G.union` swpPos2')
+        else return g'
 
-    swp2 n1 (loc, inst) = (loc ++ [head $ fst n1, inst], 0)
+    prod (loc1, inst1) (loc2, inst2) = ([head loc1, inst1, head loc2, inst2], 0)
+    isMainline n = length (fst n) == 1
+
+nodeToIdxs :: Node -> [Int]
+nodeToIdxs (iden, inst) = iden ++ [inst]
+
+storedForm :: Node -> Form -> Form
+storedForm n = transform (\case
+  V v -> V $ storedVar n v
+  f -> f)
+
+storedVar :: Node -> Var -> Var
+storedVar no = \case
+  Free n t -> Free (prefix ++ n) t
+  Bound n t -> Free (prefix ++ show n) t
+  where
+    prefix = "s" ++ intercalate "_" (map show (nodeToIdxs no)) ++ "/"
+
+copyStoredVars :: Node -> [Var] -> ImplGrNode -> ImplGrNode
+copyStoredVars no svs = \case
+  InstanceNode (vs, f) -> InstanceNode (map (storedVar no) svs:vs, f)
+  n -> n
+
+selectElimination :: ImplGr -> StateT ShapeState (StateT SolveState IO) ImplGr
+selectElimination g = foldrM elim g (edgesWithForm _Select g)
+  where
+    elim :: ((Node, Node), ImplGrEdge) -> ImplGr -> StateT ShapeState (StateT SolveState IO) ImplGr
+    elim ((n1, n2), ImplGrEdge f m) g =
+      let (f', (obj, val)) = removeSelects f
+      in if length (fst n1) == 1 && length (fst n2) == 1
+         then return (G.delEdge n1 n2 g)
+         else do
+           let ([iden, inst, _, _], _) = n1
+           mapping <- get
+           liftIO $ print mapping
+           liftIO $ print n1
+           liftIO $ print n2
+           (stobj, stval) <- M.findWithDefault (LBool True, LBool True) n1 <$> get
+           let mtch = [form|$obj:Int = $stobj:Int && $val:Int = $stval:Int|]
+           let matchE = ImplGrEdge (mkAnd mtch f') m
+           g' <- lift (addAndNode [simpleNode n1, n1] (simpleNode n2) matchE g)
+           g'' <- crossEdges n1 n2 matchE g'
+           return $ G.addEdge n1 n2 matchE g''
+
+    simpleNode ([l1, i1, l2, i2], _) = ([l2], i2)
+
+crossEdges :: Node -> Node -> ImplGrEdge -> ImplGr -> StateT ShapeState (StateT SolveState IO) ImplGr
+crossEdges n1 tar e g = do
+  m <- get
+  lift (foldrM (\n2 g ->
+    if storeId n1 == n2 then return g
+    else
+      crossEdge n1 n2 tar e g) g (M.keys m))
+
+crossEdge :: Node -> Node -> Node -> ImplGrEdge -> ImplGr -> StateT SolveState IO ImplGr
+crossEdge n1 n2 tar e g = do
+    liftIO $ putStrLn ("crossing " ++ show n1 ++ " " ++ show n2 ++ " " ++ show tar)
+    addAndNode [n1, n2] tar e g
+
+storeId :: Node -> Node
+storeId n =
+  let ([sId, sInst, _, _], _) = n
+  in ([sId], sInst)
+
+
+backEdges' :: ImplGr -> [((Node, Node), ImplGrEdge)]
+backEdges' = G.backEdges . withoutModNodes
+
+withoutModNodes :: ImplGr -> ImplGr
+withoutModNodes =
+  G.filterVerts
+    (\v -> not (has _AndNode v || has _OrInputNode v || has _OrOutputNode v || has _FoldedNode v))
+
+noFieldVars :: [Var] -> [Var]
+noFieldVars = filter (not . has T._Array . T.typeOf)
+
+gNoFieldVars :: ImplGr -> ImplGr
+gNoFieldVars = G.mapVerts (\case
+  InstanceNode (vs, f) -> InstanceNode (map noFieldVars vs, f)
+  n -> n)
+
+storeUnfold g = do
+  g' <- storeElimination g >>= selectElimination
+  lift (foldBackedges (backEdges' g') g')
+
+shapeStep g = do
+  g' <- lift (foldrM unfold g (backEdges' g))
+  g'' <- storeUnfold g'
+  let re = G.reached ([0], 0) g''
+  let toEval = G.filterIdxs (`elem` G.idxs re) g''
+  sol <- liftIO (interpolate toEval)
+  case sol of
+    Left m -> error (prettyShow m)
+    Right interped -> do
+      b <- liftIO $ isInductive ([0], 0) interped
+      if b then
+        return (Right interped)
+      else do
+        liftIO $ putStrLn "not inductive"
+        liftIO $ G.display "step" interped
+        return (Left g')
+
+-- shape :: StateT ShapeState (StateT SolveState IO) ImplGr
+shape 0 g = storeUnfold g
+shape n g =
+  do
+    sol <- shapeStep g
+    case sol of
+      Left g' -> shape (n-1) g'
+      Right g' -> storeUnfold g'
 
 main :: IO ()
 main = do
-  G.display "shape" g
-  let g' = evalState (unfold (head $ G.backEdges g) g) emptySolveState
-  G.display "unfolded" g'
-  G.display "elim" $ storeElimination g'
-  -- sol <- evalStateT (runExceptT $ step [4] g) emptySolveState
-  -- case sol of
-  --   Left (Failed m) -> putStrLn $ prettyShow m
-  --   Left (Complete g') -> do
-  --     putStrLn "Done!"
-  --     G.display "shape-2" g'
-  --   Right g' -> G.display "shape-2" g'
+  let g' = gNoFieldVars g
+  sol <- evalStateT (
+        evalStateT (shape 2 g') M.empty
+        ) (emptySolveState g')
+  -- putStrLn (prettyShow $ entailmentChc (noBackedges sol))
+  G.display "elim2" sol

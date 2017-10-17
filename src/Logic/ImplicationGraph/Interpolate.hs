@@ -52,7 +52,6 @@ makeLenses ''ChcState
 interpolate :: ImplGr -> IO (Either Model ImplGr)
 interpolate g = do
   let chc = entailmentChc g
-  putStrLn (prettyShow chc)
   solveChc chc >>= \case
     Left m -> return (Left m)
     Right m -> return (Right $ applyModel m g)
@@ -137,5 +136,5 @@ chcFromState st =
     instanceApp :: Node -> Instance -> App
     instanceApp (iden, inst) (vs, _) =
       let name = "r" ++ intercalate "_" (map show (iden ++ [inst]))
-          t = curryType (map typeOf vs) T.Bool
-      in App (Free name t) vs
+          t = curryType (map typeOf (concat vs)) T.Bool
+      in App (Free name t) (concat vs)
