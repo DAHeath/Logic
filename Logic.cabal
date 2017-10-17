@@ -28,6 +28,7 @@ library
                      , Logic.Solver.Duality
                      , Language.Imperative
                      , Data.Graph.Inductive.Extras
+                     , Data.Ord.Graph.Extras
                      , Data.Tree.Extras
 
   default-extensions:  LambdaCase

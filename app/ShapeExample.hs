@@ -4,8 +4,8 @@ import           Control.Lens
 import           Control.Monad.State
 import           Control.Monad.Except
 
-import qualified Data.Graph.Inductive.Graph as G
-import qualified Data.Graph.Inductive.Extras as G
+import qualified Data.Ord.Graph.Extras as G
+import qualified Data.Ord.Graph as G
 import qualified Data.Map as M
 import           Data.Maybe
 
@@ -16,6 +16,8 @@ import           Logic.Var
 import           Logic.ImplicationGraph
 import           Logic.ImplicationGraph.Type
 import           Text.PrettyPrint.HughesPJClass
+
+import Debug.Trace
 
 h, h', t, t', i, i', c, c', n, next, next' :: Var
 h  = Free "h"  T.Int
@@ -49,62 +51,78 @@ s = [h, t, i, c, n, next]
 
 g :: ImplGr
 g =
-  G.insEdge (0, 1, ImplGrEdge [form| h:Int = 1
-                                  && t:Int = 1
-                                  && i:Int = 2
-                                  && c:Int = 0|]
-                              M.empty) $
-  G.insEdge (1, 1, ImplGrEdge [form| c:Int < n:Int
-                                  && next':Arr{Int,Int} = store next:Arr{Int,Int} t:Int i:Int
-                                  && t':Int = i:Int
-                                  && i':Int = i:Int + 1
-                                  && c':Int = c:Int + 1|]
-                              (M.fromList [(next, next'), (t, t'), (i, i'), (c, c')])) $
-  G.insEdge (1, 2, ImplGrEdge [form| c:Int >= n:Int && c':Int = 0|]
-                              (M.singleton c c')) $
-  G.insEdge (2, 2, ImplGrEdge [form| c:Int < n:Int
-                                  && c':Int = c:Int + 1
-                                  && h':Int = select next:Arr{Int,Int} h:Int |]
-                              (M.fromList [(h, h'), (c, c')])) $
-  G.insEdge (2, 3, ImplGrEdge [form|c:Int >= n:Int|] M.empty) $
-  G.insNode (0, InstanceNode (mkInstance [0, 0] [])) $
-  G.insNode (1, InstanceNode (mkInstance [1, 1] s)) $
-  G.insNode (2, InstanceNode (mkInstance [2, 2] s)) $
-  G.insNode (3, QueryNode [form|h:Int = t:Int|])
-  G.empty
 
-storeEdges :: ImplGr -> [(G.Node, G.Node, ImplGrEdge)]
-storeEdges g = undefined
+  G.fromLists
+    [ (([0], 0), InstanceNode $ emptyInstance [])
+    , (([1], 0), InstanceNode $ emptyInstance s)
+    , (([2], 0), InstanceNode $ emptyInstance s)
+    , (([3], 0), QueryNode [form|h:Int = t:Int|])
+    ]
+    [ (([0], 0), ([1], 0),
+      ImplGrEdge [form| h:Int = 1
+                     && t:Int = 1
+                     && i:Int = 2
+                     && c:Int = 0|]
+                 M.empty)
+    , (([1], 0), ([1], 0),
+      ImplGrEdge [form| c:Int < n:Int
+                     && next':Arr{Int,Int} = store next:Arr{Int,Int} t:Int i:Int
+                     && t':Int = i:Int
+                     && i':Int = i:Int + 1
+                     && c':Int = c:Int + 1|]
+                 (M.fromList [(next, next'), (t, t'), (i, i'), (c, c')]))
+    , (([1], 0), ([2], 0),
+      ImplGrEdge [form| c:Int >= n:Int && c':Int = 0|]
+                 (M.singleton c c'))
+    , (([2], 0), ([2], 0),
+      ImplGrEdge [form| c:Int < n:Int
+                     && c':Int = c:Int + 1
+                     && h':Int = select next:Arr{Int,Int} h:Int |]
+                 (M.fromList [(h, h'), (c, c')]))
+    , (([2], 0), ([3], 0),
+      ImplGrEdge [form|c:Int >= n:Int|] M.empty)
+    ]
+
+noBackedges :: Ord i => G.Graph i e v -> G.Graph i e v
+noBackedges g =
+  foldr (\(i, _) -> uncurry G.delEdge i) g (G.backEdges g)
+
+storeEdges :: ImplGr -> [((Node, Node), ImplGrEdge)]
+storeEdges g =
+  filter (\(_, ImplGrEdge f _) -> any (has _Store) $ universe f)
+         (noBackedges g ^@.. G.iallEdges)
 
 removeStores :: Form -> Form
-removeStores = undefined
+removeStores = rewrite (\case
+  (Eql _ :@ (Store _ _ :@ _ :@ _ :@ _) :@ _) -> Just (LBool True)
+  (Eql _ :@ _ :@ (Store _ _ :@ _ :@ _ :@ _)) -> Just (LBool True)
+  _       -> Nothing)
 
 storeElimination :: ImplGr -> ImplGr
 storeElimination g = foldr elim g (storeEdges g)
 
   where
-    elim :: (G.Node, G.Node, ImplGrEdge) -> ImplGr -> ImplGr
-    elim (n1, n2, ImplGrEdge f m) g =
-      let (InstanceNode i) = G.vertex n1 g
-          f' = removeStores f
-          g' = G.insEdge (n1, n2, ImplGrEdge f' m) $ G.delEdge (n1, n2) g
-          re = G.reached n1 g
-          swpPos2 = g
-            & G.labnfilter (\(_, l) -> case l of
-                InstanceNode i' -> head (i' ^. identity) == (i' ^. identity) !! 1
-                _ -> True)
-            & G.nmap (\case
-                InstanceNode i' -> InstanceNode (i' & identity . ix 1 .~ (fromJust $ i ^? identity . ix 0))
-                n' -> n')
-      in undefined
+    elim :: ((Node, Node), ImplGrEdge) -> ImplGr -> ImplGr
+    elim ((n1, n2), ImplGrEdge f m) g =
+      let f' = removeStores f
+          g' = G.addEdge n1 n2 (ImplGrEdge f' m) g
+          swpPos2 = G.reached n2 g' & G.mapIdxs (swp2 n1)
+      in
+      traceShow n1 $ traceShow n2 $
+      G.addEdge n1 (swp2 n1 n2) (ImplGrEdge f' m) (g' `G.union` swpPos2)
+
+    swp2 n1 (loc, inst) = (loc ++ [head $ fst n1, inst], 0)
 
 main :: IO ()
 main = do
   G.display "shape" g
-  sol <- evalStateT (runExceptT $ step [4] g) emptySolveState
-  case sol of
-    Left (Failed m) -> putStrLn $ prettyShow m
-    Left (Complete g') -> do
-      putStrLn "Done!"
-      G.display "shape-2" g'
-    Right g' -> G.display "shape-2" g'
+  let g' = evalState (unfold (head $ G.backEdges g) g) emptySolveState
+  G.display "unfolded" g'
+  G.display "elim" $ storeElimination g'
+  -- sol <- evalStateT (runExceptT $ step [4] g) emptySolveState
+  -- case sol of
+  --   Left (Failed m) -> putStrLn $ prettyShow m
+  --   Left (Complete g') -> do
+  --     putStrLn "Done!"
+  --     G.display "shape-2" g'
+  --   Right g' -> G.display "shape-2" g'

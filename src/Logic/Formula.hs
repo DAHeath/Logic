@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Logic.Formula where
 
 import           Control.Lens
@@ -48,6 +49,8 @@ data Form
   deriving (Show, Read, Eq, Ord, Data)
 
 infixl 9 :@
+
+makePrisms ''Form
 
 instance Plated Form where plate = uniplate
 
