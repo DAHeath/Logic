@@ -109,7 +109,7 @@ removeSelects f = runState (rewriteM (\case
   (Eql _ :@ val :@ (Select _ _ :@ _ :@ obj)) -> put (obj, val) >> return (Just (LBool True))
   _       -> return Nothing) f) (LBool True, LBool True)
 
-type ShapeState = Map Node (Form, Form)
+type ShapeState = Map Lbl (Form, Form)
 
 storeElimination :: ImplGr -> StateT ShapeState (StateT SolveState IO) ImplGr
 storeElimination g = foldrM elim g (edgesWithForm _Store g)
@@ -129,7 +129,7 @@ storeElimination g = foldrM elim g (edgesWithForm _Store g)
              return $ G.addEdge n1 (prod n1 n2) (ImplGrEdge (mkAnd copies f') m) (g' `G.union` swpPos2')
         else return g'
 
-    prod (loc1, inst1) (loc2, inst2) = ([head loc1, inst1, head loc2, inst2], 0)
+    prod (loc1, inst1) (loc2, inst2) = ([head loc1, inst1, head loc2], inst2)
     isMainline n = length (fst n) == 1
 
 nodeToIdxs :: Node -> [Int]
@@ -173,7 +173,7 @@ selectElimination g = foldrM elim g (edgesWithForm _Select g)
            g'' <- crossEdges n1 n2 matchE g'
            return $ G.addEdge n1 n2 matchE g''
 
-    simpleNode ([l1, i1, l2, i2], _) = ([l2], i2)
+    simpleNode ([l1, i1, l2], i2) = ([l2], i2)
 
 crossEdges :: Node -> Node -> ImplGrEdge -> ImplGr -> StateT ShapeState (StateT SolveState IO) ImplGr
 crossEdges n1 tar e g = do
@@ -190,7 +190,7 @@ crossEdge n1 n2 tar e g = do
 
 storeId :: Node -> Node
 storeId n =
-  let ([sId, sInst, _, _], _) = n
+  let ([sId, sInst, _], _) = n
   in ([sId], sInst)
 
 
