@@ -17,6 +17,7 @@ import           Text.PrettyPrint.HughesPJClass
 
 main :: IO ()
 main = do
+  G.display "before" g
   sol <- solve [3] g
   case sol of
     Left m -> putStrLn (prettyShow m)

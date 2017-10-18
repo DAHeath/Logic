@@ -1,8 +1,9 @@
-{-# LANGUAGE QuasiQuotes, LambdaCase #-}
+{-# LANGUAGE QuasiQuotes, LambdaCase, FlexibleContexts #-}
 
 import           Control.Lens
 import           Control.Monad.State
 import           Control.Monad.Except
+import           Control.Monad.Reader
 
 import qualified Data.Ord.Graph.Extras as G
 import qualified Data.Ord.Graph as G
@@ -94,8 +95,10 @@ noBackedges g =
 
 edgesWithForm :: Getting Any Form a -> ImplGr -> [((Node, Node), ImplGrEdge)]
 edgesWithForm p g =
-  filter (\(_, ImplGrEdge f _) -> any (has p) $ universe f)
-         (noBackedges g ^@.. G.iallEdges)
+  filter (\(_, ImplGrEdge f _) -> any (has p) $ universe f) (g ^@.. G.iallEdges)
+
+forwardEdgesWithForm :: Getting Any Form a -> ImplGr -> [((Node, Node), ImplGrEdge)]
+forwardEdgesWithForm p g = edgesWithForm p (noBackedges g)
 
 removeStores :: Form -> (Form, (Form, Form))
 removeStores f = runState (rewriteM (\case
@@ -109,12 +112,12 @@ removeSelects f = runState (rewriteM (\case
   (Eql _ :@ val :@ (Select _ _ :@ _ :@ obj)) -> put (obj, val) >> return (Just (LBool True))
   _       -> return Nothing) f) (LBool True, LBool True)
 
-type ShapeState = Map Lbl (Form, Form)
+type StoreInfo = Map Lbl (Form, Form)
 
-storeElimination :: ImplGr -> StateT ShapeState (StateT SolveState IO) ImplGr
-storeElimination g = foldrM elim g (edgesWithForm _Store g)
+storeElimination :: ImplGr -> ReaderT StoreInfo (StateT SolveState IO) ImplGr
+storeElimination g = foldrM elim g (forwardEdgesWithForm _Store g)
   where
-    elim :: ((Node, Node), ImplGrEdge) -> ImplGr -> StateT ShapeState (StateT SolveState IO) ImplGr
+    elim :: ((Node, Node), ImplGrEdge) -> ImplGr -> ReaderT StoreInfo (StateT SolveState IO) ImplGr
     elim ((n1, n2), ImplGrEdge f m) g =
       let (f', (obj, val)) = removeStores f
           g' = G.addEdge n1 n2 (ImplGrEdge f' m) g
@@ -124,13 +127,22 @@ storeElimination g = foldrM elim g (edgesWithForm _Store g)
                loc = prod n1 n2
                swpPos2' = G.mapVerts (copyStoredVars loc vs) swpPos2
                copies = manyAnd $ map (\v -> mkEql (T.typeOf v) (V v) (V (storedVar loc v))) vs
-           in do
-             modify (M.insert (prod n1 n2) (storedForm loc obj, storedForm loc val))
+           in
              return $ G.addEdge n1 (prod n1 n2) (ImplGrEdge (mkAnd copies f') m) (g' `G.union` swpPos2')
         else return g'
 
     prod (loc1, inst1) (loc2, inst2) = ([head loc1, inst1, head loc2], inst2)
     isMainline n = length (fst n) == 1
+
+storeInfo :: ImplGr -> Map Lbl (Form, Form)
+storeInfo g = foldr addStore M.empty (edgesWithForm _Store g)
+  where
+    addStore ((([iden], inst), _), ImplGrEdge f _) m =
+      let (_, (obj, val)) = removeStores f
+      in M.insert iden (obj, val) m
+
+selectLocs :: ImplGr -> [Node]
+selectLocs g = filter (\n -> length (fst n) > 1) $ map (fst . fst) (forwardEdgesWithForm _Select g)
 
 nodeToIdxs :: Node -> [Int]
 nodeToIdxs (iden, inst) = iden ++ [inst]
@@ -145,48 +157,56 @@ storedVar no = \case
   Free n t -> Free (prefix ++ n) t
   Bound n t -> Free (prefix ++ show n) t
   where
-    prefix = "s" ++ intercalate "_" (map show (nodeToIdxs no)) ++ "/"
+    prefix = "s" ++ intercalate "_" (map show (nodeToIdxs $ storeId no)) ++ "/"
 
 copyStoredVars :: Node -> [Var] -> ImplGrNode -> ImplGrNode
 copyStoredVars no svs = \case
   InstanceNode (vs, f) -> InstanceNode (map (storedVar no) svs:vs, f)
   n -> n
 
-selectElimination :: ImplGr -> StateT ShapeState (StateT SolveState IO) ImplGr
-selectElimination g = foldrM elim g (edgesWithForm _Select g)
+selectElimination :: ImplGr -> ReaderT StoreInfo (StateT SolveState IO) ImplGr
+selectElimination g = do
+  foldrM elim g (forwardEdgesWithForm _Select g)
   where
-    elim :: ((Node, Node), ImplGrEdge) -> ImplGr -> StateT ShapeState (StateT SolveState IO) ImplGr
+    elim :: ((Node, Node), ImplGrEdge) -> ImplGr -> ReaderT StoreInfo (StateT SolveState IO) ImplGr
     elim ((n1, n2), ImplGrEdge f m) g =
       let (f', (obj, val)) = removeSelects f
       in if length (fst n1) == 1 && length (fst n2) == 1
          then return (G.delEdge n1 n2 g)
          else do
-           let ([iden, inst, _, _], _) = n1
-           mapping <- get
-           liftIO $ print mapping
-           liftIO $ print n1
-           liftIO $ print n2
-           (stobj, stval) <- M.findWithDefault (LBool True, LBool True) n1 <$> get
-           let mtch = [form|$obj:Int = $stobj:Int && $val:Int = $stval:Int|]
-           let matchE = ImplGrEdge (mkAnd mtch f') m
+           let ([iden, inst, _], _) = n1
+           matchE <- matchNodeForm obj val n1 (ImplGrEdge f' m)
+
            g' <- lift (addAndNode [simpleNode n1, n1] (simpleNode n2) matchE g)
-           g'' <- crossEdges n1 n2 matchE g'
+
+           g'' <- crossEdges obj val n1 n2 (crossCandidates n1) (ImplGrEdge f' m) g'
            return $ G.addEdge n1 n2 matchE g''
 
-    simpleNode ([l1, i1, l2], i2) = ([l2], i2)
+    selects = selectLocs g
+    crossCandidates ([sIden, sInst, iden], inst)
+      = concatMap (\can@([sIden', sInst', iden'], inst') ->
+          if sIden == sIden' && sInst == sInst' then []
+          else [can | iden == iden' && inst == inst']) selects
 
-crossEdges :: Node -> Node -> ImplGrEdge -> ImplGr -> StateT ShapeState (StateT SolveState IO) ImplGr
-crossEdges n1 tar e g = do
-  m <- get
-  lift (foldrM (\n2 g ->
+matchNodeForm obj val n@([iden, _, _], _) (ImplGrEdge f m) = do
+  (stobj, stval) <- M.findWithDefault (LBool True, LBool True) iden <$> ask
+  let stobj' = storedForm n stobj
+  let stval' = storedForm n stval
+  let mtch = [form|$obj:Int = $stobj':Int && $val:Int = $stval':Int|]
+  return $ ImplGrEdge (mkAnd mtch f) m
+
+simpleNode ([l1, i1, l2], i2) = ([l2], i2)
+
+crossEdges :: Form -> Form -> Node -> Node -> [Node] -> ImplGrEdge -> ImplGr -> ReaderT StoreInfo (StateT SolveState IO) ImplGr
+crossEdges obj val n1 tar cans e g =
+  foldrM (\n2 g ->
     if storeId n1 == n2 then return g
-    else
-      crossEdge n1 n2 tar e g) g (M.keys m))
+    else do
+      e' <- matchNodeForm obj val n2 e
+      lift (crossEdge n1 n2 tar e' g)) g cans
 
 crossEdge :: Node -> Node -> Node -> ImplGrEdge -> ImplGr -> StateT SolveState IO ImplGr
-crossEdge n1 n2 tar e g = do
-    liftIO $ putStrLn ("crossing " ++ show n1 ++ " " ++ show n2 ++ " " ++ show tar)
-    addAndNode [n1, n2] tar e g
+crossEdge n1 n2 = addAndNode [n1, n2]
 
 storeId :: Node -> Node
 storeId n =
@@ -228,10 +248,9 @@ shapeStep g = do
         return (Right interped)
       else do
         liftIO $ putStrLn "not inductive"
-        liftIO $ G.display "step" interped
         return (Left g')
 
--- shape :: StateT ShapeState (StateT SolveState IO) ImplGr
+-- shape :: ReaderT StoreInfo (StateT SolveState IO) ImplGr
 shape 0 g = storeUnfold g
 shape n g =
   do
@@ -244,7 +263,7 @@ main :: IO ()
 main = do
   let g' = gNoFieldVars g
   sol <- evalStateT (
-        evalStateT (shape 2 g') M.empty
+        runReaderT (shape 999 g') (storeInfo g')
         ) (emptySolveState g')
   -- putStrLn (prettyShow $ entailmentChc (noBackedges sol))
   G.display "elim2" sol
