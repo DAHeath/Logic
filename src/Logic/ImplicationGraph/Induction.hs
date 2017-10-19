@@ -15,13 +15,11 @@ import           Logic.Formula
 import           Logic.ImplicationGraph.Type
 
 -- | Is the full graph inductive?
-isInductive :: Node -> ImplGr -> IO Bool
+isInductive :: LblLike lbl => Node' lbl -> ImplGr' lbl -> IO Bool
 isInductive start g = evalStateT (ind start) M.empty
   where
-    ind :: Node -> StateT (Map Node Bool) IO Bool
     ind n = maybe (computeInd n) return . M.lookup n =<< get
 
-    computeInd :: Node -> StateT (Map Node Bool) IO Bool
     computeInd n = do
       let node = look n
       b <- case node of
@@ -39,21 +37,21 @@ isInductive start g = evalStateT (ind start) M.empty
       modify (M.insert n b)
       return b
 
-    ancestorInstances :: Node -> [Form]
     ancestorInstances n =
       let ns = G.ancestors g n
       in concatMap (\n' ->
-        if idenMatch n n' then
+        if matchNode n n' then
           let anc = look n'
           in case anc of
             InstanceNode (_, f) -> [f]
             _ -> []
         else []) ns
 
+    matchNode (l1, _) (l2, _) = match l1 l2
+
     idenMatch n1 n2 = case (fst n1, fst n2) of
       ([x], [y]) -> x == y
       ([x, _, x', _], [y, _, y', _]) -> x == y && x' == y'
       _ -> False
 
-    look :: Node -> ImplGrNode
     look n = fromJust $ g ^. at n

@@ -34,14 +34,14 @@ s = [i, n]
 g :: ImplGr
 g =
   G.fromLists
-    [ (([0], 0), InstanceNode $ emptyInstance [])
-    , (([1], 0), InstanceNode $ emptyInstance s)
-    , (([2], 0), QueryNode [form|not (i:Int = 41)|])
+    [ ((0, 0), InstanceNode $ emptyInstance [])
+    , ((1, 0), InstanceNode $ emptyInstance s)
+    , ((2, 0), QueryNode [form|not (i:Int = 41)|])
     ]
-    [ (([0], 0), ([1], 0), ImplGrEdge [form|i:Int = 0|] M.empty)
-    , (([1], 0), ([1], 0), ImplGrEdge [form|i':Int = i:Int + 2 && i:Int < n:Int|]
+    [ ((0, 0), (1, 0), ImplGrEdge [form|i:Int = 0|] M.empty)
+    , ((1, 0), (1, 0), ImplGrEdge [form|i':Int = i:Int + 2 && i:Int < n:Int|]
                                       (M.singleton i i'))
-    , (([1], 0), ([2], 0), ImplGrEdge [form|i:Int >= n:Int|] M.empty)
+    , ((1, 0), (2, 0), ImplGrEdge [form|i:Int >= n:Int|] M.empty)
     ]
 
 bs = G.backEdges g

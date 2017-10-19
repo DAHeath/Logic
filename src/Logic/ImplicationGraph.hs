@@ -4,6 +4,7 @@ module Logic.ImplicationGraph where
 import           Control.Lens hiding (Context)
 import           Control.Monad.State
 import           Control.Monad.Except
+import           Control.Arrow
 
 import           Data.Data
 import           Data.Ord.Graph (Graph)
@@ -27,21 +28,32 @@ data Result
   | Complete ImplGr
   deriving (Show, Read, Eq)
 
-data SolveState = SolveState
-  { _finishedQueries :: [Node]
-  , _instanceMap :: Map [Lbl] InstanceId
-  , _andNode :: Node
-  , _orNode :: Node
-  , _foldedNode :: Node
+data SolveState' lbl = SolveState
+  { _finishedQueries :: [Node' lbl]
+  , _instanceMap :: Map lbl InstanceId
+  , _andNode :: Node' lbl
+  , _orNode :: Node' lbl
+  , _foldedNode :: Node' lbl
   } deriving (Show, Read, Eq, Ord, Data)
 
-makeLenses ''SolveState
+makeLenses ''SolveState'
+
+mapSolveState :: Ord b => (a -> b) -> SolveState' a -> SolveState' b
+mapSolveState f (SolveState qs m andN orN foldN)
+  = SolveState (map (first f) qs)
+               (M.mapKeys f m)
+               (first f andN)
+               (first f orN)
+               (first f foldN)
+
+type SolveState = SolveState' Lbl
+
 
 emptySolveState :: ImplGr -> SolveState
 emptySolveState g =
-  let andNode = S.findMax (G.idxSet g) & _1 . ix 0 +~ 1
-      orNode = andNode & _1 . ix 0 +~ 1
-      foldedNode = orNode & _1 . ix 0 +~ 1
+  let andNode = S.findMax (G.idxSet g) & _1 +~ 1
+      orNode = andNode & _1 +~ 1
+      foldedNode = orNode & _1 +~ 1
   in SolveState [] M.empty andNode orNode foldedNode
 
 solve :: [Int] -> ImplGr -> IO (Either Model ImplGr)
@@ -67,7 +79,7 @@ step dim g = do
   case sol of
     Left m -> throwError $ Failed m
     Right g1 -> do
-      let start = (map (const 0) dim, 0)
+      let start = (0, 0)
       b <- liftIO $ isInductive start g1
       if b then throwError $ Complete g1
       else do
@@ -86,7 +98,8 @@ foldedEdges g = filter (\((_, n2), _) -> case g ^? (at n2 . _Just . _FoldedNode)
   Just _ -> True) (g ^@.. G.iallEdges)
 
 -- | Replace all backedges with edges to folded nodes, generating a DAG.
-foldBackedges :: MonadState SolveState m => [((Node, Node), ImplGrEdge)] -> ImplGr -> m ImplGr
+foldBackedges :: (LblLike lbl, MonadState (SolveState' lbl) m)
+              => [((Node' lbl, Node' lbl), ImplGrEdge)] -> ImplGr' lbl -> m (ImplGr' lbl)
 foldBackedges bs g = do
   let ns = map (snd . fst) bs
   ns' <- mapM (const newFoldedNode) ns
@@ -99,7 +112,8 @@ foldBackedges bs g = do
      $ flip (foldr (uncurry G.addVert)) fns
      $ G.ifilterEdges (\i1 i2 e -> ((i1, i2), e) `notElem` bs) g
 
-unfold :: MonadState SolveState m => ((Node, Node), e) -> Graph Node e v -> m (Graph Node e v)
+unfold :: (LblLike lbl, MonadState (SolveState' lbl) m)
+       => ((Node' lbl, Node' lbl), e) -> Graph (Node' lbl) e v -> m (Graph (Node' lbl) e v)
 unfold ((i1, i2), b) g = do
   let g' = G.reached i2 g
   i2' <- latestInstance i2
@@ -108,25 +122,26 @@ unfold ((i1, i2), b) g = do
   let connected = G.addEdge i1 i2' b merged
   return (G.delEdge i1 i2 connected)
 
-newAndNode :: MonadState SolveState m => m Node
+newAndNode :: (LblLike lbl, MonadState (SolveState' lbl) m) => m (Node' lbl)
 newAndNode = use andNode >>= updateInstance
 
-newFoldedNode :: MonadState SolveState m => m Node
+newFoldedNode :: (LblLike lbl, MonadState (SolveState' lbl) m) => m (Node' lbl)
 newFoldedNode = use foldedNode >>= updateInstance
 
-addAndNode :: MonadState SolveState m => [Node] -> Node -> ImplGrEdge -> ImplGr -> m ImplGr
+addAndNode :: (LblLike lbl, MonadState (SolveState' lbl) m)
+           => [Node' lbl] -> Node' lbl -> ImplGrEdge -> ImplGr' lbl -> m (ImplGr' lbl)
 addAndNode srcs tgt e g = do
   a <- newAndNode
   return $
     foldr (\n -> G.addEdge n a (ImplGrEdge (LBool True) M.empty))
       (G.addEdge a tgt e $ G.addVert a AndNode g) srcs
 
-latestInstance :: MonadState SolveState m => Node -> m Node
+latestInstance :: (LblLike lbl, MonadState (SolveState' lbl) m) => Node' lbl -> m (Node' lbl)
 latestInstance (iden, _) = do
   inst <- M.findWithDefault 0 iden <$> use instanceMap
   return (iden, inst + 1)
 
-updateInstance :: MonadState SolveState m => Node -> m Node
+updateInstance :: (LblLike lbl, MonadState (SolveState' lbl) m) => Node' lbl -> m (Node' lbl)
 updateInstance (iden, inst) = do
   res <- latestInstance (iden, inst)
   instanceMap . at iden ?= snd res

@@ -12,29 +12,46 @@ import           Logic.Formula
 import           Logic.Var
 
 import           Text.PrettyPrint.HughesPJClass as PP
+import           Text.Read (readMaybe)
 
 type InstanceId = Int
 type Lbl = Int
 
-type Node = ([Lbl], InstanceId)
+class (Show a, Ord a, Data a) => LblLike a where
+  match :: a -> a -> Bool
+  toPrefix :: a -> String
+  fromPrefix :: ReadS a
+
+instance LblLike Int where
+  match = (==)
+  toPrefix = show
+  fromPrefix = reads
+
+type Node' lbl = (lbl, InstanceId)
+type Node = Node' Lbl
+
+nodePrefix :: LblLike lbl => Node' lbl -> String
+nodePrefix (l, i) = toPrefix l ++ "_" ++ show i
 
 type Instance = ([[Var]], Form)
 
 emptyInstance :: [Var] -> Instance
 emptyInstance vs = ([vs], LBool True)
 
-data ImplGrNode
+data ImplGrNode' lbl
   = AndNode
   | OrInputNode
   | OrOutputNode
   | InstanceNode Instance
   | QueryNode Form
-  | FoldedNode Node
+  | FoldedNode (Node' lbl)
   deriving (Show, Read, Eq, Ord, Data)
 
-makePrisms ''ImplGrNode
+makePrisms ''ImplGrNode'
 
-instance Pretty ImplGrNode where
+type ImplGrNode = ImplGrNode' Lbl
+
+instance Pretty lbl => Pretty (ImplGrNode' lbl) where
   pPrint = \case
     AndNode -> text "AND"
     OrInputNode -> text "OR-IN"
@@ -49,4 +66,5 @@ data ImplGrEdge = ImplGrEdge Form (Map Var Var)
 instance Pretty ImplGrEdge where
   pPrint (ImplGrEdge f m) = pPrint f <+> pPrint (M.toList m)
 
-type ImplGr = Graph Node ImplGrEdge ImplGrNode
+type ImplGr' lbl = Graph (Node' lbl) ImplGrEdge (ImplGrNode' lbl)
+type ImplGr = ImplGr' Lbl
