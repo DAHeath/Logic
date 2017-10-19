@@ -20,7 +20,7 @@ library
                      , Logic.Type
                      , Logic.Model
                      , Logic.Chc
-                     , Logic.ImplicationGraph
+                     , Logic.ImplicationGraph.Solve
                      , Logic.ImplicationGraph.Type
                      , Logic.ImplicationGraph.Interpolate
                      , Logic.ImplicationGraph.Induction

@@ -48,7 +48,7 @@ makeLenses ''ChcState
 
 -- | Apply constrained Horn Clause Solving to relabel the nodes with fresh
 -- invariants.
-interpolate :: LblLike lbl => ImplGr' lbl -> IO (Either Model (ImplGr' lbl))
+interpolate :: MonadIO m => LblLike lbl => ImplGr' lbl -> m (Either Model (ImplGr' lbl))
 interpolate g = do
   let chc = entailmentChc g
   solveChc chc >>= \case

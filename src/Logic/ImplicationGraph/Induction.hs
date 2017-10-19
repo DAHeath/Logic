@@ -9,33 +9,42 @@ import qualified Data.Ord.Graph as G
 import           Data.Maybe (fromJust)
 import           Data.Map (Map)
 import qualified Data.Map as M
+import           Data.Set (Set)
 
 import           Logic.Solver.Z3
 import           Logic.Formula
 import           Logic.ImplicationGraph.Type
 
 -- | Is the full graph inductive?
-isInductive :: LblLike lbl => Node' lbl -> ImplGr' lbl -> IO Bool
-isInductive start g = evalStateT (ind start) M.empty
+isInductive :: MonadIO m => LblLike lbl => Node' lbl -> ImplGr' lbl
+            -> m (Either (Set (Node' lbl)) (ImplGr' lbl))
+isInductive start g = do
+  (b, m) <- runStateT (ind start) M.empty
+  if b then return (Right g)
+  else
+    return $ Left $ M.keysSet $ M.filter id m
   where
     ind n = maybe (computeInd n) return . M.lookup n =<< get
 
     computeInd n = do
       let node = look n
       b <- case node of
-        AndNode      -> allM ind (G.successors n g)
-        OrInputNode  -> anyM ind (G.successors n g)
-        OrOutputNode -> allM ind (G.successors n g)
+        AndNode      -> allInd n
+        OrInputNode  -> anyInd n
+        OrOutputNode -> allInd n
         QueryNode _  -> return True
         FoldedNode _ -> return False
         InstanceNode (_, f) -> do
           let ancs = manyOr $ ancestorInstances n
           orM [ return $ f == LBool False
-              , liftIO $ entails f ancs
-              , allM ind (G.successors n g)
+              , entails f ancs
+              , allInd n
               ]
       modify (M.insert n b)
       return b
+
+    allInd n = and <$> mapM ind (G.successors n g)
+    anyInd n = or  <$> mapM ind (G.successors n g)
 
     ancestorInstances n =
       let ns = G.ancestors g n

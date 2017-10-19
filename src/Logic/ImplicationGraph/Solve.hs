@@ -1,5 +1,5 @@
-{-# LANGUAGE TypeFamilies, TemplateHaskell #-}
-module Logic.ImplicationGraph where
+{-# LANGUAGE TypeFamilies, TemplateHaskell, ConstraintKinds #-}
+module Logic.ImplicationGraph.Solve where
 
 import           Control.Lens hiding (Context)
 import           Control.Monad.State
@@ -23,40 +23,46 @@ import           Logic.ImplicationGraph.Type
 import           Logic.ImplicationGraph.Interpolate
 import           Logic.ImplicationGraph.Induction
 
-data Result
+data Result' lbl
   = Failed Model
-  | Complete ImplGr
+  | Complete (ImplGr' lbl)
   deriving (Show, Read, Eq)
+
+type Result = Result' Lbl
 
 data SolveState' lbl = SolveState
   { _finishedQueries :: [Node' lbl]
   , _instanceMap :: Map lbl InstanceId
   , _andNode :: Node' lbl
-  , _orNode :: Node' lbl
+  , _orInputNode :: Node' lbl
+  , _orOutputNode :: Node' lbl
   , _foldedNode :: Node' lbl
   } deriving (Show, Read, Eq, Ord, Data)
 
 makeLenses ''SolveState'
 
 mapSolveState :: Ord b => (a -> b) -> SolveState' a -> SolveState' b
-mapSolveState f (SolveState qs m andN orN foldN)
+mapSolveState f (SolveState qs m andN orInputN orOutputN foldN)
   = SolveState (map (first f) qs)
                (M.mapKeys f m)
                (first f andN)
-               (first f orN)
+               (first f orInputN)
+               (first f orOutputN)
                (first f foldN)
 
 type SolveState = SolveState' Lbl
-
+type Solve lbl m =
+  (MonadError (Result' lbl) m, MonadState (SolveState' lbl) m, MonadIO m)
 
 emptySolveState :: ImplGr -> SolveState
 emptySolveState g =
   let andNode = S.findMax (G.idxSet g) & _1 +~ 1
-      orNode = andNode & _1 +~ 1
-      foldedNode = orNode & _1 +~ 1
-  in SolveState [] M.empty andNode orNode foldedNode
+      orInputNode = andNode & _1 +~ 1
+      orOutputNode = orInputNode & _1 +~ 1
+      foldedNode = orOutputNode & _1 +~ 1
+  in SolveState [] M.empty andNode orInputNode orOutputNode foldedNode
 
-solve :: [Int] -> ImplGr -> IO (Either Model ImplGr)
+solve :: MonadIO m => [Int] -> ImplGr -> m (Either Model ImplGr)
 solve dim g = do
   sol <- evalStateT (runExceptT (loop g)) (emptySolveState g)
   case sol of
@@ -64,35 +70,49 @@ solve dim g = do
     Left (Complete res) -> return (Right res)
     Right _ -> error "infinite loop terminated successfully?"
   where
-    loop gr = loop =<< step dim gr
+    loop gr = loop =<< step (0, 0) gr
 
-step :: [Int] -> ImplGr -> ExceptT Result (StateT SolveState IO) ImplGr
-step dim g = do
+backEdges' :: LblLike lbl => ImplGr' lbl -> [((Node' lbl, Node' lbl), ImplGrEdge)]
+backEdges' = G.backEdges . withoutModNodes
+
+withoutModNodes :: LblLike lbl => ImplGr' lbl -> ImplGr' lbl
+withoutModNodes =
+  G.filterVerts
+    (\v -> not (has _AndNode v || has _OrInputNode v || has _OrOutputNode v || has _FoldedNode v))
+
+step :: (LblLike lbl, Solve lbl m) => Node' lbl -> ImplGr' lbl -> m (ImplGr' lbl)
+step start g = do
   let bs = G.backEdges g
   g' <- foldBackedges bs g
   fQuers <- use finishedQueries
   let g'' = G.filterIdxs (`notElem` fQuers) g'
-  sol <- liftIO $ interpolate g''
+  sol <- interpolate g''
   finishedQueries .= concatMap (\(n, l) -> case l of
     QueryNode _ -> [n]
     _ -> []) (g' ^@.. G.iallVerts)
   case sol of
     Left m -> throwError $ Failed m
     Right g1 -> do
-      let start = (0, 0)
-      b <- liftIO $ isInductive start g1
-      if b then throwError $ Complete g1
-      else do
-        let fes = foldedEdges g'
-        let g3 = foldr reconnectBackedge g' fes
-        foldrM unfold g3 bs
+      ind <- isInductive start g1
+      case ind of
+        Right done -> throwError $ Complete done
+        Left indS -> do
+          let fes = foldedEdges $ G.filterIdxs (`notElem` indS) g'
+          let g3 = foldr reconnectBackedge g' fes
+          foldrM unfold g3 bs
 
-reconnectBackedge :: ((Node, Node), ImplGrEdge) -> ImplGr -> ImplGr
+collectAnswer :: (Ord (Base lbl), LblLike lbl) => ImplGr' lbl -> Map (Base lbl) Form
+collectAnswer g =
+  execState (G.itravVerts (\k v -> case v of
+    InstanceNode i -> modify (M.insertWith mkOr (toBase (fst k)) (snd i))
+    _ -> return ()) g) M.empty
+
+reconnectBackedge :: LblLike lbl => ((Node' lbl, Node' lbl), ImplGrEdge) -> ImplGr' lbl -> ImplGr' lbl
 reconnectBackedge ((n1, n2), e) g = case g ^? (at n2 . _Just . _FoldedNode) of
   Nothing -> error "tried to reconnect backedge with non-folded node"
   Just n2' -> G.addEdge n1 n2' e $ G.delIdx n2 g
 
-foldedEdges :: ImplGr -> [((Node, Node), ImplGrEdge)]
+foldedEdges :: LblLike lbl => ImplGr' lbl -> [((Node' lbl, Node' lbl), ImplGrEdge)]
 foldedEdges g = filter (\((_, n2), _) -> case g ^? (at n2 . _Just . _FoldedNode) of
   Nothing -> False
   Just _ -> True) (g ^@.. G.iallEdges)
@@ -124,6 +144,12 @@ unfold ((i1, i2), b) g = do
 
 newAndNode :: (LblLike lbl, MonadState (SolveState' lbl) m) => m (Node' lbl)
 newAndNode = use andNode >>= updateInstance
+
+newOrInputNode :: (LblLike lbl, MonadState (SolveState' lbl) m) => m (Node' lbl)
+newOrInputNode = use orInputNode >>= updateInstance
+
+newOrOutputNode :: (LblLike lbl, MonadState (SolveState' lbl) m) => m (Node' lbl)
+newOrOutputNode = use orOutputNode >>= updateInstance
 
 newFoldedNode :: (LblLike lbl, MonadState (SolveState' lbl) m) => m (Node' lbl)
 newFoldedNode = use foldedNode >>= updateInstance

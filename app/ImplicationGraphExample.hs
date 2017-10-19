@@ -7,7 +7,7 @@ import qualified Data.Ord.Graph as G
 import qualified Data.Ord.Graph.Extras as G
 import qualified Data.Map as M
 
-import           Logic.ImplicationGraph
+import           Logic.ImplicationGraph.Solve
 import           Logic.ImplicationGraph.Type
 import qualified Logic.Type as T
 import           Logic.Formula.Parser

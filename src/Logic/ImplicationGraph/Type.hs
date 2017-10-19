@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, TypeFamilies #-}
 module Logic.ImplicationGraph.Type where
 
 import           Control.Lens hiding (Context)
@@ -18,12 +18,16 @@ type InstanceId = Int
 type Lbl = Int
 
 class (Show a, Ord a, Data a) => LblLike a where
+  type Base a
+  toBase :: a -> Base a
   match :: a -> a -> Bool
   toPrefix :: a -> String
   fromPrefix :: ReadS a
 
 instance LblLike Int where
-  match = (==)
+  type Base Int = Int
+  toBase = id
+  match x y = toBase x == toBase y
   toPrefix = show
   fromPrefix = reads
 

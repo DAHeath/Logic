@@ -163,6 +163,9 @@ interpolate ftree = runEnvZ3 $ do
     populate (Tr.Node _ cs) =
       flip Tr.Node <$> traverse populate cs <*> state (fromJust . uncons)
 
+simplify :: MonadIO m => Form -> m Form
+simplify f = runEnvZ3 $ astToForm =<< Z3.Monad.simplify =<< formToAst f
+
 -- | A monadic context for Z3 actions which caches the variables and functions
 -- which have already been created. It also resolve DeBrujin indices which Z3
 -- uses to represent variables.
