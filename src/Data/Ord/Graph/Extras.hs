@@ -17,13 +17,13 @@ import           Text.PrettyPrint.HughesPJClass (Pretty, prettyShow)
 backEdges :: Ord i => Graph i e v -> [((i, i), e)]
 backEdges g = filter (\((i1, i2), _) -> i2 <= i1) $ g ^@.. iallEdges
 
-unfold :: (Applicative f, Ord i)
+unwind :: (Applicative f, Ord i)
        => (i -> f i)
        -> (i -> i -> e -> f e)
        -> (i -> v -> f v)
        -> i -> i -> e
        -> Graph i e v -> f (Graph i e v)
-unfold fi fe fv i1 i2 e g =
+unwind fi fe fv i1 i2 e g =
   let g' = reaches i1 g
       am = M.fromList <$> traverse (\i -> fmap (\i' -> (i, i')) (fi i)) (idxs g')
       ae = fe i1 i2 e
@@ -31,8 +31,8 @@ unfold fi fe fv i1 i2 e g =
   in complete i1 i2 <$> am <*> ae <*> pure g <*> ag
 
   where
-    complete i1 i2 m e g g' = delEdge i1 i2 (connect m e g (unfold' m g'))
-    unfold' m = mapIdxs (\i -> M.findWithDefault i i m)
+    complete i1 i2 m e g g' = delEdge i1 i2 (connect m e g (unwind' m g'))
+    unwind' m = mapIdxs (\i -> M.findWithDefault i i m)
     connect m e g g' = addEdge (M.findWithDefault i1 i1 m) i2 e $ union g g'
 
 display :: (MonadIO m, Eq i, Pretty i, Pretty e, Pretty v)

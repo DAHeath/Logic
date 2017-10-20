@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable, TypeFamilies, TemplateHaskell, ConstraintKinds #-}
-module Logic.ImplicationGraph.Type where
+module Logic.ImplicationGraph where
 
 import           Control.Lens
 import           Control.Monad.State
@@ -172,7 +172,7 @@ step end g =
   interpolate g >>= either (throwError . Failed) (\interpolated ->
     whenM (isInductive end interpolated)
       (throwError $ Complete interpolated) >>
-    foldrM (\((i1, i2), e) -> unfold i1 i2 e) g (G.backEdges g))
+    foldrM (\((i1, i2), e) -> unwind i1 i2 e) g (G.backEdges g))
 
 collectAnswer :: (Ord (BaseIdx idx), Idx idx)
               => ImplGr idx -> Map (BaseIdx idx) Form
@@ -181,9 +181,9 @@ collectAnswer g =
     InstanceV _ f -> modify (M.insertWith mkOr (i ^. baseIdx) f)
     _ -> return ()) g) M.empty
 
-unfold :: (Idx idx, Ord (BaseIdx idx), Solve idx m)
+unwind :: (Idx idx, Ord (BaseIdx idx), Solve idx m)
        => idx -> idx -> Edge -> ImplGr idx -> m (ImplGr idx)
-unfold = G.unfold updateInstance (\_ _ -> return) (const return)
+unwind = G.unwind updateInstance (\_ _ -> return) (const return)
 
 latestInstance :: (Idx idx, Ord (BaseIdx idx), MonadState (SolveState idx) m)
                => idx -> m idx

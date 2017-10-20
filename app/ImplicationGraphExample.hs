@@ -7,7 +7,7 @@ import qualified Data.Ord.Graph as G
 import qualified Data.Ord.Graph.Extras as G
 import qualified Data.Map as M
 
-import           Logic.ImplicationGraph.Type
+import           Logic.ImplicationGraph
 import qualified Logic.Type as T
 import           Logic.Formula.Parser
 import           Logic.Var
@@ -43,5 +43,5 @@ example =
   edge (LinIdx 1 0) (LinIdx 2 0) [form|i:Int >= n:Int|] M.empty $
   emptyInst (LinIdx 0 0) [] $
   emptyInst (LinIdx 1 0) s $
-  query (LinIdx 2 0) [form|not (i:Int = 41)|]
+  query (LinIdx 2 0) [form|not (i:Int = 13)|]
   emptyImplGr
