@@ -7,6 +7,7 @@ import qualified Data.Map as M
 import           Logic.Formula
 import           Logic.Model
 import           Logic.Var
+import qualified Logic.Type as T
 
 import           Text.PrettyPrint.HughesPJClass (Pretty, pPrint)
 import qualified Text.PrettyPrint.HughesPJClass as PP
@@ -18,6 +19,9 @@ data Chc
 
 data App = App { appOperator :: Var, appOperands :: [Var] }
   deriving (Show, Eq, Ord, Data)
+
+mkApp :: Name -> [Var] -> App
+mkApp n vs = App (Free n (T.curryType (map T.typeOf vs) T.Bool)) vs
 
 instance Formulaic Chc where
   toForm (Rule lhs phi rhs) = app2 Impl (manyAnd (map toForm lhs ++ [phi])) (toForm rhs)
