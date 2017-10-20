@@ -28,19 +28,18 @@ unfold fi fe fv i1 i2 e g =
       am = M.fromList <$> traverse (\i -> fmap (\i' -> (i, i')) (fi i)) (idxs g')
       ae = fe i1 i2 e
       ag = idfs fe fv g'
-  in delEdge i1 i2 <$> (connect <$> am <*> ae <*> pure g <*> (unfold' <$> am <*> ag))
+  in complete i1 i2 <$> am <*> ae <*> pure g <*> ag
 
   where
-    unfold' m =
-      mapIdxs (\i -> M.findWithDefault i i m)
-    connect m e g g' =
-      addEdge (M.findWithDefault i1 i1 m) i2 e $ union g g'
+    complete i1 i2 m e g g' = delEdge i1 i2 (connect m e g (unfold' m g'))
+    unfold' m = mapIdxs (\i -> M.findWithDefault i i m)
+    connect m e g g' = addEdge (M.findWithDefault i1 i1 m) i2 e $ union g g'
 
-display :: (Eq i, Pretty i, Pretty e, Pretty v)
-        => FilePath -> Graph i e v -> IO ()
+display :: (MonadIO m, Eq i, Pretty i, Pretty e, Pretty v)
+        => FilePath -> Graph i e v -> m ()
 display fn g = do
   let txt = dot ": " prettyShow prettyShow prettyShow g
-  writeFile fn txt
+  liftIO $ writeFile fn txt
   let fn' = Turtle.fromString fn
   _ <- Turtle.shell ("dot -Tpdf " <> fn' <> "> " <> fn' <> ".pdf") Turtle.empty
   _ <- Turtle.shell ("open " <> fn' <> ".pdf") Turtle.empty
