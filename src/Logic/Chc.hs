@@ -3,14 +3,12 @@ module Logic.Chc where
 import           Data.Data (Data)
 import           Data.Monoid ((<>))
 import qualified Data.Map as M
+import           Data.Text.Prettyprint.Doc hiding ((<>))
 
 import           Logic.Formula
 import           Logic.Model
 import           Logic.Var
 import qualified Logic.Type as T
-
-import           Text.PrettyPrint.HughesPJClass (Pretty, pPrint)
-import qualified Text.PrettyPrint.HughesPJClass as PP
 
 data Chc
   = Rule [App] Form App
@@ -56,12 +54,12 @@ isQuery Query{} = True
 isQuery _ = False
 
 instance Pretty Chc where
-  pPrint (Rule as f h)  = PP.sep (map pPrint as ++ [pPrint f, PP.text "=>", pPrint h])
-  pPrint (Query as f h) = PP.sep (map pPrint as ++ [pPrint f, PP.text "=>", pPrint h])
+  pretty (Rule as f h)  = sep (map pretty as ++ [pretty f, pretty "=>", pretty h])
+  pretty (Query as f h) = sep (map pretty as ++ [pretty f, pretty "=>", pretty h])
 
 instance Pretty App where
-  pPrint a = PP.braces (PP.sep
-    (PP.text (varName (appOperator a)) : map pPrint (appOperands a)))
+  pretty a = braces (sep
+    (pretty (varName (appOperator a)) : map pretty (appOperands a)))
 
 applyModelToApp :: Model -> App -> Form
 applyModelToApp (Model m) (App fun vs) =

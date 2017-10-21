@@ -11,13 +11,12 @@ import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Map (Map)
 import qualified Data.Map as M
+import           Data.Text.Prettyprint.Doc
 
 import           Logic.Type as T
 import           Logic.Formula
 import           Logic.Var
 import           Logic.Chc
-
-import           Text.PrettyPrint.HughesPJClass
 
 -- | The space of imperative programs are represented as inductively constructed
 -- commands.
@@ -215,29 +214,35 @@ commGraph comm =
         (map adj bef, M.findWithDefault (-1) n' ren, a, map adj aft)) g
 
 instance Pretty Comm where
-  pPrint = \case
-    Seq c1 c2    -> pPrint c1 $+$ pPrint c2
-    Case e c1 c2 -> (text "IF" <+> pPrint e) $+$ nest 2 (pPrint c1) $+$
-                    text "ELSE" $+$ nest 2 (pPrint c2)
-    Loop e c     -> (text "WHILE" <+> pPrint e) $+$ nest 2 (pPrint c)
-    Ass v r      -> hsep [pPrint v, text ":=", pPrint r]
-    Skip         -> text "SKIP"
-    Lbl l c      -> text ("LABEL: " ++ show l) $+$ pPrint c
-    Jump l       -> text ("JUMP: " ++ show l)
-    Save f i v   -> hsep [text "SAVE", text f, pPrint i, pPrint v]
+  pretty = \case
+    Seq c1 c2    -> vsep [pretty c1, pretty c2]
+    Case e c1 c2 ->
+      vsep [ pretty "IF" <+> pretty e
+           , nest 2 (pretty c1)
+           , pretty "ELSE"
+           , nest 2 (pretty c2) ]
+    Loop e c     -> vsep [pretty "WHILE" <+> pretty e, nest 2 (pretty c)]
+    Ass v r      -> hsep [pretty v, pretty ":=", pretty r]
+    Skip         -> pretty "SKIP"
+    Lbl l c      -> vsep [pretty ("LABEL: " ++ show l), pretty c]
+    Jump l       -> pretty ("JUMP: " ++ show l)
+    Save f i v   -> hsep [pretty "SAVE", pretty f, pretty i, pretty v]
 
 instance Pretty RHS where
-  pPrint = \case
-    Expr f -> pPrint f
-    Arbitrary t -> text "ANY" <+> pPrint t
-    Load f i -> hsep [text "LOAD", text f, pPrint i]
+  pretty = \case
+    Expr f -> pretty f
+    Arbitrary t -> pretty "ANY" <+> pretty t
+    Load f i -> hsep [pretty "LOAD", pretty f, pretty i]
 
 instance Pretty SemAct where
-  pPrint = \case
-    SemSeq a1 a2    -> pPrint a1 <> text ";" $+$ pPrint a2
-    SemAss v r      -> hsep [pPrint v, text ":=", pPrint r]
-    SemPredicate e  -> pPrint e
-    SemCase e c1 c2 -> (text "IF" <+> pPrint e) $+$ nest 2 (pPrint c1) $+$
-                       text "ELSE" $+$ nest 2 (pPrint c2)
-    SemSkip         -> text "SKIP"
-    SemSave f i v  -> hsep [text "SAVE", text f, pPrint i, pPrint v]
+  pretty = \case
+    SemSeq a1 a2    -> vsep [pretty a1 <> pretty ";", pretty a2]
+    SemAss v r      -> hsep [pretty v, pretty ":=", pretty r]
+    SemPredicate e  -> pretty e
+    SemCase e c1 c2 ->
+      vsep [ pretty "IF" <+> pretty e
+           , nest 2 (pretty c1)
+           , pretty "ELSE"
+           , nest 2 (pretty c2) ]
+    SemSkip         -> pretty "SKIP"
+    SemSave f i v  -> hsep [pretty "SAVE", pretty f, pretty i, pretty v]

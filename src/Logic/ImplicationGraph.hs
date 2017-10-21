@@ -13,9 +13,10 @@ import qualified Data.Ord.Graph as G
 import qualified Data.Ord.Graph.Extras as G
 import           Data.Map (Map)
 import qualified Data.Map as M
-import           Data.Maybe (mapMaybe, fromJust)
+import           Data.Maybe (mapMaybe, fromJust, catMaybes)
 import           Data.List.Split (splitOn)
 import           Data.Foldable (foldrM)
+import           Data.Text.Prettyprint.Doc
 
 import           Logic.Formula
 import           Logic.Model
@@ -23,7 +24,6 @@ import           Logic.Chc
 import           Logic.Var
 import qualified Logic.Solver.Z3 as Z3
 
-import           Text.PrettyPrint.HughesPJClass
 import           Text.Read (readMaybe)
 
 data Vert idx
@@ -36,12 +36,12 @@ data Edge = Edge Form (Map Var Var)
   deriving (Show, Read, Eq, Ord, Data)
 
 instance Pretty Edge where
-  pPrint (Edge f m) = pPrint f <+> pPrint (M.toList m)
+  pretty (Edge f m) = pretty f <+> pretty (M.toList m)
 
 instance Pretty idx => Pretty (Vert idx) where
-  pPrint = \case
-    InstanceV vs f -> pPrint vs <+> pPrint f
-    QueryV f -> pPrint f
+  pretty = \case
+    InstanceV vs f -> pretty vs <+> pretty f
+    QueryV f -> pretty f
 
 class (Show a, Ord a, Data a) => Idx a where
   type BaseIdx a
@@ -74,7 +74,7 @@ instance Idx LinIdx where
   inst = linInst
 
 instance Pretty LinIdx where
-  pPrint (LinIdx iden i) = pPrint iden <+> pPrint i
+  pretty (LinIdx iden i) = pretty iden <+> pretty i
 
 type ImplGr idx = Graph idx Edge (Vert idx)
 
@@ -122,30 +122,28 @@ implGrChc g = concatMap idxRules (G.idxs g)
         let rhs = subst mvs f
         return (Query [lhs] e rhs)) (g ^@.. G.iedgesTo i)
 
+    -- We only create rules for non-back edges
     relevantIncoming i = g ^@.. G.iedgesTo i . indices (i >)
 
 -- | Interpolate the facts in the graph using CHC solving to label the vertices
 -- with fresh definitions.
 interpolate :: (MonadIO m, Idx idx) => ImplGr idx -> m (Either Model (ImplGr idx))
 interpolate g = Z3.solveChc (implGrChc g) >>= \case
-    Left m -> return (Left m)
-    Right m -> return (Right $ applyModel m g)
+  Left m -> return (Left m)
+  Right m -> return (Right $ applyModel m g)
 
 -- | Replace the fact at each vertex in the graph by the fact in the model.
 applyModel :: Idx idx => Model -> ImplGr idx -> ImplGr idx
 applyModel m = G.imapVerts applyVert
   where
-    applyVert i = \case
-      InstanceV vs _ ->
-        let fact = M.findWithDefault (LBool True) i m'
-        in InstanceV vs fact
-      n -> n
+    applyVert i = _InstanceV . _2 .~ M.findWithDefault (LBool True) i m'
 
-    m' = M.mapKeys (interpretName . varName) $
-           M.filterWithKey (\k _ -> head (varName k) == 'r') (getModel m)
+    -- TODO Map pair of lists iso?
+    m' = M.toList (getModel m)
+      & map (traverseOf _1 %%~ interpretName . varName)
+      & catMaybes & M.fromList
       where
-        interpretName ('r':rest) = fromJust $ fromPrefix rest
-        interpretName _ = undefined
+        interpretName n = join (n ^? to uncons . _Just . _2 . to fromPrefix)
 
 data Result idx
   = Failed Model
@@ -157,6 +155,8 @@ type SolveState idx = Map (BaseIdx idx) Integer
 type Solve idx m =
   (MonadError (Result idx) m, MonadState (SolveState idx) m, MonadIO m)
 
+-- | Repeatedly unwind the program until a counterexample is found or inductive
+-- invariants are found.
 solve :: MonadIO m => LinIdx -> ImplGr LinIdx -> m (Either Model (ImplGr LinIdx))
 solve end g =
   evalStateT (runExceptT (loop g)) M.empty >>= \case
@@ -166,37 +166,29 @@ solve end g =
   where
     loop gr = loop =<< step end gr
 
+-- | Perform interpolation on the graph (exiting on failure), perform and induction
+-- check, and unwind further if required.
 step :: (Idx idx, Ord (BaseIdx idx), Eq (BaseIdx idx), Solve idx m)
      => idx -> ImplGr idx -> m (ImplGr idx)
-step end g =
-  interpolate g >>= either (throwError . Failed) (\interpolated ->
-    whenM (isInductive end interpolated)
-      (throwError $ Complete interpolated) >>
-    foldrM (\((i1, i2), e) -> unwind i1 i2 e) g (G.backEdges g))
+step end g = interpolate g >>= either (throwError . Failed) (\interp ->
+  whenM (isInductive end interp)
+    (throwError $ Complete interp) >>
+  foldrM (\((i1, i2), e) -> unwind i1 i2 e) g (G.backEdges g))
 
-collectAnswer :: (Ord (BaseIdx idx), Idx idx)
-              => ImplGr idx -> Map (BaseIdx idx) Form
-collectAnswer g =
-  execState (G.itravVerts (\i v -> case v of
-    InstanceV _ f -> modify (M.insertWith mkOr (i ^. baseIdx) f)
-    _ -> return ()) g) M.empty
+-- | Gather all facts known about each instance of the same index together by disjunction.
+collectAnswer :: (Ord (BaseIdx idx), Idx idx) => ImplGr idx -> Map (BaseIdx idx) Form
+collectAnswer g = execState (G.itravVerts (\i v -> case v of
+  InstanceV _ f -> modify (M.insertWith mkOr (i ^. baseIdx) f)
+  _ -> return ()) g) M.empty
 
+-- | Unwind the graph on the given backedge and update all instances in the unwinding.
 unwind :: (Idx idx, Ord (BaseIdx idx), Solve idx m)
        => idx -> idx -> Edge -> ImplGr idx -> m (ImplGr idx)
 unwind = G.unwind updateInstance (\_ _ -> return) (const return)
 
-latestInstance :: (Idx idx, Ord (BaseIdx idx), MonadState (SolveState idx) m)
-               => idx -> m idx
-latestInstance idx = do
-  i <- M.findWithDefault 0 (idx ^. baseIdx) <$> get
-  return (idx & inst .~ i)
-
+-- | Find a fresh instance counter for the given index.
 updateInstance :: (Idx idx, Ord (BaseIdx idx), MonadState (SolveState idx) m) => idx -> m idx
-updateInstance idx = do
-  res <- latestInstance idx
-  let res' = res & inst +~ 1
-  at (idx ^. baseIdx) ?= (res' ^. inst)
-  return res'
+updateInstance idx = flip (set inst) idx <$> (at (idx ^. baseIdx) . non 0 <+= 1)
 
 emptyImplGr :: ImplGr ix
 emptyImplGr = G.empty

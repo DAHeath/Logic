@@ -23,7 +23,6 @@ import qualified Logic.Type as T
 import qualified Logic.Model as M
 
 import           Z3.Monad hiding (local)
-import qualified Text.PrettyPrint.HughesPJClass as PP
 
 data Env = Env { _envVars :: Map Var AST
                , _envFuns :: Map Var FuncDecl

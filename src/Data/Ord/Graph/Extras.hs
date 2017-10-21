@@ -8,11 +8,11 @@ import           Data.Ord.Graph
 import           Data.Maybe (fromJust)
 import qualified Data.Map as M
 import           Data.Monoid ((<>))
+import           Data.Text.Prettyprint.Doc hiding ((<>), dot)
 
 import           Prelude hiding (reverse)
 
 import qualified Turtle
-import           Text.PrettyPrint.HughesPJClass (Pretty, prettyShow)
 
 backEdges :: Ord i => Graph i e v -> [((i, i), e)]
 backEdges g = filter (\((i1, i2), _) -> i2 <= i1) $ g ^@.. iallEdges
@@ -38,7 +38,7 @@ unwind fi fe fv i1 i2 e g =
 display :: (MonadIO m, Eq i, Pretty i, Pretty e, Pretty v)
         => FilePath -> Graph i e v -> m ()
 display fn g = do
-  let txt = dot ": " prettyShow prettyShow prettyShow g
+  let txt = dot ": " (show . pretty) (show . pretty) (show . pretty) g
   liftIO $ writeFile fn txt
   let fn' = Turtle.fromString fn
   _ <- Turtle.shell ("dot -Tpdf " <> fn' <> "> " <> fn' <> ".pdf") Turtle.empty

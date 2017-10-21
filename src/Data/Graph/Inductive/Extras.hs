@@ -12,12 +12,11 @@ import           Data.Graph.Inductive.Basic
 import           Data.Graph.Inductive.Query.DFS
 import           Data.Graph.Inductive.Query.BFS
 import           Data.Monoid ((<>))
+import           Data.Text.Prettyprint.Doc hiding ((<>), dot)
 
 import qualified Data.GraphViz as GV
 import qualified Turtle
 import qualified Data.Text.Lazy.IO as TIO
-
-import           Text.PrettyPrint.HughesPJClass (Pretty, prettyShow)
 
 rebuildFrom :: Int -> Gr n e -> Gr n e
 rebuildFrom bot g =
@@ -128,7 +127,7 @@ vertex n g = fromJust (lab g n)
 
 display :: (Pretty n, Pretty e) => FilePath -> Gr n e -> IO ()
 display fn g =
-  let g' = nmap prettyShow $ emap prettyShow g
+  let g' = nmap (show . pretty) $ emap (show . pretty) g
       params = GV.nonClusteredParams { GV.fmtNode = \ (n,l)  -> [GV.toLabel (show n ++ ": " ++ l)]
                                      , GV.fmtEdge = \ (_, _, l) -> [GV.toLabel l]
                                      }

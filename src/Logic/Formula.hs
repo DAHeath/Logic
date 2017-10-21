@@ -6,13 +6,11 @@ import           Control.Lens
 import           Data.Data (Data)
 import           Data.Data.Lens (uniplate)
 import           Data.List (sort)
+import           Data.Text.Prettyprint.Doc
 
 import           Logic.Type (Type((:=>)), Typed)
 import qualified Logic.Type as T
 import           Logic.Var
-
-import           Text.PrettyPrint.HughesPJClass ((<+>), Pretty, pPrint)
-import qualified Text.PrettyPrint.HughesPJClass as PP
 
 data Form
   = Form :@ Form
@@ -95,49 +93,49 @@ instance Typed Form where
     LReal _     -> T.Real
 
 instance Pretty Form where
-  pPrint = \case
+  pretty = \case
     f :@ x :@ y ->
       if isBinaryInfix f
-      then PP.hsep [binArg x, pPrint f, binArg y]
-      else PP.parens (inlinePrint f x <+> pPrint y)
-    V v          -> PP.pPrint v
-    f :@ x       -> PP.parens (pPrint f <+> pPrint x)
+      then hsep [binArg x, pretty f, binArg y]
+      else parens (inlinePrint f x <+> pretty y)
+    V v          -> pretty v
+    f :@ x       -> parens (pretty f <+> pretty x)
 
-    If _         -> PP.text "if"
+    If _         -> pretty "if"
 
-    Distinct _   -> PP.text "distinct"
+    Distinct _   -> pretty "distinct"
 
-    And          -> PP.text "&&"
-    Or           -> PP.text "||"
-    Impl         -> PP.text "->"
-    Iff          -> PP.text "<->"
-    Not          -> PP.text "not"
+    And          -> pretty "&&"
+    Or           -> pretty "||"
+    Impl         -> pretty "->"
+    Iff          -> pretty "<->"
+    Not          -> pretty "not"
 
-    Add _        -> PP.text "+"
-    Mul _        -> PP.text "*"
-    Sub _        -> PP.text "-"
-    Div _        -> PP.text "/"
-    Mod _        -> PP.text "%"
+    Add _        -> pretty "+"
+    Mul _        -> pretty "*"
+    Sub _        -> pretty "-"
+    Div _        -> pretty "/"
+    Mod _        -> pretty "%"
 
-    Eql _        -> PP.text "="
-    Lt _         -> PP.text "<"
-    Le _         -> PP.text "<="
-    Gt _         -> PP.text ">"
-    Ge _         -> PP.text ">="
+    Eql _        -> pretty "="
+    Lt _         -> pretty "<"
+    Le _         -> pretty "<="
+    Gt _         -> pretty ">"
+    Ge _         -> pretty ">="
 
-    Store{}      -> PP.text "store"
-    Select{}     -> PP.text "select"
+    Store{}      -> pretty "store"
+    Select{}     -> pretty "select"
 
-    LUnit        -> PP.text "()"
-    LBool b      -> pPrint b
-    LInt i       -> pPrint i
-    LReal r      -> pPrint r
+    LUnit        -> pretty "()"
+    LBool b      -> pretty b
+    LInt i       -> pretty i
+    LReal r      -> pretty r
     where
-      binArg f = if isLit f || isVar f then pPrint f else PP.parens (pPrint f)
+      binArg f = if isLit f || isVar f then pretty f else parens (pretty f)
 
       inlinePrint f x = case f of
-        f' :@ y -> inlinePrint f' y <+> pPrint x
-        f' -> pPrint f' <+> pPrint x
+        f' :@ y -> inlinePrint f' y <+> pretty x
+        f' -> pretty f' <+> pretty x
 
 class Formulaic a where
   toForm :: a -> Form

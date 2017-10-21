@@ -5,25 +5,25 @@ import Logic.Chc
 import Logic.Solver.Z3
 import Logic.Solver.Duality
 import Logic.Formula.Parser
-import Text.PrettyPrint.HughesPJClass (prettyShow)
+import Data.Text.Prettyprint.Doc
 
 test :: [Chc] -> IO ()
 test t = do
   sol <- solveChc t
   case sol of
     Left f -> do putStrLn "counterexample"
-                 putStrLn (prettyShow f)
+                 print (pretty f)
     Right m -> do putStrLn "solution"
-                  putStrLn (prettyShow m)
+                  print (pretty m)
 
 testDuality :: [Chc] -> IO ()
 testDuality t = do
   sol <- duality t
   case sol of
     Left f -> do putStrLn "counterexample"
-                 putStrLn (prettyShow f)
+                 print (pretty f)
     Right m -> do putStrLn "solution"
-                  putStrLn (prettyShow m)
+                  print (pretty m)
 
 main :: IO ()
 main = testDuality test2

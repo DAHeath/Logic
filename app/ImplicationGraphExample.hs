@@ -6,20 +6,19 @@ import           Data.Ord.Graph (Graph)
 import qualified Data.Ord.Graph as G
 import qualified Data.Ord.Graph.Extras as G
 import qualified Data.Map as M
+import           Data.Text.Prettyprint.Doc
 
 import           Logic.ImplicationGraph
 import qualified Logic.Type as T
 import           Logic.Formula.Parser
 import           Logic.Var
 
-import           Text.PrettyPrint.HughesPJClass
-
 main :: IO ()
 main = do
   G.display "before" example
   sol <- solve (LinIdx 2 0) example
   case sol of
-    Left m -> putStrLn (prettyShow m)
+    Left m -> print (pretty m)
     Right r -> G.display "test" r
 
 stepTest :: IO ()

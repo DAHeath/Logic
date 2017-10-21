@@ -8,12 +8,10 @@ import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Set (Set)
 import qualified Data.Set as S
+import           Data.Text.Prettyprint.Doc
 
 import           Logic.Type (Type, Typed)
 import qualified Logic.Type as T
-
-import           Text.PrettyPrint.HughesPJClass (Pretty, pPrint)
-import qualified Text.PrettyPrint.HughesPJClass as PP
 
 type Name = String
 
@@ -27,7 +25,7 @@ instance Typed Var
         typeOf (Free _ t) = t
 
 instance Pretty Var
-  where pPrint = PP.text . varName
+  where pretty = pretty . varName
 
 -- | A name for the variable. If the variable is bound, it is a textual
 -- representation of the index. Otherwise, it is just the variable name.

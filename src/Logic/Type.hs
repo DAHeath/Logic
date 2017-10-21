@@ -3,7 +3,7 @@ module Logic.Type where
 
 import           Control.Lens hiding (List)
 import           Data.Data (Data)
-import           Text.PrettyPrint.HughesPJClass
+import           Data.Text.Prettyprint.Doc
 
 data Type
   = Unit
@@ -20,13 +20,13 @@ infixr 0 :=>
 makePrisms ''Type
 
 instance Pretty Type where
-  pPrint = \case
-    Unit     -> text "Unit"
-    Bool     -> text "Bool"
-    Int      -> text "Int"
-    Real     -> text "Real"
-    t :=> t' -> pPrint t <+> text "->" <+> pPrint t'
-    List t   -> text "List<" <> pPrint t <> text ">"
+  pretty = \case
+    Unit     -> pretty "Unit"
+    Bool     -> pretty "Bool"
+    Int      -> pretty "Int"
+    Real     -> pretty "Real"
+    t :=> t' -> pretty t <+> pretty "->" <+> pretty t'
+    List t   -> pretty "List<" <> pretty t <> pretty ">"
 
 class Typed a where
   typeOf :: a -> Type

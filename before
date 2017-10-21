@@ -1,8 +1,0 @@
-digraph {
-  0 [label="0 0: [] True"];
-  1 [label="1 0: [i, n] True"];
-  2 [label="2 0: (not i = 13)"];
-  0 -> 1 [label="i = 0 []"];
-  1 -> 1 [label="((i + 2) = i') && (i < n) [(i, i')]"];
-  1 -> 2 [label="i >= n []"];
-}
