@@ -4,9 +4,8 @@ import           Control.Monad.State
 
 import           Data.Data (Data)
 import           Data.Tuple (swap)
-import qualified Data.Graph.Inductive.Graph as G
-import           Data.Graph.Inductive.PatriciaTree
-import           Data.Graph.Inductive.Extras
+import qualified Data.Ord.Graph as G
+import           Data.Ord.Graph (Graph)
 import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Map (Map)
@@ -143,14 +142,14 @@ commSem = \case
 -- transition formulas on the edges. The semantic actions are labelled with the
 -- variables that are live at the end of the semantic action.
 data FlowGr = FlowGr
-  { getFlowGr :: Gr (Set Var) SemAct
-  , entrance :: G.Node
-  , exit :: G.Node
+  { getFlowGr :: Graph Int SemAct (Set Var)
+  , entrance :: Int
+  , exit :: Int
   }
 
-data PartGraph = PartGraph (Gr () SemAct) G.Node SemAct
+data PartGraph = PartGraph (Graph Int SemAct ()) Int SemAct
 
-commGraph :: Comm -> Gr () SemAct
+commGraph :: Comm -> Graph Int SemAct ()
 commGraph comm =
   renumber $ evalState (do
     i <- initial
@@ -166,26 +165,26 @@ commGraph comm =
           (PartGraph g1 n1 s1) <- commGraph' c1 pg
           (PartGraph g2 n2 s2) <- commGraph' c2 pg
           h <- vert
-          let g' = G.insEdge (h, n1, semSeq (SemPredicate e) s1)
-                 $ G.insEdge (h, n2, semSeq (SemPredicate (Not :@ e)) s2)
-                 $ G.insNode (h, ())
-                 $ overlay g1 g2
+          let g' = G.addEdge h n1 (semSeq (SemPredicate e) s1)
+                 $ G.addEdge h n2 (semSeq (SemPredicate (Not :@ e)) s2)
+                 $ G.addVert h ()
+                 $ G.union g1 g2
           return $ PartGraph g' h SemSkip
         Loop e c -> do
           h <- vert
-          (PartGraph g' en' s') <- commGraph' c (PartGraph (G.insNode (h, ()) G.empty) h SemSkip)
-          let g'' = G.insEdge (h, en', semSeq (SemPredicate e) s') g'
+          (PartGraph g' en' s') <- commGraph' c (PartGraph (G.addVert h () G.empty) h SemSkip)
+          let g'' = G.addEdge h en' (semSeq (SemPredicate e) s') g'
           return $ PartGraph
-              ( G.insEdge (h, n, semSeq (SemPredicate (Not :@ e)) s)
-              $ overlay g g'')
+              ( G.addEdge h n (semSeq (SemPredicate (Not :@ e)) s)
+              $ G.union g g'')
               h SemSkip
         Skip -> return pg
         Jump l -> skipTo g <$> lblVert l
         Lbl l c -> do
           v <- lblVert l
           (PartGraph g' en s') <- commGraph' c pg
-          return $ PartGraph ( G.insEdge (v, en, s')
-                             $ G.insNode (v, ()) g'
+          return $ PartGraph ( G.addEdge v en s'
+                             $ G.addVert v () g'
                              ) v SemSkip
         _ -> return $ PartGraph g n (semSeq (commSem comm') s)
     lblVert l = do
@@ -198,20 +197,17 @@ commGraph comm =
           return v
     vert = state (\(v, m) -> (v, (v+1, m)))
     initial = skipTo G.empty <$> vert
-    skipTo g n = PartGraph (G.insNode (n, ()) g) n SemSkip
+    skipTo g n = PartGraph (G.addVert n () g) n SemSkip
     terminate (PartGraph g en s) =
       if s == SemSkip then return g
       else do
         v <- vert
-        return $ G.insEdge (v, en, s) $ G.insNode (v, ()) g
-    renumber :: Gr () a -> Gr () a
+        return $ G.addEdge v en s $ G.addVert v () g
+    renumber :: Graph Int a () -> Graph Int a ()
     renumber g =
-      let n = G.noNodes g
+      let n = G.order g
           ren = M.fromList (zip [n-1,n-2..0] [0..n-1])
-          adj (b, n') = (b, M.findWithDefault (-1) n' ren)
-      in
-      G.gmap (\(bef, n', a, aft) ->
-        (map adj bef, M.findWithDefault (-1) n' ren, a, map adj aft)) g
+      in G.mapIdxs (\i -> M.findWithDefault (-1) i ren) g
 
 instance Pretty Comm where
   pretty = \case

@@ -22,11 +22,8 @@ library
                      , Logic.Chc
                      , Logic.ImplicationGraph
                      , Logic.Solver.Z3
-                     , Logic.Solver.Duality
                      , Language.Imperative
-                     , Data.Graph.Inductive.Extras
                      , Data.Ord.Graph.Extras
-                     , Data.Tree.Extras
 
   default-extensions:  LambdaCase
                      , DeriveDataTypeable
@@ -37,7 +34,6 @@ library
 
   build-depends:       base             >= 4.8
                      , containers       >= 0.5
-                     , fgl              >= 5.5.3.1
                      , tardis
                      , graphviz
                      , turtle
@@ -77,20 +73,8 @@ executable ImplicationGraphExample
                      , mtl
                      , prettyprinter
                      , containers
-                     , fgl
                      , Logic
                      , ord-graph
-  default-language:    Haskell2010
-
-executable GraphExample
-  hs-source-dirs:      app
-  main-is:             GraphExample.hs
-  ghc-options:
-  build-depends:       base
-                     , text             >= 1.2
-                     , prettyprinter
-                     , Logic
-                     , fgl
   default-language:    Haskell2010
 
 executable ImperativeExample
@@ -102,7 +86,6 @@ executable ImperativeExample
                      , prettyprinter
                      , Logic
                      , mtl
-                     , fgl
                      , containers
                      , ord-graph
   default-language:    Haskell2010
@@ -115,7 +98,6 @@ executable ImperativeExample
                      -- , text             >= 1.2
                      -- , prettyprinter
                      -- , Logic
-                     -- , fgl
                      -- , containers
                      -- , mtl
                      -- , ord-graph

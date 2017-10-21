@@ -3,7 +3,6 @@
 import Logic.Formula
 import Logic.Chc
 import Logic.Solver.Z3
-import Logic.Solver.Duality
 import Logic.Formula.Parser
 import Data.Text.Prettyprint.Doc
 
@@ -16,17 +15,8 @@ test t = do
     Right m -> do putStrLn "solution"
                   print (pretty m)
 
-testDuality :: [Chc] -> IO ()
-testDuality t = do
-  sol <- duality t
-  case sol of
-    Left f -> do putStrLn "counterexample"
-                 print (pretty f)
-    Right m -> do putStrLn "solution"
-                  print (pretty m)
-
 main :: IO ()
-main = testDuality test2
+main = test test2
 
 test1, test2 :: [Chc]
 test1 = [chc| i:Int = 0 => {r i:Int}

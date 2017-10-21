@@ -2,8 +2,7 @@
 import           Control.Monad.State
 
 import qualified Data.Map as M
-import           Data.Graph.Inductive.Extras
-import           Data.Graph.Inductive.Graph
+import           Data.Ord.Graph
 
 import qualified Logic.Type as T
 import           Logic.Formula
