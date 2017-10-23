@@ -36,11 +36,15 @@ n  = Free "n"  T.Int
 s :: [Var]
 s = [i, n]
 
-example =
-  edge (LinIdx 0 0) (LinIdx 1 0) [form|i:Int = 0|] M.empty $
-  edge (LinIdx 1 0) (LinIdx 1 0) [form|i':Int = i:Int + 2 && i:Int < n:Int|] (M.singleton i i') $
-  edge (LinIdx 1 0) (LinIdx 2 0) [form|i:Int >= n:Int|] M.empty $
-  emptyInst (LinIdx 0 0) [] $
-  emptyInst (LinIdx 1 0) s $
-  query (LinIdx 2 0) [form|not (i:Int = 13)|]
-  emptyImplGr
+example :: Graph LinIdx Edge Vert
+example = G.fromLists
+  [ (LinIdx 0 0, emptyInst [])
+  , (LinIdx 1 0, emptyInst s)
+  , (LinIdx 2 0, QueryV [form|not (i:Int = 13)|])]
+  [ ( LinIdx 0 0, LinIdx 1 0
+    , Edge [form|i:Int = 0|] M.empty)
+  , ( LinIdx 1 0, LinIdx 1 0
+    , Edge [form|i':Int = i:Int + 2 && i:Int < n:Int|] (M.singleton i i'))
+  , ( LinIdx 1 0, LinIdx 2 0
+    , Edge [form|i:Int >= n:Int|] M.empty)
+  ]

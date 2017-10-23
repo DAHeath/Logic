@@ -13,7 +13,7 @@ import qualified Data.Ord.Graph as G
 import qualified Data.Ord.Graph.Extras as G
 import           Data.Map (Map)
 import qualified Data.Map as M
-import           Data.Maybe (mapMaybe, fromJust, catMaybes)
+import           Data.Maybe (mapMaybe, catMaybes)
 import           Data.List.Split (splitOn)
 import           Data.Foldable (foldrM)
 import           Data.Text.Prettyprint.Doc
@@ -26,11 +26,14 @@ import qualified Logic.Solver.Z3 as Z3
 
 import           Text.Read (readMaybe)
 
-data Vert idx
+data Vert
   = InstanceV [Var] Form
   | QueryV Form
   deriving (Show, Read, Eq, Ord, Data)
 makePrisms ''Vert
+
+emptyInst :: [Var] -> Vert
+emptyInst vs = InstanceV vs (LBool True)
 
 data Edge = Edge Form (Map Var Var)
   deriving (Show, Read, Eq, Ord, Data)
@@ -38,7 +41,7 @@ data Edge = Edge Form (Map Var Var)
 instance Pretty Edge where
   pretty (Edge f m) = pretty f <+> pretty (M.toList m)
 
-instance Pretty idx => Pretty (Vert idx) where
+instance Pretty Vert where
   pretty = \case
     InstanceV vs f -> pretty vs <+> pretty f
     QueryV f -> pretty f
@@ -46,9 +49,7 @@ instance Pretty idx => Pretty (Vert idx) where
 class (Show a, Ord a, Data a) => Idx a where
   type BaseIdx a
   baseIdx :: Lens' a (BaseIdx a)
-  toPrefix :: a -> String
-  fromPrefix :: String -> Maybe a
-  inst :: Lens' a Integer
+  written :: Prism' String a
 
 match :: (Idx a, Eq (BaseIdx a)) => a -> a -> Bool
 match x y = x ^. baseIdx == y ^. baseIdx
@@ -67,16 +68,17 @@ instance Ord LinIdx where
 instance Idx LinIdx where
   type BaseIdx LinIdx = Integer
   baseIdx = linIden
-  toPrefix (LinIdx iden i) = show iden ++ "_" ++ show i
-  fromPrefix s = case splitOn "_" s of
-      [iden, i] -> LinIdx <$> readMaybe iden <*> readMaybe i
-      _ -> Nothing
-  inst = linInst
+  written = prism' toWritten fromWritten
+    where
+      toWritten (LinIdx iden i) = show iden ++ "_" ++ show i
+      fromWritten s = case splitOn "_" s of
+          [iden, i] -> LinIdx <$> readMaybe iden <*> readMaybe i
+          _ -> Nothing
 
 instance Pretty LinIdx where
   pretty (LinIdx iden i) = pretty iden <+> pretty i
 
-type ImplGr idx = Graph idx Edge (Vert idx)
+type ImplGr idx = Graph idx Edge Vert
 
 -- | Check whether the vertex labels in the graph form an inductive relationship.
 isInductive :: (Eq (BaseIdx idx), Idx idx, MonadIO m) => idx -> ImplGr idx -> m Bool
@@ -106,7 +108,7 @@ implGrChc :: Idx idx => ImplGr idx -> [Chc]
 implGrChc g = concatMap idxRules (G.idxs g)
   where
     idxApp i = instApp i <$> g ^? ix i . _InstanceV
-    instApp i (vs, _) = mkApp ('r' : toPrefix i) vs
+    instApp i (vs, _) = mkApp ('r' : written # i) vs
 
     idxRules i = maybe [] (\case
       InstanceV _ _ ->
@@ -137,23 +139,20 @@ applyModel :: Idx idx => Model -> ImplGr idx -> ImplGr idx
 applyModel m = G.imapVerts applyVert
   where
     applyVert i = _InstanceV . _2 .~ M.findWithDefault (LBool True) i m'
-
-    -- TODO Map pair of lists iso?
     m' = M.toList (getModel m)
       & map (traverseOf _1 %%~ interpretName . varName)
       & catMaybes & M.fromList
-      where
-        interpretName n = join (n ^? to uncons . _Just . _2 . to fromPrefix)
+      where interpretName n = n ^? to uncons . _Just . _2 . written
 
 data Result idx
   = Failed Model
   | Complete (ImplGr idx)
   deriving (Show, Read, Eq)
 
-type SolveState idx = Map (BaseIdx idx) Integer
+type SolveState = Map (BaseIdx LinIdx) Integer
 
 type Solve idx m =
-  (MonadError (Result idx) m, MonadState (SolveState idx) m, MonadIO m)
+  (MonadError (Result idx) m, MonadState SolveState m, MonadIO m)
 
 -- | Repeatedly unwind the program until a counterexample is found or inductive
 -- invariants are found.
@@ -168,12 +167,10 @@ solve end g =
 
 -- | Perform interpolation on the graph (exiting on failure), perform and induction
 -- check, and unwind further if required.
-step :: (Idx idx, Ord (BaseIdx idx), Eq (BaseIdx idx), Solve idx m)
-     => idx -> ImplGr idx -> m (ImplGr idx)
+step :: Solve LinIdx m => LinIdx -> ImplGr LinIdx -> m (ImplGr LinIdx)
 step end g = interpolate g >>= either (throwError . Failed) (\interp ->
   whenM (isInductive end interp)
-    (throwError $ Complete interp) >>
-  foldrM (\((i1, i2), e) -> unwind i1 i2 e) g (G.backEdges g))
+    (throwError $ Complete interp) >> unwindAllBackEdges g)
 
 -- | Gather all facts known about each instance of the same index together by disjunction.
 collectAnswer :: (Ord (BaseIdx idx), Idx idx) => ImplGr idx -> Map (BaseIdx idx) Form
@@ -182,31 +179,12 @@ collectAnswer g = execState (G.itravVerts (\i v -> case v of
   _ -> return ()) g) M.empty
 
 -- | Unwind the graph on the given backedge and update all instances in the unwinding.
-unwind :: (Idx idx, Ord (BaseIdx idx), Solve idx m)
-       => idx -> idx -> Edge -> ImplGr idx -> m (ImplGr idx)
+unwind :: Solve idx m => LinIdx -> LinIdx -> Edge -> ImplGr LinIdx -> m (ImplGr LinIdx)
 unwind = G.unwind updateInstance (\_ _ -> return) (const return)
 
+unwindAllBackEdges :: Solve idx m => ImplGr LinIdx -> m (ImplGr LinIdx)
+unwindAllBackEdges g = foldrM (\((i1, i2), e) -> unwind i1 i2 e) g (G.backEdges g)
+
 -- | Find a fresh instance counter for the given index.
-updateInstance :: (Idx idx, Ord (BaseIdx idx), MonadState (SolveState idx) m) => idx -> m idx
-updateInstance idx = flip (set inst) idx <$> (at (idx ^. baseIdx) . non 0 <+= 1)
-
-emptyImplGr :: ImplGr ix
-emptyImplGr = G.empty
-
-emptyInst :: Idx idx => idx -> [Var] -> ImplGr idx -> ImplGr idx
-emptyInst i vs = G.addVert i (InstanceV vs (LBool True))
-
-query :: Idx idx => idx -> Form -> ImplGr idx -> ImplGr idx
-query i f = G.addVert i (QueryV f)
-
-edge :: Idx idx => idx -> idx -> Form -> Map Var Var -> ImplGr idx -> ImplGr idx
-edge i1 i2 f m = G.addEdge i1 i2 (Edge f m)
-
--- connAnd :: Idx idx => [idx] -> idx -> Form -> Map Var Var -> ImplGr idx -> ImplGr idx
--- connAnd is i f m g =
---   foldr (\(i', f', m') -> G.addEdge i' i (Edge f' m'))
---         (g & ix i . _InstanceV %~ AndInst is)
---         (zip3 is (f:repeat (LBool True)) (m:repeat M.empty))
-
--- connOr :: Idx idx => [[idx]] -> idx -> ImplGr idx -> ImplGr idx
--- connOr is i = ix i . _InstanceV %~ OrInst is
+updateInstance :: MonadState SolveState m => LinIdx -> m LinIdx
+updateInstance idx = flip (set linInst) idx <$> (at (idx ^. baseIdx) . non 0 <+= 1)
