@@ -8,7 +8,7 @@ License:     BSD-3-clause
 Library util
   Path:         src/util
   BuildTools:   ocamlbuild
-  BuildDepends: core
+  BuildDepends: core, ppx_hash, ppx_compare, ppx_sexp_conv, ppx_deriving
   ByteOpt:      -thread
   NativeOpt:    -thread
   Modules:      QualifiedIdentity, Algorithm
@@ -16,18 +16,10 @@ Library util
 Library java 
   Path:         src/java
   BuildTools:   ocamlbuild
-  BuildDepends: core, sawja, ocamlgraph, util
+  BuildDepends: core, sawja, ocamlgraph, util, ppx_hash, ppx_compare, ppx_sexp_conv, ppx_deriving
   ByteOpt:      -thread
   NativeOpt:    -thread
-  Modules:      ParseJava, InstrGraph, GraphDebug
-
-Library prover
-  Path:         src/prover
-  BuildTools:   ocamlbuild
-  BuildDepends: core, util, java, Z3
-  ByteOpt:      -thread
-  NativeOpt:    -thread
-  Modules:      GraphToCHC
+  Modules:      ParseJava, InstrGraph, GraphDebug, Ir, ImplicationGraph
 
 Executable equivalencecheck
   Path:         src
