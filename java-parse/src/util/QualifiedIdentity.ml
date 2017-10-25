@@ -1,13 +1,16 @@
+open Core
+
 (** A qualified identity is intended to be a unique identity for some entity.
    The id consists of a list of sub-ids which become increasingly specific as
    the list is traversed from left to right. *)
 type t = QID of string list
+[@@deriving hash, compare]
 
 type store = t list
 
 (** Combine the subidentifiers into a single identifier. Each component is
    delimited by the first argument *)
-let to_string delim (QID xs) = String.concat delim xs
+let to_string delim (QID xs) = String.concat ~sep:delim xs
 
 let of_list xs = QID xs
 
