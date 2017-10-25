@@ -79,6 +79,26 @@ let append_instrs
   Array.foldi instrs ~init:start_graph ~f:collect_vertices
 
 
+let squash_gotos (graph: t) =
+  let rec find_nongoto = function
+    | (_, JBir.Goto _) as v ->
+       succ graph v |> List.hd |> Option.bind ~f:find_nongoto
+    | found -> Some found
+  in
+  let remove_gotos ((v: V.t), (e: E.label), (v': V.t)) (out: t) =
+    match v with
+    | (_, JBir.Goto _) -> out
+    | _ ->
+       (* walk the graph until we don't have a goto statement *)
+       let nongoto = match find_nongoto v' with
+         | Some g -> g
+         | None -> failwith "Goto to unknown loc"
+       in
+       add_edge_e out (E.create v e nongoto)
+  in
+  fold_edges_e remove_gotos graph empty
+
+
 let build_graph
       (program: JBir.t JProgram.program)
       (method_sig: JBasics.class_method_signature)
@@ -88,6 +108,7 @@ let build_graph
     | Ok instrs -> instrs
   in
   append_instrs (cms_to_qid method_sig) instrs empty
+  |> squash_gotos
 
 
 let unimplemented () = failwith "unimplemented"
