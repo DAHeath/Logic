@@ -1,0 +1,39 @@
+OASISFormat: 0.4
+Name:        Equivalence
+Version:     0.1
+Synopsis:    Equivalence analysis.
+Authors:     David Heath, Michael Eden
+License:     BSD-3-clause
+
+Library util
+  Path:         src/util
+  BuildTools:   ocamlbuild
+  BuildDepends: core
+  ByteOpt:      -thread
+  NativeOpt:    -thread
+  Modules:      QualifiedIdentity, Algorithm
+
+Library java 
+  Path:         src/java
+  BuildTools:   ocamlbuild
+  BuildDepends: core, sawja, ocamlgraph, util
+  ByteOpt:      -thread
+  NativeOpt:    -thread
+  Modules:      ParseJava, InstrGraph, GraphDebug
+
+Library prover
+  Path:         src/prover
+  BuildTools:   ocamlbuild
+  BuildDepends: core, util, java, Z3
+  ByteOpt:      -thread
+  NativeOpt:    -thread
+  Modules:      GraphToCHC
+
+Executable equivalencecheck
+  Path:         src
+  BuildTools:   ocamlbuild
+  MainIs:       main.ml
+  BuildDepends: sawja, core, java
+  ByteOpt:      -thread
+  NativeOpt:    -thread
+
