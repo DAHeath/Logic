@@ -1,3 +1,5 @@
+module Env = Sawja_pack.Live_bir.Env
+
 open Core
 
 (* module for creating dot-files *)
@@ -17,16 +19,22 @@ module InstrDot = struct
     ]
   let default_edge_attributes _ = []
 
-  let vertex_name (qid, _) =
-    QID.as_path qid |> Printf.sprintf "\"%s\""
+  let vertex_name v =
+    QID.as_path v.InstrGraph.Instr.loc |> Printf.sprintf "\"%s\""
 
-  let vertex_label (qid, instr) =
-    let instr_txt = JBir.print_instr ~show_type:false instr
+  let vertex_label v =
+    let open InstrGraph.Instr in
+    let instr_txt = JBir.print_instr ~show_type:false v.instr
                     |> String.substr_replace_all ~pattern:">" ~with_:"&gt;"
     in
-    let path = QID.as_path qid in
-    Printf.sprintf "<font color=\"grey\" point-size=\"10\">%s</font><br/>%s"
-                   path instr_txt
+    let live = v.live
+             |> Env.elements
+             |> List.map ~f:JBir.var_name_g
+             |> String.concat ~sep:", "
+    in
+    let path = QID.as_path v.loc in
+    Printf.sprintf "<font color=\"grey\" point-size=\"10\">%s</font><br/>{%s} %s"
+                   path live instr_txt
 
   let vertex_attributes v = [
       `Shape `Box;

@@ -33,9 +33,9 @@ let to_implication
         (graph: t) =
     let open Vertex in
     let open Edge in
-    let (_, instr) = v in
-    let start = { loc = fst v } in
-    let finish = { loc = fst v' } in
+    let start = { loc = v.InstrGraph.Instr.loc } in
+    let finish = { loc = v'.InstrGraph.Instr.loc } in
+    let instr = v.InstrGraph.Instr.instr in
     let expr = match (InstrGraph.instr_to_expr vartable instr, e) with
       | (None, _) -> Ir.LBool true
       | (Some expr, InstrGraph.Branch.True) -> expr

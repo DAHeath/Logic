@@ -6,12 +6,16 @@ module QID = QualifiedIdentity
 open Core
 
 module Instr = struct
-  type t = QID.t * JBir.instr
+  type t = {
+      loc: QualifiedIdentity.t;
+      instr: JBir.instr;
+      live: Sawja_pack.Live_bir.Env.t;
+    }
 
-  let equal (a, _) (b, _) = a = b
-  let hash (id, _) = QID.to_string "/" id |> String.hash
-  let compare (a, _) (b, _) =
-    String.compare (QID.to_string "/" a) (QID.to_string "/" b)
+  let equal a b = a = b
+  let hash a = QID.to_string "/" a.loc |> String.hash
+  let compare a b =
+    String.compare (QID.to_string "/" a.loc) (QID.to_string "/" b.loc)
 end
 
 module Branch = struct
@@ -56,10 +60,12 @@ let append_instrs
       (prefix: QID.t)
       (instrs: JBir.instr array)
       (start_graph: t)
+      live
   =
+  let open Instr in
   let collect_vertices i graph instr =
     let path = QID.specify prefix (string_of_int i) in
-    let vertex = (path, instr) in
+    let vertex = { loc = path; instr = instr; live = (live i) } in
 
     let dest_i = match instr with
       | JBir.Goto target -> [(Branch.Goto, target)]
@@ -70,7 +76,12 @@ let append_instrs
     in
     let connect_vertices graph (br, j) =
       let instr = Array.nget instrs j in
-      let v = (QID.specify prefix (string_of_int j), instr) in
+      let v: Instr.t = {
+          loc = QID.specify prefix (string_of_int j);
+          instr = instr;
+          live = live i;
+        }
+      in
       add_edge_e graph (E.create vertex br v)
     in
 
@@ -80,14 +91,14 @@ let append_instrs
 
 
 let squash_gotos (graph: t) =
-  let rec find_nongoto = function
-    | (_, JBir.Goto _) as v ->
+  let rec find_nongoto: (Instr.t -> Instr.t option) = function
+    | { Instr.instr = JBir.Goto _; _ } as v ->
        succ graph v |> List.hd |> Option.bind ~f:find_nongoto
     | found -> Some found
   in
   let remove_gotos ((v: V.t), (e: E.label), (v': V.t)) (out: t) =
     match v with
-    | (_, JBir.Goto _) -> out
+    | { Instr.instr = JBir.Goto _; _ } -> out
     | _ ->
        (* walk the graph until we don't have a goto statement *)
        let nongoto = match find_nongoto v' with
@@ -107,7 +118,8 @@ let build_graph
     | Error `Native -> failwith "Cannot analyze native methods!"
     | Ok instrs -> instrs
   in
-  append_instrs (cms_to_qid method_sig) instrs empty
+  let live i = Sawja_pack.Live_bir.run code i in
+  append_instrs (cms_to_qid method_sig) instrs empty live
   |> squash_gotos
 
 
