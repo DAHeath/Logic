@@ -73,8 +73,8 @@ module ImplicationDot = struct
   let vertex_label (vertex: ImplicationGraph.V.t) =
     let open ImplicationGraph.Vertex in
     let path = QID.as_path vertex.loc in
-    Printf.sprintf "<font color=\"grey\" point-size=\"10\">%s</font><br/>%s"
-                   path "TODO"
+    Printf.sprintf "<font color=\"grey\" point-size=\"10\">%s</font><br/>{%s}"
+                   path (vertex.live |> String.concat ~sep:", ")
 
   let vertex_attributes v = [
       `Shape `Box;

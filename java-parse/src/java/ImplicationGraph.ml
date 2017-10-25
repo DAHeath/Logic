@@ -1,6 +1,7 @@
 open Core
 
 module QID = QualifiedIdentity
+module Env = Sawja_pack.Live_bir.Env
 
 module Edge = struct
   type t = {
@@ -14,7 +15,8 @@ end
 
 module Vertex = struct
   type t = {
-      loc: QualifiedIdentity.t
+      loc: QualifiedIdentity.t;
+      live: string list;
     }
   [@@deriving hash, compare]
 
@@ -33,8 +35,15 @@ let to_implication
         (graph: t) =
     let open Vertex in
     let open Edge in
-    let start = { loc = v.InstrGraph.Instr.loc } in
-    let finish = { loc = v'.InstrGraph.Instr.loc } in
+    let live_names env = env |> Env.elements |> List.map ~f:InstrGraph.var_name in
+    let start = {
+        loc = v.InstrGraph.Instr.loc;
+        live = live_names v.InstrGraph.Instr.live;
+      } in
+    let finish = {
+        loc = v'.InstrGraph.Instr.loc;
+        live = live_names v.InstrGraph.Instr.live;
+      } in
     let instr = v.InstrGraph.Instr.instr in
     let expr = match (InstrGraph.instr_to_expr vartable instr, e) with
       | (None, _) -> Ir.LBool true
