@@ -50,6 +50,39 @@ let collect_files_methods min files methods =
     in
     List.zip_exn files methods
 
+(* print out implication graph *)
+
+let print_implication files methods output () =
+  let out_path = Option.value output ~default:"dot-out" in
+  let () = Unix.mkdir_p out_path in
+
+  let parse (file, jmethod) = ParseJava.parse (classpath file) file jmethod in
+  let save_dot (graph, jmethod) =
+    let path = InstrGraph.cms_to_qid jmethod |> QID.to_string "-" in
+    let file = Out_channel.create (Printf.sprintf "%s/%s.dot" out_path path) in
+    GraphDebug.ImplicationDrawDot.output_graph file graph
+  in
+
+  collect_files_methods 1 files methods
+  |> List.map ~f:parse
+  |> List.map ~f:(fun (p, m, v) -> (InstrGraph.build_graph p m, m, v))
+  |> List.map ~f:(fun (g, m, v) -> (ImplicationGraph.to_implication g v, m))
+  |> List.iter ~f:save_dot
+
+
+let print_implication_command =
+  Command.basic
+    ~summary:"Print out dot file of many classes and methods."
+    Command.Spec.(
+    empty
+    +> flag "-c" (listed class_file)
+            ~doc:"class file to analyze (put before method name)."
+    +> flag "-m" (listed string)
+            ~doc:"method name in classfile to target."
+    +> flag "-o" (optional string)
+            ~doc:"output folder to write dot data to."
+  )
+  print_implication
 
 (* print out program graph *)
 
@@ -61,12 +94,12 @@ let print_dot files methods output () =
   let save_dot (graph, jmethod) =
     let path = InstrGraph.cms_to_qid jmethod |> QID.to_string "-" in
     let file = Out_channel.create (Printf.sprintf "%s/%s.dot" out_path path) in
-    GraphDebug.DrawDot.output_graph file graph
+    GraphDebug.InstrDrawDot.output_graph file graph
   in
 
   collect_files_methods 1 files methods
   |> List.map ~f:parse
-  |> List.map ~f:(fun (p, m) -> (InstrGraph.build_graph p m), m)
+  |> List.map ~f:(fun (p, m, _) -> (InstrGraph.build_graph p m), m)
   |> List.iter ~f:save_dot
 
 
@@ -90,8 +123,8 @@ let print_jbir class_file method_sig output () =
   let out_folder = Option.value output ~default:"jbir-html" in
   let () = Unix.mkdir_p out_folder in
 
-  let program = ParseJava.parse (classpath class_file) class_file method_sig in
-  let () = JBir.print_program (fst program) out_folder in
+  let (program, _, _) = ParseJava.parse (classpath class_file) class_file method_sig in
+  let () = JBir.print_program program out_folder in
   Printf.printf "Wrote results to: '%s'.\n" out_folder
 
 
@@ -116,6 +149,7 @@ let command =
                 [
                   "print-jbir", print_jbir_command;
                   "print-graph", print_dot_command;
+                  "print-implication", print_implication_command;
                 ]
 let () = Command.run ~version:"0.1.0" command
 

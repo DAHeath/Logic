@@ -1,7 +1,7 @@
 open Core
 
 (* module for creating dot-files *)
-module Dot = struct
+module InstrDot = struct
   include InstrGraph
 
   let get_subgraph _ = None
@@ -40,4 +40,44 @@ module Dot = struct
     ]
 end
 
-module DrawDot = Graph.Graphviz.Dot(Dot)
+module InstrDrawDot = Graph.Graphviz.Dot(InstrDot)
+
+(* module for creating dot-files *)
+module ImplicationDot = struct
+  include ImplicationGraph
+
+  let get_subgraph _ = None
+
+  let formula_to_str (edge: ImplicationGraph.Edge.t) =
+    let open ImplicationGraph.Edge in
+    Ir.sexp_of_expr edge.formula |> Sexp.to_string
+
+  let edge_attributes e = [
+      `Label (E.label e |> formula_to_str);
+      `Fontname "monospace"
+    ]
+  let default_edge_attributes _ = []
+
+  let vertex_name (vertex: ImplicationGraph.V.t) =
+    let open ImplicationGraph.Vertex in
+    QID.as_path vertex.loc |> Printf.sprintf "\"%s\""
+
+  let vertex_label (vertex: ImplicationGraph.V.t) =
+    let open ImplicationGraph.Vertex in
+    let path = QID.as_path vertex.loc in
+    Printf.sprintf "<font color=\"grey\" point-size=\"10\">%s</font><br/>%s"
+                   path "TODO"
+
+  let vertex_attributes v = [
+      `Shape `Box;
+      `Fontname "monospace";
+      `HtmlLabel (vertex_label v);
+    ]
+  let default_vertex_attributes _ = []
+
+  let graph_attributes graph = [
+      `Fontname "monospace";
+    ]
+end
+
+module ImplicationDrawDot = Graph.Graphviz.Dot(ImplicationDot)
