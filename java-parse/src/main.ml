@@ -53,21 +53,24 @@ let collect_files_methods min files methods =
 (* print out implication graph *)
 
 let print_implication files methods output () =
-  let out_path = Option.value output ~default:"dot-out" in
-  let () = Unix.mkdir_p out_path in
-
   let parse (file, jmethod) = ParseJava.parse (classpath file) file jmethod in
-  let save_dot (graph, jmethod) =
-    let path = InstrGraph.cms_to_qid jmethod |> QID.to_string "-" in
-    let file = Out_channel.create (Printf.sprintf "%s/%s.dot" out_path path) in
-    GraphDebug.ImplicationDrawDot.output_graph file graph
+  let serialize (graph, jmethod) =
+    match output with
+    | None ->
+       let serialized = ImplicationGraph.serialize graph in
+       Printf.printf "%s\n" serialized
+    | Some out_path ->
+       let () = Unix.mkdir_p out_path in
+       let path = InstrGraph.cms_to_qid jmethod |> QID.to_string "-" in
+       let file = Out_channel.create (Printf.sprintf "%s/%s.dot" out_path path) in
+       GraphDebug.ImplicationDrawDot.output_graph file graph
   in
 
   collect_files_methods 1 files methods
   |> List.map ~f:parse
   |> List.map ~f:(fun (p, m, v) -> (InstrGraph.build_graph p m, m, v))
   |> List.map ~f:(fun (g, m, v) -> (ImplicationGraph.to_implication g v, m))
-  |> List.iter ~f:save_dot
+  |> List.iter ~f:serialize
 
 
 let print_implication_command =
@@ -80,7 +83,7 @@ let print_implication_command =
     +> flag "-m" (listed string)
             ~doc:"method name in classfile to target."
     +> flag "-o" (optional string)
-            ~doc:"output folder to write dot data to."
+            ~doc:"output to dot instead of json and specify out folder."
   )
   print_implication
 
