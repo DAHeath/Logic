@@ -60,3 +60,33 @@ let to_implication
   in
   InstrGraph.fold_edges_e build instr_graph empty
 
+
+let serialize (graph: t) =
+  let collect_vertices v l =
+    let open Vertex in
+    let lives = v.live
+                |> List.map ~f:(fun var -> Printf.sprintf "\"%s\"" var)
+                |> String.concat ~sep:","
+    in
+    (Printf.sprintf "\"%s\":[%s]" (QID.as_path v.loc) lives) :: l
+  in
+  let vertices = fold_vertex collect_vertices graph [] in
+  let vlist = String.concat vertices ~sep:"," |> Printf.sprintf "{%s}" in
+  let rename_str r =
+    List.map ~f:(fun (a, b) -> Printf.sprintf "{\"%s\":\"%s\"}" a b) r
+    |> String.concat ~sep:","
+    |> Printf.sprintf "[%s]"
+  in
+  let edge_str (v, e, v') l =
+    let open Edge in
+    let open Vertex in
+    Printf.sprintf "{\"start\":\"%s\",\"end\":\"%s\",\"formula\":\"%s\",\"rename\":%s}"
+                   (QID.as_path v.loc)
+                   (QID.as_path v'.loc)
+                   (Ir.sexp_of_expr e.formula |> Sexp.to_string)
+                   (rename_str e.rename)
+    :: l
+  in
+  let edges = fold_edges_e edge_str graph [] in
+  let elist = String.concat ~sep:"," edges |> Printf.sprintf "[%s]" in
+  Printf.sprintf "{\"edges\":%s,\"vertices\":%s}" elist vlist

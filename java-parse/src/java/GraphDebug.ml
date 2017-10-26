@@ -58,13 +58,28 @@ module ImplicationDot = struct
 
   let formula_to_str (edge: ImplicationGraph.Edge.t) =
     let open ImplicationGraph.Edge in
-    let formula = Ir.sexp_of_expr edge.formula |> Sexp.to_string in
-    let rename = edge.rename
-                 |> List.map ~f:(fun (a, b) -> Printf.sprintf "%s &rarr; %s" a b)
-                 |> String.concat ~sep:", "
+    let formula =
+      Ir.pprint_expr false edge.formula
+      |> String.substr_replace_all ~pattern:"!=" ~with_:"&ne;"
+      |> String.substr_replace_all ~pattern:"<=" ~with_:"&le;"
+      |> String.substr_replace_all ~pattern:">=" ~with_:"&ge;"
+      |> String.substr_replace_all ~pattern:"*" ~with_:"&sdot;"
+      |> String.substr_replace_all ~pattern:"-" ~with_:"&minus;"
+      |> String.substr_replace_all ~pattern:"->" ~with_:"&rarr;"
+      |> String.substr_replace_all ~pattern:"<->" ~with_:"&harr;"
+      |> String.substr_replace_all ~pattern:"||" ~with_:"&or;"
+      |> String.substr_replace_all ~pattern:"&&" ~with_:"&and;"
     in
-    Printf.sprintf "%s\n{%s}"
-                   formula rename
+    if List.hd edge.rename |> Option.is_some
+    then
+      let rename =
+        edge.rename
+        |> List.map ~f:(fun (a, b) -> Printf.sprintf "%s &rarr; %s" a b)
+        |> String.concat ~sep:", "
+      in
+      Printf.sprintf "%s\n{%s}" formula rename
+    else
+      Printf.sprintf "%s" formula
 
   let edge_attributes e = [
       `Label (E.label e |> formula_to_str);
