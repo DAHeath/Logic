@@ -79,7 +79,7 @@ let append_instrs
       let v: Instr.t = {
           loc = QID.specify prefix (string_of_int j);
           instr = instr;
-          live = live i;
+          live = live j;
         }
       in
       add_edge_e graph (E.create vertex br v)
@@ -140,9 +140,6 @@ let ( $:: ) a b = Ir.ExprCons (a, b)
 
 
 let var_name var =
-  let _ = Printf.printf "var_name: %s\n" (JBir.var_name var) in
-  let _ = Printf.printf "var_name_g: %s\n" (JBir.var_name_g var) in
-  let _ = Printf.printf "var_name_debug: %s\n" (Option.value (JBir.var_name_debug var) ~default:"No debug name.") in
   JBir.var_name_debug var
   |> Option.value ~default:(JBir.var_name var)
 

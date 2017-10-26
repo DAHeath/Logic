@@ -43,7 +43,7 @@ let to_implication
       } in
     let finish = {
         loc = v'.InstrGraph.Instr.loc;
-        live = live_names v.InstrGraph.Instr.live;
+        live = live_names v'.InstrGraph.Instr.live;
       } in
     let instr = v.InstrGraph.Instr.instr in
     let (expr, rename) = match (InstrGraph.instr_to_expr vartable instr, e) with
@@ -52,12 +52,11 @@ let to_implication
       | (Some (expr, r), InstrGraph.Branch.Goto) -> (expr, r)
       | (Some (expr, r), InstrGraph.Branch.False) -> (Ir.ExprCons (Ir.Not, expr), r)
     in
-    add_edge_e graph (E.create start
-                               {
-                                 formula = expr;
-                                 rename = String.Map.to_alist rename;
-                               }
-                               finish)
+    let edge = {
+        formula = expr;
+        rename = String.Map.to_alist rename;
+      } in
+    add_edge_e graph (E.create start edge finish)
   in
   InstrGraph.fold_edges_e build instr_graph empty
 
