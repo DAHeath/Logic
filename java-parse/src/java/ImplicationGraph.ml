@@ -6,10 +6,11 @@ module Env = Sawja_pack.Live_bir.Env
 module Edge = struct
   type t = {
       formula: Ir.expr;
+      rename: (string * string) list;
     }
   [@@deriving hash, compare]
 
-  let default = { formula = Ir.LBool true }
+  let default = { formula = Ir.LBool true; rename = [] }
   let equal = (=)
 end
 
@@ -45,13 +46,18 @@ let to_implication
         live = live_names v.InstrGraph.Instr.live;
       } in
     let instr = v.InstrGraph.Instr.instr in
-    let expr = match (InstrGraph.instr_to_expr vartable instr, e) with
-      | (None, _) -> Ir.LBool true
-      | (Some expr, InstrGraph.Branch.True) -> expr
-      | (Some expr, InstrGraph.Branch.Goto) -> expr
-      | (Some expr, InstrGraph.Branch.False) -> Ir.ExprCons (Ir.Not, expr)
+    let (expr, rename) = match (InstrGraph.instr_to_expr vartable instr, e) with
+      | (None, _) -> (Ir.LBool true, String.Map.empty)
+      | (Some (expr, r), InstrGraph.Branch.True) -> (expr, r)
+      | (Some (expr, r), InstrGraph.Branch.Goto) -> (expr, r)
+      | (Some (expr, r), InstrGraph.Branch.False) -> (Ir.ExprCons (Ir.Not, expr), r)
     in
-    add_edge_e graph (E.create start { formula = expr } finish)
+    add_edge_e graph (E.create start
+                               {
+                                 formula = expr;
+                                 rename = String.Map.to_alist rename;
+                               }
+                               finish)
   in
   InstrGraph.fold_edges_e build instr_graph empty
 

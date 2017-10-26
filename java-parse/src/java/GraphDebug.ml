@@ -58,7 +58,13 @@ module ImplicationDot = struct
 
   let formula_to_str (edge: ImplicationGraph.Edge.t) =
     let open ImplicationGraph.Edge in
-    Ir.sexp_of_expr edge.formula |> Sexp.to_string
+    let formula = Ir.sexp_of_expr edge.formula |> Sexp.to_string in
+    let rename = edge.rename
+                 |> List.map ~f:(fun (a, b) -> Printf.sprintf "%s &rarr; %s" a b)
+                 |> String.concat ~sep:", "
+    in
+    Printf.sprintf "%s\n{%s}"
+                   formula rename
 
   let edge_attributes e = [
       `Label (E.label e |> formula_to_str);

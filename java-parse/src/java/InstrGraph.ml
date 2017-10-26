@@ -126,6 +126,16 @@ let build_graph
 let unimplemented () = failwith "unimplemented"
 
 
+let rec collect_vars = function
+  | JBir.Const const -> []
+  | JBir.Var (_, var) -> [var]
+  | JBir.Unop (_, expr) -> collect_vars expr
+  | JBir.Binop (_, expr_a, expr_b) ->
+     List.append (collect_vars expr_a) (collect_vars expr_a)
+  | JBir.Field _ -> unimplemented ()
+  | JBir.StaticField _ -> unimplemented ()
+
+
 let ( $:: ) a b = Ir.ExprCons (a, b)
 
 
@@ -167,6 +177,11 @@ let java_to_var
   in
   let name = var_name var in
   (Ir.Var (Ir.Free (name, kind)), kind)
+
+
+let rename_var f = function
+  | Ir.Var (Ir.Free (name, t)) -> Ir.Var (Ir.Free (f name, t))
+  | other -> other
 
 
 let rec java_to_expr vartable = function
@@ -239,20 +254,26 @@ let java_to_condition vartable cond a b =
 
 let instr_to_expr vartable = function
   | JBir.AffectVar (var, expr) ->
+     let is_redefined = collect_vars expr
+                        |> List.exists ~f:(fun v -> JBir.var_equal v var)
+     in
      let (irvar, t_a) = java_to_var vartable None var in
      let (irexpr, t_b) = java_to_expr vartable expr in
-     let open Sexplib.Std in
-     let _ = Printf.printf "instr: %s\n" (JBir.print_instr ~show_type:true (JBir.AffectVar (var, expr))) in
-     let _ = Printf.printf "instr_expr: %s\n" (JBir.print_expr ~show_type:true expr) in
-     let _ = Printf.printf "var (%s): %s\n" (Ir.sexp_of_kind t_a |> Sexp.to_string) (Ir.sexp_of_expr irvar |> Sexp.to_string) in
-     let _ = Printf.printf "expr (%s): %s\n" (Ir.sexp_of_kind t_b |> Sexp.to_string) (Ir.sexp_of_expr irexpr |> Sexp.to_string) in
-     let _ = Printf.printf "\n" in
      let kind = if t_a = t_b
                 then t_a
                 else failwith "Mismatched types in condition."
      in
-     Some ((Ir.Eql kind) $:: irvar $:: irexpr)
-  | JBir.Ifd ((comp, a, b), i) -> Some (java_to_condition vartable comp a b)
+     if is_redefined
+     then
+       let name = var_name var in
+       let name' = name ^ "'" in
+       let irvar' = rename_var (fun _ -> name') irvar in
+       let rename = Map.add String.Map.empty ~key:name ~data:name' in
+       Some ((Ir.Eql kind) $:: irvar' $:: irexpr, rename)
+     else
+       Some ((Ir.Eql kind) $:: irvar $:: irexpr, String.Map.empty)
+  | JBir.Ifd ((comp, a, b), i) ->
+     Some (java_to_condition vartable comp a b, String.Map.empty)
   | JBir.Nop -> None
   (* we're in a graph we can just delete this vertex *)
   | JBir.Goto i -> None
