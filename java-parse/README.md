@@ -93,7 +93,7 @@ echo 'eval $(opam config env)' >> ~/.bashrc
 opam switch 4.03.0
 
 # This can get complicated, follow all the prompts and install the deps it says.
-opam install -y oasis core sawja ocamlgraph
+opam install -y oasis core sawja ocamlgraph ppx_deriving
 
 git clone 'https://bitbucket.org/wrharris/sim-itps.git'
 cd sim-itps
