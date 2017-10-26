@@ -54,6 +54,81 @@ And here's a sample output:
 
 ![graph of first climbstairs function][climbstairs_graph]
 
+## Printing a JSON Implication Graph
+
+```
+Print out implication graph (in JSON) of many classes and methods.
+
+  main.byte print-implication
+
+=== flags ===
+
+  [-c class]   file to analyze (put before method name).
+  [-m method]  name in classfile to target.
+  [-o output]  to dot instead of json and specify out folder.
+  [-help]      print this help text and exit
+               (alias: -?)
+```
+
+Here's an example:
+
+```
+javac -g examples/simple/EvenLoop.java
+./main.sh print-graph -c ./examples/simple/EvenLoop.class -m 'loop(I)I' > imp_graph.json
+```
+
+And here's a sample output:
+```
+{
+  "edges": [
+    {
+      "start": "EvenLoop/loop/2",
+      "end": "EvenLoop/loop/1",
+      "formula": "(ExprCons(ExprCons(Eql Int)(Var(Free i' Int)))(ExprCons(ExprCons(Add Int)(Var(Free i Int)))(LInt 2)))",
+      "rename": [
+        {
+          "i": "i'"
+        }
+      ]
+    },
+    {
+      "start": "EvenLoop/loop/1",
+      "end": "EvenLoop/loop/4",
+      "formula": "(ExprCons(ExprCons(Ge Int)(Var(Free i Int)))(Var(Free n Int)))",
+      "rename": []
+    },
+    {
+      "start": "EvenLoop/loop/1",
+      "end": "EvenLoop/loop/2",
+      "formula": "(ExprCons Not(ExprCons(ExprCons(Ge Int)(Var(Free i Int)))(Var(Free n Int))))",
+      "rename": []
+    },
+    {
+      "start": "EvenLoop/loop/0",
+      "end": "EvenLoop/loop/1",
+      "formula": "(ExprCons(ExprCons(Eql Int)(Var(Free i Int)))(LInt 0))",
+      "rename": []
+    }
+  ],
+  "vertices": {
+    "EvenLoop/loop/4": [
+      "i"
+    ],
+    "EvenLoop/loop/2": [
+      "i",
+      "n"
+    ],
+    "EvenLoop/loop/1": [
+      "i",
+      "n"
+    ],
+    "EvenLoop/loop/0": [
+      "n"
+    ]
+  }
+}
+```
+
 ## A Note about Methods '-m'
 
 You can specify a method to target in the command line, the format is

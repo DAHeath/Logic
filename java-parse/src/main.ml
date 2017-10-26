@@ -75,7 +75,7 @@ let print_implication files methods output () =
 
 let print_implication_command =
   Command.basic
-    ~summary:"Print out dot file of many classes and methods."
+    ~summary:"Print out implication graph (in JSON) of many classes and methods."
     Command.Spec.(
     empty
     +> flag "-c" (listed class_file)
