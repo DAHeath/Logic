@@ -14,6 +14,8 @@ import           Prelude hiding (reverse)
 
 import qualified Turtle
 
+import           System.Info
+
 backEdges :: Ord i => Graph i e v -> [((i, i), e)]
 backEdges g = filter (\((i1, i2), _) -> i2 <= i1) $ g ^@.. iallEdges
 
@@ -39,10 +41,14 @@ display :: (MonadIO m, Eq i, Pretty i, Pretty e, Pretty v)
         => FilePath -> Graph i e v -> m ()
 display fn g = do
   let txt = dot ": " (show . pretty) (show . pretty) (show . pretty) g
+      cmdopen = case System.Info.os of
+        "mingw32" -> "start"
+        "linux"   -> "xdg-open"
+        _         -> "open"
   liftIO $ writeFile fn txt
   let fn' = Turtle.fromString fn
   _ <- Turtle.shell ("dot -Tpdf " <> fn' <> "> " <> fn' <> ".pdf") Turtle.empty
-  _ <- Turtle.shell ("open " <> fn' <> ".pdf") Turtle.empty
+  _ <- Turtle.shell (cmdopen <> " " <> fn' <> ".pdf") Turtle.empty
   return ()
 
 dot :: Eq i

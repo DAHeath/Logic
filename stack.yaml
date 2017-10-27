@@ -14,4 +14,6 @@ extra-deps:
 - safepath-0.1.0.0
 - validity-0.3.3.0
 - random-extras-0.19
+- erf-native-1.0.0.1
+- polynomial-0.7.3
 resolver: lts-9.0
