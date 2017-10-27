@@ -1,3 +1,5 @@
+extra-deps: []
+resolver: lts-9.0
 flags: {}
 extra-package-dbs: []
 packages:
@@ -14,4 +16,10 @@ extra-deps:
 - safepath-0.1.0.0
 - validity-0.3.3.0
 - random-extras-0.19
+- erf-native-1.0.0.1
+- polynomial-0.7.3
+extra-include-dirs:
+- ../z3/src/api
+extra-lib-dirs:
+- ../z3/build
 resolver: lts-9.0
