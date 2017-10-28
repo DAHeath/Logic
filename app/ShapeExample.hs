@@ -2,7 +2,7 @@
 
 import           Control.Monad (void)
 
-import qualified Data.Ord.Graph as G
+import qualified Data.Optic.Graph as G
 import qualified Data.Map as M
 
 import qualified Logic.Type as T

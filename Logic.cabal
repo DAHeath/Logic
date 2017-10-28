@@ -23,7 +23,7 @@ library
                      , Logic.ImplicationGraph
                      , Logic.Solver.Z3
                      , Language.Imperative
-                     , Data.Ord.Graph.Extras
+                     , Data.Optic.Graph.Extras
 
   default-extensions:  LambdaCase
                      , DeriveDataTypeable
@@ -50,7 +50,7 @@ library
                      , text             >= 1.2
                      , transformers     >= 0.5
                      , z3               >= 4.1
-                     , ord-graph
+                     , optic-graph
                      , split
   default-language:    Haskell2010
 
@@ -74,7 +74,7 @@ executable ImplicationGraphExample
                      , prettyprinter
                      , containers
                      , Logic
-                     , ord-graph
+                     , optic-graph
   default-language:    Haskell2010
 
 executable ImperativeExample
@@ -87,7 +87,7 @@ executable ImperativeExample
                      , Logic
                      , mtl
                      , containers
-                     , ord-graph
+                     , optic-graph
   default-language:    Haskell2010
 
 -- executable ShapeExample
@@ -100,7 +100,7 @@ executable ImperativeExample
                      -- , Logic
                      -- , containers
                      -- , mtl
-                     -- , ord-graph
+                     -- , optic-graph
                      -- , lens
   -- default-language:    Haskell2010
 

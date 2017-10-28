@@ -1,10 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Data.Ord.Graph.Extras where
+module Data.Optic.Graph.Extras where
 
 import           Control.Lens
 import           Control.Monad.State
 
-import           Data.Ord.Graph
+import           Data.Optic.Graph
 import           Data.Maybe (fromJust)
 import qualified Data.Map as M
 import           Data.Monoid ((<>))

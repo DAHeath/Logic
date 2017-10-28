@@ -1,7 +1,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 
-import qualified Data.Ord.Graph as G
-import qualified Data.Ord.Graph.Extras as G
+import qualified Data.Optic.Graph as G
+import qualified Data.Optic.Graph.Extras as G
 import qualified Data.Map as M
 import           Data.Text.Prettyprint.Doc
 
