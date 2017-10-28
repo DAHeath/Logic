@@ -107,15 +107,17 @@ isInductive start g = evalStateT (ind start) M.empty
 implGrChc :: Idx idx => ImplGr idx -> [Chc]
 implGrChc g = concatMap idxRules (G.idxs g)
   where
-    idxApp i = instApp i <$> g ^? ix i . _InstanceV
-    instApp i (vs, _) = mkApp ('r' : written # i) vs
+    idxApp i = instApp i =<< g ^? ix i . _InstanceV
+    instApp _ ([], _) = Nothing
+    instApp i (vs, _) = Just $ mkApp ('r' : written # i) vs
 
     idxRules i = maybe [] (\case
       InstanceV _ _ ->
         mapMaybe (\(i', Edge f mvs) -> do
-          lhs <- idxApp i'
           rhs <- subst mvs <$> idxApp i
-          return (Rule [lhs] f rhs)) (relevantIncoming i)
+          case idxApp i' of
+            Nothing -> Just (Rule [] f rhs)
+            Just lhs -> Just (Rule [lhs] f rhs)) (relevantIncoming i)
       QueryV f -> queries i f) (g ^? ix i)
 
     queries i f =
