@@ -59,9 +59,9 @@ jumpy =
       assS)
 
 main :: IO ()
-main = undefined
-  -- let g = commGraph test
-  --     b = head $ backEdges g
-  --     g' = unfold b g
-  -- in do display "original" g
-  --       display "unfolded" (emap (fst . semantics) g')
+main =
+  let g = commGraph test
+      b = head $ backEdges g
+      g' = unfold b g
+  in do display "original" g
+        display "unfolded" (emap (fst . semantics) g')

@@ -81,8 +81,9 @@ isInductive start g = evalStateT (ind start) M.empty
     rpredecessors i g = filter (\i' -> i == i' || i' ^. idx1 >= i ^. idx1) $ G.predecessors i g
 
     descendantInstanceVs i =
-      G.descendants g i
+      G.descendants i g
         & filter (match i)
+        & filter (/= i)
         & mapMaybe (\i' -> g ^? ix i' . _InstanceV . _2)
 
 equivProduct :: ImplGr LinIdx -> ImplGr LinIdx -> ImplGr PIdx

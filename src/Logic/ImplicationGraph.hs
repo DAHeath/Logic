@@ -101,6 +101,7 @@ isInductive start g = evalStateT (ind start) M.empty
     descendantInstanceVs i =
       G.descendants i g
         & filter (match i)
+        & filter (/= i)
         & mapMaybe (\i' -> g ^? ix i' . _InstanceV . _2)
 
 -- | Convert the graph into a system of Constrained Horn Clauses.
