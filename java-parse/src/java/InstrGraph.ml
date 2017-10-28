@@ -234,11 +234,7 @@ let rec java_to_expr vartable = function
 let java_to_condition vartable cond a b =
   let (expr_a, t_a) = (java_to_expr vartable a) in
   let (expr_b, t_b) = (java_to_expr vartable b) in
-  let kind = if t_a = t_b
-             then t_a
-             else failwith "Mismatched types in condition."
-  in
-  let op = match cond with
+  let op kind = match cond with
     | `Eq -> Ir.Eql kind
     | `Ge -> Ir.Ge kind
     | `Gt -> Ir.Gt kind
@@ -246,7 +242,15 @@ let java_to_condition vartable cond a b =
     | `Lt -> Ir.Lt kind
     | `Ne -> Ir.Distinct kind
   in
-  op $:: expr_a $:: expr_b
+  match (t_a, t_b, expr_a, expr_b) with
+    | (a, b, _, _) when a = b -> (op a) $:: expr_a $:: expr_b
+    | (Ir.Bool, Ir.Int, _, Ir.LInt 0) -> Ir.Not $:: expr_a
+    | (Ir.Bool, Ir.Int, _, Ir.LInt 1) -> expr_a
+    | _ ->
+       let mkstr e = Ir.sexp_of_expr e |> Sexp.to_string in
+       Printf.sprintf "Mismatched types: %s and %s."
+                      (mkstr expr_a) (mkstr expr_b)
+       |> failwith
 
 
 let instr_to_expr vartable = function
