@@ -12,9 +12,9 @@ import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Set (Set)
 import qualified Data.Set as S
-import           Data.Ord.Graph (Graph)
-import qualified Data.Ord.Graph as G
-import qualified Data.Ord.Graph.Extras as G
+import           Data.Optic.Graph (Graph)
+import qualified Data.Optic.Graph as G
+import qualified Data.Optic.Graph.Extras as G
 import           Data.Maybe (fromMaybe)
 import           Data.Monoid (Any)
 import           Data.List.Split (splitOn)

@@ -11,8 +11,8 @@ import           Data.Maybe (mapMaybe)
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.List.Split (splitOn)
-import qualified Data.Ord.Graph as G
-import qualified Data.Ord.Graph.Extras as G
+import qualified Data.Optic.Graph as G
+import qualified Data.Optic.Graph.Extras as G
 import           Data.Text.Prettyprint.Doc
 
 import qualified Logic.Type as T

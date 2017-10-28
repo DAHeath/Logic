@@ -7,8 +7,8 @@ packages:
     commit: 03b02396c09b659ca8355e2290d3ebfcbd969a2b
   extra-dep: true
 - location:
-    git: https://github.com/DAHeath/ord-graph
-    commit: 9bcc90e9f9e00de55c412950b449550772d0a586
+    git: https://github.com/DAHeath/optic-graph
+    commit: 1e35e194cb9ee865091845d3bdd70a2bc94e1e46
   extra-dep: true
 extra-deps:
 - safepath-0.1.0.0

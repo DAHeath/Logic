@@ -8,9 +8,9 @@ import           Control.Monad.Extra (whenM)
 import           Control.Monad.Loops (orM, anyM)
 
 import           Data.Data
-import           Data.Ord.Graph (Graph)
-import qualified Data.Ord.Graph as G
-import qualified Data.Ord.Graph.Extras as G
+import           Data.Optic.Graph (Graph)
+import qualified Data.Optic.Graph as G
+import qualified Data.Optic.Graph.Extras as G
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe (mapMaybe, catMaybes)
@@ -99,7 +99,7 @@ isInductive start g = evalStateT (ind start) M.empty
     allInd i is = and <$> mapM (indPred i) is
 
     descendantInstanceVs i =
-      G.descendants g i
+      G.descendants i g
         & filter (match i)
         & mapMaybe (\i' -> g ^? ix i' . _InstanceV . _2)
 

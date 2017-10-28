@@ -4,8 +4,8 @@ import           Control.Monad.State
 
 import           Data.Data (Data)
 import           Data.Tuple (swap)
-import qualified Data.Ord.Graph as G
-import           Data.Ord.Graph (Graph)
+import qualified Data.Optic.Graph as G
+import           Data.Optic.Graph (Graph)
 import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Map (Map)

@@ -2,9 +2,9 @@
 import           Control.Monad.State
 import           Control.Monad.Except
 
-import           Data.Ord.Graph (Graph)
-import qualified Data.Ord.Graph as G
-import qualified Data.Ord.Graph.Extras as G
+import           Data.Optic.Graph (Graph)
+import qualified Data.Optic.Graph as G
+import qualified Data.Optic.Graph.Extras as G
 import qualified Data.Map as M
 import           Data.Text.Prettyprint.Doc
 

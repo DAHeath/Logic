@@ -4,7 +4,7 @@ set -euo pipefail
 # get the directory the file is in
 source_dir() {
     local SOURCE_DIR
-    SOURCE_DIR=$(stat -f "${BASH_SOURCE[0]}")
+    SOURCE_DIR=$(perl -e 'use Cwd "abs_path"; print abs_path(shift)' "${BASH_SOURCE[0]}")
     dirname "$SOURCE_DIR"
 }
 

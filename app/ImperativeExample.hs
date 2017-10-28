@@ -2,7 +2,7 @@
 import           Control.Monad.State
 
 import qualified Data.Map as M
-import           Data.Ord.Graph
+import           Data.Optic.Graph
 
 import qualified Logic.Type as T
 import           Logic.Formula
