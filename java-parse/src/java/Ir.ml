@@ -123,3 +123,53 @@ and pprint_expr parens = function
 
   | other -> sexp_of_expr other |> Sexp.to_string
 
+
+let jsonsexp cons args =
+  String.concat ~sep:"," args
+  |> Printf.sprintf "{\"%s\":[%s]}" cons
+
+let wrapstr = Printf.sprintf "\"%s\""
+
+let rec jsonsexp_kind = function
+  | Unit -> jsonsexp "unit" []
+  | Bool -> jsonsexp "bool" []
+  | Int -> jsonsexp "int" []
+  | Real -> jsonsexp "real" []
+  | List k -> jsonsexp "list" [jsonsexp_kind k]
+
+let jsonsexp_var = function
+  | Bound (i, k) -> jsonsexp "bound" [string_of_int i; jsonsexp_kind k]
+  | Free (n, k) -> jsonsexp "free" [wrapstr n; jsonsexp_kind k]
+
+let rec jsonsexp_expr = function
+  | Var var -> jsonsexp "var" [jsonsexp_var var]
+  | If k -> jsonsexp "if" [jsonsexp_kind k]
+
+  | Not -> jsonsexp "not" []
+  | Impl -> jsonsexp "impl" []
+  | Iff -> jsonsexp "iff" []
+  | And -> jsonsexp "and" []
+  | Or -> jsonsexp "or" []
+
+  | Add kind -> jsonsexp "add" [jsonsexp_kind kind]
+  | Mul kind -> jsonsexp "mul" [jsonsexp_kind kind]
+  | Sub kind -> jsonsexp "sub" [jsonsexp_kind kind]
+  | Div kind -> jsonsexp "div" [jsonsexp_kind kind]
+  | Mod kind -> jsonsexp "mod" [jsonsexp_kind kind]
+
+  | Distinct kind -> jsonsexp "distinct" [jsonsexp_kind kind]
+  | Eql kind -> jsonsexp "eql" [jsonsexp_kind kind]
+  | Lt kind -> jsonsexp "lt" [jsonsexp_kind kind]
+  | Le kind -> jsonsexp "le" [jsonsexp_kind kind]
+  | Gt kind -> jsonsexp "gt" [jsonsexp_kind kind]
+  | Ge kind -> jsonsexp "ge" [jsonsexp_kind kind]
+
+  | Store (ka, kb) -> jsonsexp "store" [jsonsexp_kind ka; jsonsexp_kind kb]
+  | Select (ka, kb) -> jsonsexp "select" [jsonsexp_kind ka; jsonsexp_kind kb]
+
+  | LUnit -> jsonsexp "lunit" []
+  | LBool b -> jsonsexp "lbool" [string_of_bool b]
+  | LInt i -> jsonsexp "lint" [string_of_int i]
+  | LReal f -> jsonsexp "lreal" [string_of_float f]
+
+  | ExprCons (a, b) -> jsonsexp "exprcons" [jsonsexp_expr a; jsonsexp_expr b]

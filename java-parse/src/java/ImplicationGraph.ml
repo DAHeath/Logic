@@ -80,10 +80,10 @@ let serialize (graph: t) =
   let edge_str (v, e, v') l =
     let open Edge in
     let open Vertex in
-    Printf.sprintf "{\"start\":\"%s\",\"end\":\"%s\",\"formula\":\"%s\",\"rename\":%s}"
+    Printf.sprintf "{\"start\":\"%s\",\"end\":\"%s\",\"formula\":%s,\"rename\":%s}"
                    (QID.as_path v.loc)
                    (QID.as_path v'.loc)
-                   (Ir.sexp_of_expr e.formula |> Sexp.to_string)
+                   (Ir.jsonsexp_expr e.formula)
                    (rename_str e.rename)
     :: l
   in
