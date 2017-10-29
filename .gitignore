@@ -3,4 +3,10 @@ dist/
 *~
 *.swp
 .DS_STORE
+
+# Ignore IntelliJ IDEA
 .#*
+.idea/
+out/
+*.iml
+cabal.config
