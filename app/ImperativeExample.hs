@@ -3,6 +3,7 @@ import           Control.Monad.State
 
 import qualified Data.Map as M
 import           Data.Optic.Graph
+import           Data.Optic.Graph.Extras
 
 import qualified Logic.Type as T
 import           Logic.Formula
