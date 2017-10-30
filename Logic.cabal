@@ -43,6 +43,7 @@ library
                      , monad-loops
                      , extra
                      , random-fu
+                     , random-extras
                      , parsec           >= 3.1
                      , prettyprinter
                      , template-haskell >= 2.11

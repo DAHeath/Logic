@@ -3,6 +3,7 @@ import           Control.Monad.State
 
 import qualified Data.Map as M
 import           Data.Optic.Graph
+import           Data.Optic.Graph.Extras
 
 import qualified Logic.Type as T
 import           Logic.Formula
@@ -59,9 +60,9 @@ jumpy =
       assS)
 
 main :: IO ()
-main = undefined
-  -- let g = commGraph test
-  --     b = head $ backEdges g
-  --     g' = unfold b g
-  -- in do display "original" g
-  --       display "unfolded" (emap (fst . semantics) g')
+main =
+  let g = commGraph test
+      b = head $ backEdges g
+      g' = unfold b g
+  in do display "original" g
+        display "unfolded" (emap (fst . semantics) g')

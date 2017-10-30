@@ -2,11 +2,13 @@
 module Data.Optic.Graph.Extras where
 
 import           Control.Lens
+import           Control.Applicative.Backwards
 import           Control.Monad.State
 
 import           Data.Optic.Graph
 import           Data.Maybe (fromJust)
 import qualified Data.Map as M
+import qualified Data.Set as S
 import           Data.Monoid ((<>))
 import           Data.Text.Prettyprint.Doc hiding ((<>), dot)
 
@@ -19,21 +21,32 @@ import           System.Info
 backEdges :: Ord i => Graph i e v -> [((i, i), e)]
 backEdges g = filter (\((i1, i2), _) -> i2 <= i1) $ g ^@.. iallEdges
 
-unwind :: (Applicative f, Ord i)
+noBackEdges :: Ord i => Graph i e v -> Graph i e v
+noBackEdges g =
+  ifilterEdges (\i1 i2 _ -> (i1, i2) `notElem` map fst (backEdges g)) g
+
+between :: Ord i => i -> i -> Graph i e v -> Graph i e v
+between i1 i2 g =
+  let is1 = idxSet (reached i1 g)
+      is2 = idxSet (reaches i2 g)
+      is = S.intersection is1 is2
+  in filterIdxs (`elem` is) g
+
+unwind :: (Applicative f, Ord i, Show i)
        => (i -> f i)
        -> (i -> i -> e -> f e)
        -> (i -> v -> f v)
        -> i -> i -> e
-       -> Graph i e v -> f (Graph i e v)
+       -> Graph i e v -> f (i, Graph i e v)
 unwind fi fe fv i1 i2 e g =
-  let g' = reaches i1 g
-      am = M.fromList <$> traverse (\i -> fmap (\i' -> (i, i')) (fi i)) (idxs g')
+  let g' = reaches i2 (delEdge i1 i2 g) `mappend` between i2 i1 g
+      am = M.fromList <$> traverse (\i -> fmap (\i' -> (i, i')) (Backwards $ fi i)) (idxs g')
       ae = fe i1 i2 e
       ag = idfs fe fv g'
-  in complete i1 i2 <$> am <*> ae <*> pure g <*> ag
+  in complete i1 i2 <$> forwards am <*> ae <*> pure g <*> ag
 
   where
-    complete i1 i2 m e g g' = delEdge i1 i2 (connect m e g (unwind' m g'))
+    complete i1 i2 m e g g' = ( M.findWithDefault i2 i2 m, connect m e g (unwind' m g'))
     unwind' m = mapIdxs (\i -> M.findWithDefault i i m)
     connect m e g g' = addEdge (M.findWithDefault i1 i1 m) i2 e $ union g g'
 
