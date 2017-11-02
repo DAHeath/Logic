@@ -28,6 +28,7 @@ library
                      , Logic.Solver.Z3
                      , Data.Optic.Graph.Extras
                      , Logic.ImplicationGraph.JSONParser
+                     , Logic.ImplicationGraph.Optimize
 
   default-extensions:  LambdaCase
                      , DeriveDataTypeable
@@ -92,7 +93,7 @@ executable ImplicationGraphExample
                      , bytestring
   default-language:    Haskell2010
 
-executable EquivalenceExample
+executable ImperativeExample
   hs-source-dirs:      app
   main-is:             EquivalenceExample.hs
   ghc-options:
