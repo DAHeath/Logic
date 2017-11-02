@@ -13,8 +13,13 @@ import qualified Logic.Type as T
 import           Logic.Formula.Parser
 import           Logic.Var
 
+import           Logic.ImplicationGraph.JSONParser (parseGraphFromJSON)
+import qualified Data.ByteString.Lazy.Char8 as BS
+
 main :: IO ()
 main = do
+  parsedGraph <- parseGraphFromJSON <$> BS.readFile "test.json"
+  G.display "parsed" parsedGraph
   G.display "before" example
   sol <- solve (LinIdx 2 0) example
   case sol of

@@ -63,6 +63,6 @@ main :: IO ()
 main =
   let g = commGraph test
       b = head $ backEdges g
-      g' = unfold b g
+      --g' = unfold b g
   in do display "original" g
-        display "unfolded" (emap (fst . semantics) g')
+        --display "unfolded" (emap (fst . semantics) g')
