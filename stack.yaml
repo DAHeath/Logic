@@ -8,7 +8,7 @@ packages:
   extra-dep: true
 - location:
     git: https://github.com/DAHeath/optic-graph
-    commit: 1e35e194cb9ee865091845d3bdd70a2bc94e1e46
+    commit: 5ebdb1e5b054d8c00e2285abf6f07777eca1b10e
   extra-dep: true
 extra-deps:
 - safepath-0.1.0.0

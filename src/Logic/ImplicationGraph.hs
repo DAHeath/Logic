@@ -199,7 +199,7 @@ unwindAllBackEdges :: Solve idx m => [LinIdx] -> LinIdx -> ImplGr LinIdx -> m (I
 unwindAllBackEdges ind end g = do
   let bes = G.backEdges g
   (is, g') <- foldrM (\((i1, i2), e) (is, g') ->
-    if any (`elem` ind) (G.idxs (G.reached i1 (G.noBackEdges g')))
+    if any (`elem` ind) (G.idxs (G.reached i1 (G.withoutBackEdges g')))
     then return (is, g')
     else do (i, g'') <- unwind i1 i2 e g'
             return (i:is, g'')) ([], g) bes
