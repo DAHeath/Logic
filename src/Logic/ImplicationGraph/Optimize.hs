@@ -12,14 +12,12 @@ import           Logic.ImplicationGraph
 
 -- | Finds the exit nodes in a loop.
 exitNodes :: ImplGr LinIdx -> [LinIdx] -> [LinIdx]
-exitNodes graph loop =
-    filter exitNode loop
-    where
-        -- Whether or not any edge coming out of `idx` has a destination
-        -- outside of the loop.
-        exitNode idx = any (\(i, _) -> not $ i `elem` loop) (edges idx)
-        -- Edges originating in `idx`.
-        edges idx = graph ^@.. G.iedgesFrom idx
+exitNodes graph loop = filter exitNode loop where
+    -- Whether or not any edge coming out of `idx` has a destination
+    -- outside of the loop.
+    exitNode idx = any (\(i, _) -> not $ i `elem` loop) (edges idx)
+    -- Edges originating in `idx`.
+    edges idx = graph ^@.. G.iedgesFrom idx
 
 -- | Finds irreducible vertices in a given `Graph`.
 irreducible :: ImplGr LinIdx -> [LinIdx]
