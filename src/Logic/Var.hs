@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Logic.Var where
 
 import           Control.Lens
@@ -19,6 +20,7 @@ data Var
   = Bound Int Type
   | Free Name Type
   deriving (Show, Read, Eq, Ord, Data)
+makePrisms ''Var
 
 instance Typed Var
   where typeOf (Bound _ t) = t

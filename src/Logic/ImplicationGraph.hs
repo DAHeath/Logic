@@ -34,8 +34,11 @@ makePrisms ''Vert
 emptyInst :: [Var] -> Vert
 emptyInst vs = InstanceV vs (LBool False)
 
-data Edge = Edge Form (Map Var Var)
-  deriving (Show, Read, Eq, Ord, Data)
+data Edge = Edge
+  { _edgeForm :: Form
+  , _edgeMap :: Map Var Var
+  } deriving (Show, Read, Eq, Ord, Data)
+makeLenses ''Edge
 
 instance Pretty Edge where
   pretty (Edge f m) = pretty f <+> pretty (M.toList m)
