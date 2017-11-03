@@ -10,10 +10,11 @@ import qualified Data.Optic.Graph.Extras as G
 
 import           Logic.ImplicationGraph
 
--- | Finds the exit nodes in a loop.
+-- | Finds the exit nodes of a loop.
 exitNodes :: ImplGr LinIdx -> [LinIdx] -> [LinIdx]
 exitNodes graph loop = filter exitNode loop where
-    -- Whether or not any edge coming out of `idx` has a destination
+    -- Any edge coming _out_ of a loop subgraph is an exit node.
+    -- Check whether or not any edge coming out of `idx` has a destination
     -- outside of the loop.
     exitNode idx = any (\(i, _) -> not $ i `elem` loop) (edges idx)
     -- Edges originating in `idx`.
@@ -37,6 +38,10 @@ irreducible' graph = [startIndex, queryIndex] ++ loopHeaders ++ loopExits where
     backEdges = G.backEdges graph
     sccs = G.scc graph
 
+    -- The loop headers correspond to the destination vertices of back edges.
     loopHeaders = map (\((s, _), _) -> s) backEdges
+    -- Loops (header, body and exit vertices) correspond to strongly connected
+    -- components that include loop headers.
     loops = filter (\scc -> (length $ scc `intersect` loopHeaders) > 0) sccs
     loopExits = concat $ map (exitNodes graph) loops
+ 
