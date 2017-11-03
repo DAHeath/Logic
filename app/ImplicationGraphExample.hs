@@ -21,16 +21,9 @@ main = do
   parsedGraph <- parseGraphFromJSON <$> BS.readFile "test.json"
   G.display "parsed" parsedGraph
   G.display "before" example
-  sol <- solve (LinIdx 2 0) example
+  sol <- solve 2 example
   case sol of
     Left m -> print (pretty m)
-    Right r -> G.display "test" r
-
-stepTest :: IO ()
-stepTest = do
-  sol <- evalStateT (runExceptT (step (LinIdx 2 0) =<< step (LinIdx 2 0) example)) M.empty
-  case sol of
-    Left m -> print m
     Right r -> G.display "test" r
 
 i, i', n :: Var
@@ -41,15 +34,12 @@ n  = Free "n"  T.Int
 s :: [Var]
 s = [i, n]
 
-example :: Graph LinIdx Edge Vert
+example :: Graph Integer Edge Vert
 example = G.fromLists
-  [ (LinIdx 0 0, emptyInst [])
-  , (LinIdx 1 0, emptyInst s)
-  , (LinIdx 2 0, QueryV [form|not (i:Int = 13)|])]
-  [ ( LinIdx 0 0, LinIdx 1 0
-    , Edge [form|i:Int = 0|] M.empty)
-  , ( LinIdx 1 0, LinIdx 1 0
-    , Edge [form|i':Int = i:Int + 2 && i:Int < n:Int|] (M.singleton i i'))
-  , ( LinIdx 1 0, LinIdx 2 0
-    , Edge [form|i:Int >= n:Int|] M.empty)
+  [ (0, emptyInst [])
+  , (1, emptyInst s)
+  , (2, QueryV [form|not (i:Int = 11)|])]
+  [ ( 0, 1, Edge [form|i:Int = 0|] M.empty)
+  , ( 1, 1, Edge [form|i':Int = i:Int + 2 && i:Int < n:Int|] (M.singleton i i'))
+  , ( 1, 2, Edge [form|i:Int >= n:Int|] M.empty)
   ]

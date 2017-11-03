@@ -1,9 +1,0 @@
-# Equivalence
-+ Refine Or Node (how does an or node have multiple exits?)
-
-# Shape
-+ Inductive type for graph indices
-+ Store variable state
-  (each mainline, non-instanced location should have a pair of object and value if there is a store)
-+ Locate all branch selects:
-    Teleport between those with same mainline location but different store location.

@@ -26,25 +26,21 @@ import           Logic.ImplicationGraph.Equivalence
 --   return r;
 -- }
 
-g1 :: ImplGr LinIdx
+g1 :: ImplGr Integer
 g1 = G.fromLists
-  [ (LinIdx 0 0, emptyInst [])
-  , (LinIdx 1 0, emptyInst [n, r])
-  , (LinIdx 2 0, emptyInst [n, r, s, p, i])
-  , (LinIdx 3 0, emptyInst [n, r])
+  [ (0, emptyInst [])
+  , (1, emptyInst [n, r])
+  , (2, emptyInst [n, r, s, p, i])
+  , (3, emptyInst [n, r])
   ]
-  [ (LinIdx 0 0, LinIdx 1 0, Edge [form|r:Int = 0|] M.empty)
-  , (LinIdx 1 0, LinIdx 3 0
-    , Edge [form|n:Int <= 1 && r':Int = 1|] (M.fromList [(r, r')]))
-  , (LinIdx 1 0, LinIdx 2 0
-    , Edge [form|n:Int > 1 && s:Int = 2 && p:Int = 1 && i:Int = 2|] M.empty)
-  , (LinIdx 2 0, LinIdx 2 0
-    , Edge [form|i:Int < n:Int
-              && i':Int = i:Int+1
-              && s':Int = s:Int + p:Int
-              && p':Int = s:Int |] (M.fromList [(i, i'), (s, s'), (p, p')]))
-  , (LinIdx 2 0, LinIdx 3 0
-    , Edge [form|i:Int >= n:Int && r':Int = s:Int|] (M.fromList [(r, r')]))
+  [ (0, 1, Edge [form|r:Int = 0|] M.empty)
+  , (1, 3, Edge [form|n:Int <= 1 && r':Int = 1|] (M.fromList [(r, r')]))
+  , (1, 2, Edge [form|n:Int > 1 && s:Int = 2 && p:Int = 1 && i:Int = 2|] M.empty)
+  , (2, 2, Edge [form|i:Int < n:Int
+                   && i':Int = i:Int+1
+                   && s':Int = s:Int + p:Int
+                   && p':Int = s:Int |] (M.fromList [(i, i'), (s, s'), (p, p')]))
+  , (2, 3 , Edge [form|i:Int >= n:Int && r':Int = s:Int|] (M.fromList [(r, r')]))
   ]
 
 
@@ -64,26 +60,22 @@ g1 = G.fromLists
 --   return x;
 -- }
 
-g2 :: ImplGr LinIdx
+g2 :: ImplGr Integer
 g2 = G.fromLists
-  [ (LinIdx 0 0, emptyInst [])
-  , (LinIdx 1 0, emptyInst [m, x])
-  , (LinIdx 2 0, emptyInst [m, x, c1, c2, j])
-  , (LinIdx 3 0, emptyInst [m, x])
+  [ (0, emptyInst [])
+  , (1, emptyInst [m, x])
+  , (2, emptyInst [m, x, c1, c2, j])
+  , (3, emptyInst [m, x])
   ]
-  [ (LinIdx 0 0, LinIdx 1 0, Edge [form|x:Int = 0|] M.empty)
-  , (LinIdx 1 0, LinIdx 3 0
-    , Edge [form|m:Int <= 1 && x':Int = 1|] (M.fromList [(x, x')]))
-  , (LinIdx 1 0, LinIdx 2 0
-    , Edge [form|m:Int > 1 && c1:Int = 1 && c2:Int = 1 && j:Int = 2|] M.empty)
-  , (LinIdx 2 0, LinIdx 2 0
-    , Edge [form|j:Int <= m:Int
-              && j':Int = j:Int+1
-              && c2':Int = c2:Int + c1:Int
-              && c1':Int = c2:Int |]
+  [ (0, 1, Edge [form|x:Int = 0|] M.empty)
+  , (1, 3, Edge [form|m:Int <= 1 && x':Int = 1|] (M.fromList [(x, x')]))
+  , (1, 2, Edge [form|m:Int > 1 && c1:Int = 1 && c2:Int = 1 && j:Int = 2|] M.empty)
+  , (2, 2, Edge [form|j:Int <= m:Int
+                   && j':Int = j:Int+1
+                   && c2':Int = c2:Int + c1:Int
+                   && c1':Int = c2:Int |]
            (M.fromList [(j, j'), (c1, c1'), (c2, c2')]))
-  , (LinIdx 2 0, LinIdx 3 0
-    , Edge [form|j:Int > m:Int && x':Int = c2:Int|] (M.fromList [(x, x')]))
+  , (2, 3, Edge [form|j:Int > m:Int && x':Int = c2:Int|] (M.fromList [(x, x')]))
   ]
 
 x   = Free "x" T.Int
@@ -109,7 +101,8 @@ i' = Free "i'" T.Int
 
 main :: IO ()
 main = do
-  sol <- equivalence [(n, m)] [(x, r)] (PIdx (LinIdx 3 0) (LinIdx 3 0)) g1 g2
+  sol <- equiv 3 3 [(n, m)] [(x, r)] g1 g2
   case sol of
     Left e -> print (pretty e)
-    Right m -> print m
+    Right m ->
+      G.display "sol" m
