@@ -1,16 +1,11 @@
-{-# LANGUAGE TemplateHaskell, TypeFamilies #-}
 module Logic.ImplicationGraph.Equivalence where
 
 import           Control.Lens
 import           Control.Monad.State
 import           Control.Monad.Except
-import           Control.Monad.Extra (whenM, orM, anyM)
 
-import           Data.Data (Data)
-import           Data.Maybe (mapMaybe)
 import           Data.Map (Map)
 import qualified Data.Map as M
-import           Data.List.Split (splitOn)
 import           Data.Optic.Graph (Graph)
 import qualified Data.Optic.Graph as G
 import qualified Data.Optic.Graph.Extras as G
@@ -21,10 +16,8 @@ import qualified Logic.Type as T
 import           Logic.Formula
 import           Logic.Var
 import           Logic.Model
-import           Logic.ImplicationGraph hiding (isInductive)
-import qualified Logic.Solver.Z3 as Z3
-
-import           Text.Read (readMaybe)
+import           Logic.ImplicationGraph
+import           Logic.ImplicationGraph.Induction
 
 type ProdGr i = Graph i (These Edge Edge) Vert
 
@@ -36,7 +29,7 @@ instance (Pretty a, Pretty b) => Pretty (These a b) where
 
 -- | Repeatedly unwind the program until a counterexample is found or inductive
 -- invariants are found.
-equiv :: MonadIO m
+solve :: MonadIO m
       => Integer
       -> Integer
       -> [(Var, Var)]
@@ -44,17 +37,16 @@ equiv :: MonadIO m
       -> ImplGr Integer
       -> ImplGr Integer
       -> m (Either Model (ProdGr Idx))
-equiv e1 e2 st1 st2 g1 g2 = do
-  let g' = G.mapIdxs firstInst init
-  G.display "product" g'
+solve e1 e2 st1 st2 g1 g2 = do
+  let g' = G.mapIdxs firstInst wQuery
   runSolve (loop g') >>= \case
     Left (Failed m) -> return (Left m)
     Left (Complete res) -> return (Right res)
     Right _ -> error "infinite loop terminated successfully?"
   where
-    loop gr = loop =<< step' (firstInst (end+1)) gr
+    loop gr = loop =<< step (firstInst (end+1)) gr
 
-    init =
+    wQuery =
       equivProduct g1 g2
       & G.addVert (end+1) (QueryV
         (app2 Impl (manyAnd (map equate st1))
@@ -69,16 +61,16 @@ equiv e1 e2 st1 st2 g1 g2 = do
 
 -- | Perform interpolation on the graph (exiting on failure), perform and induction
 -- check, and unwind further if required.
-step' :: Solve (These Edge Edge) m => Idx -> ProdGr Idx -> m (ProdGr Idx)
-step' end g = do
-  int <- interp g
+step :: Solve (These Edge Edge) m => Idx -> ProdGr Idx -> m (ProdGr Idx)
+step end g = do
+  int <- interp
   indM <- induc end int
   let isInd = M.keys $ M.filter id indM
   when (M.lookup end indM == Just True) $ throwError $ Complete int
   unwindAll (backs g) isInd end int
 
   where
-    interp g = do
+    interp = do
       sol <- interpolate (G.mapEdges edge g)
       case sol of
         Left e -> throwError (Failed e)
@@ -97,16 +89,16 @@ step' end g = do
       e' -> [((i1, i2), e')]
 
 induc :: MonadIO m => Idx -> ProdGr Idx -> m (Map Idx Bool)
-induc = inductive' pred
+induc = inductive' predInd
   where
-    pred g i = do
+    predInd g i = do
       let (ls, rs) = preds g i
-      lInd <- allInd pred g i ls
-      rInd <- allInd pred g i rs
-      return [lInd, rInd]
+      lInd <- allInd predInd g i ls
+      rInd <- allInd predInd g i rs
+      return [lInd && not (null ls), rInd && not (null rs)]
 
-    preds g i = mconcat $ map (\(i, e) ->
-      fromThese [] [] $ bimap (const [i]) (const [i]) e) $ g ^@.. G.iedgesTo i
+    preds g i = mconcat $ map (\(i', e) ->
+      fromThese [] [] $ bimap (const [i']) (const [i']) e) $ g ^@.. G.iedgesTo i
 
 equivProduct :: ImplGr Integer -> ImplGr Integer -> ProdGr Integer
 equivProduct g1 g2 =

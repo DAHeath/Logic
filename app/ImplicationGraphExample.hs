@@ -9,6 +9,7 @@ import qualified Data.Map as M
 import           Data.Text.Prettyprint.Doc
 
 import           Logic.ImplicationGraph
+import           Logic.ImplicationGraph.Safety
 import qualified Logic.Type as T
 import           Logic.Formula.Parser
 import           Logic.Var

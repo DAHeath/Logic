@@ -78,48 +78,6 @@ instance Pretty Idx where
 
 type ImplGr idx = Graph idx Edge Vert
 
-type PredComp e m = Graph Idx e Vert -> Idx -> m [Bool]
-
-inductive :: MonadIO m => Idx -> ImplGr Idx -> m (Map Idx Bool)
-inductive = inductive' pred
-  where
-    pred g i = (: []) <$> allInd pred g i (G.predecessors i g)
-
--- | Check whether the vertex labels in the graph form an inductive relationship.
-inductive' :: MonadIO m => PredComp e (StateT (Map Idx Bool) m)
-           -> Idx -> Graph Idx e Vert -> m (Map Idx Bool)
-inductive' pc start g = execStateT (ind pc g start) M.empty
-
-ind :: (MonadIO m, MonadState (Map Idx Bool) m)
-    => PredComp e m -> Graph Idx e Vert -> Idx -> m Bool
-ind pc g i = maybe (computeInd pc g i) return . M.lookup i =<< get
-
-indPred :: (MonadIO m, MonadState (Map Idx Bool) m)
-        => PredComp e m -> Graph Idx e Vert -> Idx -> Idx -> m Bool
-indPred pc g i i' = if i <= i' then return False else ind pc g i'
-
-computeInd :: (MonadIO m, MonadState (Map Idx Bool) m)
-           => PredComp e m -> Graph Idx e Vert -> Idx -> m Bool
-computeInd pc g i =
-  (at i <?=) =<< maybe (return False) (\v -> do
-    psInd <- pc g i
-    case v of
-      QueryV _ -> return (or psInd)
-      InstanceV _ f ->
-        or <$> sequence ([ return $ f == LBool True
-                         , anyM (`Z3.entails` f) (descendantInstanceVs g i)
-                         ] ++ map return psInd)) (g ^. at i)
-
-allInd :: (MonadIO m, MonadState (Map Idx Bool) m)
-       => PredComp e m -> Graph Idx e Vert -> Idx -> [Idx] -> m Bool
-allInd pc g i is = and <$> mapM (indPred pc g i) is
-
-descendantInstanceVs g i =
-  G.descendants i g
-    & filter (match i)
-    & filter (/= i)
-    & mapMaybe (\i' -> g ^? ix i' . _InstanceV . _2)
-
 -- | Convert the graph into a system of Constrained Horn Clauses.
 implGrChc :: ImplGr Idx -> [Chc]
 implGrChc g = concatMap idxRules (G.idxs g)
@@ -175,27 +133,6 @@ type Solve e m =
 
 runSolve :: Monad m => ExceptT e (StateT (Map k a) m) a1 -> m (Either e a1)
 runSolve ac = evalStateT (runExceptT ac) M.empty
-
--- | Repeatedly unwind the program until a counterexample is found or inductive
--- invariants are found.
-solve :: MonadIO m => Integer -> ImplGr Integer -> m (Either Model (ImplGr Idx))
-solve end g =
-  let g' = G.mapIdxs firstInst g in
-  runSolve (loop g') >>= \case
-    Left (Failed m) -> return (Left m)
-    Left (Complete res) -> return (Right res)
-    Right _ -> error "infinite loop terminated successfully?"
-  where
-    loop gr = loop =<< step (firstInst end) gr
-
--- | Perform interpolation on the graph (exiting on failure), perform and induction
--- check, and unwind further if required.
-step :: Solve Edge m => Idx -> ImplGr Idx -> m (ImplGr Idx)
-step end g = interpolate g >>= either (throwError . Failed) (\interp -> do
-  indM <- inductive end interp
-  let isInd = M.keys $ M.filter id indM
-  when (M.lookup end indM == Just True) $ throwError $ Complete interp
-  unwindAll (G.backEdges g) isInd end interp)
 
 -- | Gather all facts known about each instance of the same index together by disjunction.
 collectAnswer :: ImplGr Idx -> Map Integer Form

@@ -101,7 +101,7 @@ i' = Free "i'" T.Int
 
 main :: IO ()
 main = do
-  sol <- equiv 3 3 [(n, m)] [(x, r)] g1 g2
+  sol <- solve 3 3 [(n, m)] [(x, r)] g1 g2
   case sol of
     Left e -> print (pretty e)
     Right m ->
