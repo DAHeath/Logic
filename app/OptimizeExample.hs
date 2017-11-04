@@ -18,21 +18,22 @@ main = do
 i :: Var
 i  = Free "i" T.Int
 
-emptyEdge s e = (LinIdx s 0, LinIdx e 0, Edge [form|i:Int = 0|] M.empty)
+emptyEdge :: (Ord i) => i -> i -> (i, i, Edge)
+emptyEdge s d = (s, d, Edge [form|i:Int = 0|] M.empty)
 
-example :: Graph LinIdx Edge Vert
+example :: Graph Int Edge Vert
 example = G.fromLists
-    [ (LinIdx 0 0, emptyInst [])
-    , (LinIdx 1 0, emptyInst [])
-    , (LinIdx 2 0, emptyInst [])
-    , (LinIdx 3 0, emptyInst [])
-    , (LinIdx 4 0, emptyInst [])
-    , (LinIdx 5 0, emptyInst [])]
+    [ (0, emptyInst [])
+    , (1, emptyInst [])
+    , (2, emptyInst [])
+    , (3, emptyInst [])
+    , (4, emptyInst [])
+    , (5, emptyInst [])]
     [ emptyEdge 0 1
     , emptyEdge 1 2
-    , emptyEdge 1 4
-    , emptyEdge 2 3
-    , emptyEdge 3 1
+    , emptyEdge 2 4
+    , emptyEdge 4 5
+    , emptyEdge 1 3
+    , emptyEdge 3 4
     , emptyEdge 3 5
-    , emptyEdge 4 3
-    , emptyEdge 4 5]
+    , emptyEdge 4 1]
