@@ -48,68 +48,38 @@ instance Pretty Vert where
     InstanceV vs f -> pretty vs <+> pretty f
     QueryV f -> pretty f
 
-class (Show a, Ord a, Data a) => Idx a where
-  type BaseIdx a
-  baseIdx :: Lens' a (BaseIdx a)
-  written :: Prism' String a
-
-match :: (Idx a, Eq (BaseIdx a)) => a -> a -> Bool
-match x y = x ^. baseIdx == y ^. baseIdx
-
-data LinIdx = LinIdx { _linIden :: Integer, _linInst :: Integer }
+data Idx = Idx { _idxIden :: Integer, _idxInst :: Integer }
   deriving (Show, Read, Eq, Data)
-makeLenses ''LinIdx
+makeLenses ''Idx
 
-instance Ord LinIdx where
-  compare (LinIdx iden1 inst1) (LinIdx iden2 inst2) =
+firstInst :: Integer -> Idx
+firstInst i = Idx i 0
+
+match :: Idx -> Idx -> Bool
+match x y = x ^. idxIden == y ^. idxIden
+
+instance Ord Idx where
+  compare (Idx iden1 inst1) (Idx iden2 inst2) =
     case compare inst1 inst2 of
       LT -> GT
       GT -> LT
       EQ -> compare iden1 iden2
 
-instance Idx LinIdx where
-  type BaseIdx LinIdx = Integer
-  baseIdx = linIden
-  written = prism' toWritten fromWritten
-    where
-      toWritten (LinIdx iden i) = show iden ++ "_" ++ show i
-      fromWritten s = case splitOn "_" s of
-          [iden, i] -> LinIdx <$> readMaybe iden <*> readMaybe i
-          _ -> Nothing
+written :: Prism' String Idx
+written = prism' toWritten fromWritten
+  where
+    toWritten (Idx iden i) = show iden ++ "_" ++ show i
+    fromWritten s = case splitOn "_" s of
+        [iden, i] -> Idx <$> readMaybe iden <*> readMaybe i
+        _ -> Nothing
 
-instance Pretty LinIdx where
-  pretty (LinIdx iden i) = pretty iden <+> pretty i
+instance Pretty Idx where
+  pretty (Idx iden i) = pretty iden <+> pretty i
 
 type ImplGr idx = Graph idx Edge Vert
 
--- | Check whether the vertex labels in the graph form an inductive relationship.
-inductive :: (Eq (BaseIdx idx), Idx idx, MonadIO m, Pretty idx) => idx -> ImplGr idx -> m (Map idx Bool)
-inductive start g = execStateT (ind start) M.empty
-  where
-    ind i = maybe (computeInd i) return . M.lookup i =<< get
-    indPred i i' = if i <= i' then return False else ind i'
-
-    computeInd i =
-      (at i <?=) =<< maybe (return False) (\v -> do
-        psInd <- allInd i (G.predecessors i g)
-        case v of
-          QueryV _ -> return psInd
-          InstanceV _ f ->
-            or <$> sequence [ return $ f == LBool True
-                            , return psInd
-                            , anyM (`Z3.entails` f) (descendantInstanceVs i)
-                            ]) (g ^. at i)
-
-    allInd i is = and <$> mapM (indPred i) is
-
-    descendantInstanceVs i =
-      G.descendants i g
-        & filter (match i)
-        & filter (/= i)
-        & mapMaybe (\i' -> g ^? ix i' . _InstanceV . _2)
-
 -- | Convert the graph into a system of Constrained Horn Clauses.
-implGrChc :: Idx idx => ImplGr idx -> [Chc]
+implGrChc :: ImplGr Idx -> [Chc]
 implGrChc g = concatMap idxRules (G.idxs g)
   where
     idxApp i = instApp i =<< g ^? ix i . _InstanceV
@@ -136,13 +106,13 @@ implGrChc g = concatMap idxRules (G.idxs g)
 
 -- | Interpolate the facts in the graph using CHC solving to label the vertices
 -- with fresh definitions.
-interpolate :: (MonadIO m, Idx idx) => ImplGr idx -> m (Either Model (ImplGr idx))
+interpolate :: MonadIO m => ImplGr Idx -> m (Either Model (ImplGr Idx))
 interpolate g = Z3.solveChc (implGrChc g) >>= \case
   Left m -> return (Left m)
   Right m -> return (Right $ applyModel m g)
 
 -- | Replace the fact at each vertex in the graph by the fact in the model.
-applyModel :: Idx idx => Model -> ImplGr idx -> ImplGr idx
+applyModel :: Model -> ImplGr Idx -> ImplGr Idx
 applyModel m = G.imapVerts applyVert
   where
     applyVert i = _InstanceV . _2 %~ (\f -> f `mkOr` M.findWithDefault (LBool False) i m')
@@ -151,68 +121,49 @@ applyModel m = G.imapVerts applyVert
       & catMaybes & M.fromList
       where interpretName n = n ^? to uncons . _Just . _2 . written
 
-data Result idx
+data Result e
   = Failed Model
-  | Complete (ImplGr idx)
+  | Complete (Graph Idx e Vert)
   deriving (Show, Read, Eq)
 
-type SolveState = Map (BaseIdx LinIdx) Integer
+type SolveState = Map Integer Integer
 
-type Solve idx m =
-  (MonadError (Result idx) m, MonadState SolveState m, MonadIO m)
+type Solve e m =
+  (MonadError (Result e) m, MonadState SolveState m, MonadIO m)
 
 runSolve :: Monad m => ExceptT e (StateT (Map k a) m) a1 -> m (Either e a1)
 runSolve ac = evalStateT (runExceptT ac) M.empty
 
--- | Repeatedly unwind the program until a counterexample is found or inductive
--- invariants are found.
-solve :: MonadIO m => LinIdx -> ImplGr LinIdx -> m (Either Model (ImplGr LinIdx))
-solve end g =
-  runSolve (loop g) >>= \case
-    Left (Failed m) -> return (Left m)
-    Left (Complete res) -> return (Right res)
-    Right _ -> error "infinite loop terminated successfully?"
-  where
-    loop gr = loop =<< step end gr
-
--- | Perform interpolation on the graph (exiting on failure), perform and induction
--- check, and unwind further if required.
-step :: Solve LinIdx m => LinIdx -> ImplGr LinIdx -> m (ImplGr LinIdx)
-step end g = interpolate g >>= either (throwError . Failed) (\interp -> do
-  indM <- inductive end interp
-  let isInd = M.keys $ M.filter id indM
-  when (M.lookup end indM == Just True) $ throwError $ Complete interp
-  unwindAllBackEdges isInd end interp)
-
 -- | Gather all facts known about each instance of the same index together by disjunction.
-collectAnswer :: (Ord (BaseIdx idx), Idx idx) => ImplGr idx -> Map (BaseIdx idx) Form
+collectAnswer :: ImplGr Idx -> Map Integer Form
 collectAnswer g = execState (G.itravVerts (\i v -> case v of
-  InstanceV _ f -> modify (M.insertWith mkOr (i ^. baseIdx) f)
+  InstanceV _ f -> modify (M.insertWith mkOr (i ^. idxIden) f)
   _ -> return ()) g) M.empty
 
 -- | Unwind the graph on the given backedge and update all instances in the unwinding.
-unwind :: Solve idx m => LinIdx -> LinIdx -> Edge -> ImplGr LinIdx -> m (LinIdx, ImplGr LinIdx)
+unwind :: Solve e m => Idx -> Idx -> e -> Graph Idx e Vert -> m (Idx, Graph Idx e Vert)
 unwind = G.unwind updateInstance (\_ _ -> return) (\_ v -> return $ v & _InstanceV . _2 .~ LBool False)
 
-
-unwindAllBackEdges :: Solve idx m => [LinIdx] -> LinIdx -> ImplGr LinIdx -> m (ImplGr LinIdx)
-unwindAllBackEdges ind end g = do
-  let bes = G.backEdges g
+unwindAll :: Solve e m
+          => [((Idx, Idx), e)]
+          -> [Idx] -> Idx
+          -> Graph Idx e Vert -> m (Graph Idx e Vert)
+unwindAll bes ind end g = do
   (is, g') <- foldrM (\((i1, i2), e) (is, g') ->
-    if any (`elem` ind) (G.idxs (G.reached i1 (G.noBackEdges g')))
+    if any (`elem` ind) (G.idxs (G.reached i1 (G.withoutBackEdges g')))
     then return (is, g')
     else do (i, g'') <- unwind i1 i2 e g'
             return (i:is, g'')) ([], g) bes
-  let g'' = G.ifilterEdges (\i1 i2 e -> ((i1, i2), e) `notElem` bes) g'
+  let g'' = G.ifilterEdges (\i1 i2 _ -> (i1, i2) `notElem` map fst bes) g'
   return (compress (mconcat $ map (`G.reached` g'') is) g'')
   where
     compress new g' =
       let compressed = g'
             & G.filterIdxs (\i -> i `notElem` ind || i `elem` G.idxs new)
-            & G.ifilterEdges (\i1 i2 e -> ((i1, i2), e) `notElem` G.backEdges g')
+            & G.ifilterEdges (\i1 i2 _ -> (i1, i2) `notElem` map fst (G.backEdges g'))
             & G.reaches end
       in G.filterIdxs (`elem` G.idxs compressed) g'
 
 -- | Find a fresh instance counter for the given index.
-updateInstance :: MonadState SolveState m => LinIdx -> m LinIdx
-updateInstance idx = flip (set linInst) idx <$> (at (idx ^. baseIdx) . non 0 <+= 1)
+updateInstance :: MonadState SolveState m => Idx -> m Idx
+updateInstance idx = flip (set idxInst) idx <$> (at (idx ^. idxIden) . non 0 <+= 1)
