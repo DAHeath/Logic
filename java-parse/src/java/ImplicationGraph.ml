@@ -6,7 +6,7 @@ module Env = Sawja_pack.Live_bir.Env
 module Edge = struct
   type t = {
       formula: Ir.expr;
-      rename: (string * string) list;
+      rename: (QID.t * QID.t) list;
     }
   [@@deriving hash, compare]
 
@@ -46,15 +46,16 @@ let to_implication
         live = live_names v'.InstrGraph.Instr.live;
       } in
     let instr = v.InstrGraph.Instr.instr in
-    let (expr, rename) = match (InstrGraph.instr_to_expr vartable instr, e) with
-      | (None, _) -> (Ir.LBool true, String.Map.empty)
+    let loc = v.InstrGraph.Instr.loc in
+    let (expr, rename) = match (InstrGraph.instr_to_expr vartable loc instr, e) with
       | (Some (expr, r), InstrGraph.Branch.True) -> (expr, r)
       | (Some (expr, r), InstrGraph.Branch.Goto) -> (expr, r)
       | (Some (expr, r), InstrGraph.Branch.False) -> (Ir.ExprCons (Ir.Not, expr), r)
+      | (None, _) -> (Ir.LBool true, [])
     in
     let edge = {
         formula = expr;
-        rename = String.Map.to_alist rename;
+        rename = rename;
       } in
     add_edge_e graph (E.create start edge finish)
   in
@@ -73,7 +74,8 @@ let serialize (graph: t) =
   let vertices = fold_vertex collect_vertices graph [] in
   let vlist = String.concat vertices ~sep:"," |> Printf.sprintf "{%s}" in
   let rename_str r =
-    List.map ~f:(fun (a, b) -> Printf.sprintf "{\"%s\":\"%s\"}" a b) r
+    List.map ~f:(fun (a, b) -> Printf.sprintf "[%s,%s]"
+                    (Ir.jsonsexp_qid a) (Ir.jsonsexp_qid b)) r
     |> String.concat ~sep:","
     |> Printf.sprintf "[%s]"
   in

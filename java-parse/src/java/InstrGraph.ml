@@ -138,10 +138,14 @@ let rec collect_vars = function
 
 let ( $:: ) a b = Ir.ExprCons (a, b)
 
-
 let var_name var =
   JBir.var_name_debug var
   |> Option.value ~default:(JBir.var_name var)
+
+let qid_var_name loc var prime =
+  var
+  |> QID.specify (QID.unspecify loc)
+  |> (Fn.flip QID.specify) prime
 
 
 let java_to_kind = function
@@ -158,6 +162,7 @@ let java_to_kind = function
 
 let java_to_var
       (vartable: (int * int * string * JBasics.value_type * int) list)
+      (loc: QID.t)
       (value_type: JBasics.value_type option)
       (var: JBir.var)
   =
@@ -172,7 +177,7 @@ let java_to_var
      | (None, None) -> failwith (Printf.sprintf "No type info for var: %s" name)
     )
   in
-  let name = var_name var in
+  let name = qid_var_name loc name "0" in
   (Ir.Var (Ir.Free (name, kind)), kind)
 
 
@@ -181,7 +186,7 @@ let rename_var f = function
   | other -> other
 
 
-let rec java_to_expr vartable = function
+let rec java_to_expr vartable loc = function
   | JBir.Const const ->
      (match const with
       | `Double real -> (Ir.LReal real, Ir.Real)
@@ -192,9 +197,9 @@ let rec java_to_expr vartable = function
       | `Class _
       | `String _ -> unimplemented ()
      )
-  | JBir.Var (value_type, var) -> java_to_var vartable (Some value_type) var
+  | JBir.Var (value_type, var) -> java_to_var vartable loc (Some value_type) var
   | JBir.Unop (op, expr) ->
-     let (ir_expr, t) = java_to_expr vartable expr in
+     let (ir_expr, t) = java_to_expr vartable loc expr in
      (match op with
       | JBir.Neg _ -> (Ir.Not $:: ir_expr, t)
       | JBir.ArrayLength
@@ -203,8 +208,8 @@ let rec java_to_expr vartable = function
       | JBir.Conv _ -> unimplemented ()
      )
   | JBir.Binop (op, expr_a, expr_b) ->
-     let (ir_expr_a, _) = java_to_expr vartable expr_a in
-     let (ir_expr_b, _) = java_to_expr vartable expr_b in
+     let (ir_expr_a, _) = java_to_expr vartable loc expr_a in
+     let (ir_expr_b, _) = java_to_expr vartable loc expr_b in
      let (ir_op, kind) = match op with
       | JBir.Add basic_type -> let t = java_to_kind basic_type in (Ir.Add t, t)
       | JBir.Sub basic_type -> let t = java_to_kind basic_type in (Ir.Sub t, t)
@@ -231,9 +236,9 @@ let rec java_to_expr vartable = function
   | JBir.StaticField _ -> unimplemented ()
 
 
-let java_to_condition vartable cond a b =
-  let (expr_a, t_a) = (java_to_expr vartable a) in
-  let (expr_b, t_b) = (java_to_expr vartable b) in
+let java_to_condition vartable loc cond a b =
+  let (expr_a, t_a) = (java_to_expr vartable loc a) in
+  let (expr_b, t_b) = (java_to_expr vartable loc b) in
   let op kind = match cond with
     | `Eq -> Ir.Eql kind
     | `Ge -> Ir.Ge kind
@@ -253,28 +258,28 @@ let java_to_condition vartable cond a b =
        |> failwith
 
 
-let instr_to_expr vartable = function
+let instr_to_expr vartable loc = function
   | JBir.AffectVar (var, expr) ->
      let is_redefined = collect_vars expr
                         |> List.exists ~f:(fun v -> JBir.var_equal v var)
      in
-     let (irvar, t_a) = java_to_var vartable None var in
-     let (irexpr, t_b) = java_to_expr vartable expr in
+     let (irvar, t_a) = java_to_var vartable loc None var in
+     let (irexpr, t_b) = java_to_expr vartable loc expr in
      let kind = if t_a = t_b
                 then t_a
                 else failwith "Mismatched types in condition."
      in
      if is_redefined
      then
-       let name = var_name var in
-       let name' = name ^ "'" in
+       let vname = var_name var in
+       let name = qid_var_name loc vname "0" in
+       let name' = qid_var_name loc vname "1" in
        let irvar' = rename_var (fun _ -> name') irvar in
-       let rename = Map.add String.Map.empty ~key:name ~data:name' in
-       Some ((Ir.Eql kind) $:: irvar' $:: irexpr, rename)
+       Some ((Ir.Eql kind) $:: irvar' $:: irexpr, [(name, name')])
      else
-       Some ((Ir.Eql kind) $:: irvar $:: irexpr, String.Map.empty)
+       Some ((Ir.Eql kind) $:: irvar $:: irexpr, [])
   | JBir.Ifd ((comp, a, b), i) ->
-     Some (java_to_condition vartable comp a b, String.Map.empty)
+     Some (java_to_condition vartable loc comp a b, [])
   | JBir.Nop -> None
   (* we're in a graph we can just delete this vertex *)
   | JBir.Goto i -> None

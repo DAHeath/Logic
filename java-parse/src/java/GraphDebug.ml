@@ -74,7 +74,8 @@ module ImplicationDot = struct
     then
       let rename =
         edge.rename
-        |> List.map ~f:(fun (a, b) -> Printf.sprintf "%s &rarr; %s" a b)
+        |> List.map ~f:(fun (a, b) -> Printf.sprintf "%s &rarr; %s"
+                           (QID.as_path a) (QID.as_path b))
         |> String.concat ~sep:", "
       in
       Printf.sprintf "%s\n{%s}" formula rename

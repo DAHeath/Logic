@@ -1,5 +1,6 @@
-open Core
+module QID = QualifiedIdentity
 
+open Core
 
 type name = string
 [@@deriving hash, compare, sexp]
@@ -18,7 +19,7 @@ type kind = Unit
 
 
 type var = Bound of int * kind
-         | Free of name * kind
+         | Free of QID.t * kind
 [@@deriving hash, compare, sexp]
 
 
@@ -86,7 +87,7 @@ let rec pprint_kind = function
 
 let pprint_var = function
   | Bound (i, k) -> Printf.sprintf "(%d):%s" i (pprint_kind k)
-  | Free (n, k) -> Printf.sprintf "%s:%s" n (pprint_kind k)
+  | Free (n, k) -> Printf.sprintf "%s:%s" (QID.as_path n) (pprint_kind k)
 
 let rec pprint_binop op a b parens =
   if parens
@@ -137,9 +138,17 @@ let rec jsonsexp_kind = function
   | Real -> jsonsexp "real" []
   | List k -> jsonsexp "list" [jsonsexp_kind k]
 
+let jsonsexp_qid (QID.QID l) =
+  let wrap_if_str s = try
+      int_of_string s |> string_of_int
+    with
+      _ -> wrapstr s
+  in
+  List.map l ~f:wrap_if_str |> jsonsexp "qid"
+
 let jsonsexp_var = function
   | Bound (i, k) -> jsonsexp "bound" [string_of_int i; jsonsexp_kind k]
-  | Free (n, k) -> jsonsexp "free" [wrapstr n; jsonsexp_kind k]
+  | Free (n, k) -> jsonsexp "free" [jsonsexp_qid n; jsonsexp_kind k]
 
 let rec jsonsexp_expr = function
   | Var var -> jsonsexp "var" [jsonsexp_var var]
