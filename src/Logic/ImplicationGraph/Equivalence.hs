@@ -32,12 +32,11 @@ instance (Pretty a, Pretty b) => Pretty (These a b) where
 solve :: MonadIO m
       => Integer
       -> Integer
-      -> [(Var, Var)]
-      -> [(Var, Var)]
+      -> Form
       -> ImplGr Integer
       -> ImplGr Integer
       -> m (Either Model (ProdGr Idx))
-solve e1 e2 st1 st2 g1 g2 = do
+solve e1 e2 quer g1 g2 = do
   let g' = G.mapIdxs firstInst wQuery
   runSolve (loop g') >>= \case
     Left (Failed m) -> return (Left m)
@@ -48,9 +47,7 @@ solve e1 e2 st1 st2 g1 g2 = do
 
     wQuery =
       equivProduct g1 g2
-      & G.addVert (end+1) (QueryV
-        (app2 Impl (manyAnd (map equate st1))
-                   (manyAnd (map equate st2))))
+      & G.addVert (end+1) (QueryV quer)
       & G.addEdge end (end+1) (This $ Edge (LBool True) M.empty)
 
     locMerge i j = j + i * (maxJ + 1)
@@ -63,6 +60,7 @@ solve e1 e2 st1 st2 g1 g2 = do
 -- check, and unwind further if required.
 step :: Solve (These Edge Edge) m => Idx -> ProdGr Idx -> m (ProdGr Idx)
 step end g = do
+  -- G.display "step" g
   int <- interp
   indM <- induc end int
   let isInd = M.keys $ M.filter id indM

@@ -30,7 +30,7 @@ instance Formulaic App where
 
 chcContext :: Chc -> Form
 chcContext (Rule _ ctx _) = ctx
-chcContext (Query _ ctx rhs) = ctx <> Not :@ rhs
+chcContext (Query _ ctx rhs) = ctx <> mkNot rhs
 
 chcLhs :: Chc -> [App]
 chcLhs (Rule lhs _ _) = lhs

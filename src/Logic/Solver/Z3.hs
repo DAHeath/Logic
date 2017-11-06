@@ -58,7 +58,7 @@ solveChc hcs = runEnvZ3 sc
 
     mkQuery q n =
       let theQuery = F.V $ Free n T.Bool in
-      F.app2 F.Impl (F.Not :@ F.toForm q) theQuery
+      F.app2 F.Impl (F.mkNot $ F.toForm q) theQuery
 
     useDuality = do
       pars <- mkParams
@@ -117,7 +117,7 @@ isValid f = runEnvZ3 $ do
   case sol of
     Unsat -> return True
     _     -> return False
-  where sc = (assert =<< formToAst (F.Not :@ f)) >> check
+  where sc = (assert =<< formToAst (F.mkNot f)) >> check
 
 -- | Is `f -> g` a valid formula?
 entails :: MonadIO m => Form -> Form -> m Bool
@@ -164,6 +164,22 @@ interpolate ftree = runEnvZ3 $ do
 
 simplify :: MonadIO m => Form -> m Form
 simplify f = runEnvZ3 $ astToForm =<< Z3.Monad.simplify =<< formToAst f
+
+superSimplify :: MonadIO m => Form -> m Form
+superSimplify f = runEnvZ3 $ astToForm =<< superSimp =<< formToAst f
+  where
+    superSimp :: MonadZ3 m => AST -> m AST
+    superSimp ast = do
+      tac  <- join $ andThenTactic <$> mkTactic "propagate-values" <*> skipTactic
+      tac' <- join $ andThenTactic <$> mkTactic "ctx-solver-simplify" <*> pure tac
+
+      g <- mkGoal True True False
+      goalAssert g ast
+      rs <- getApplyResultSubgoals =<< applyTactic tac' g
+      asts <- concat <$> mapM getGoalFormulas rs
+      case asts of
+        (f : _) -> return f
+        _ -> mkFalse
 
 -- | A monadic context for Z3 actions which caches the variables and functions
 -- which have already been created. It also resolve DeBrujin indices which Z3
@@ -289,10 +305,11 @@ formFromApp name args range
     e1 <- astToForm (args !! 1)
     e2 <- astToForm (args !! 2)
     return $ F.appMany (F.If (T.typeOf e1)) [c, e1, e2]
-  | name == "and"      = liftMany F.And
-  | name == "or"       = liftMany F.Or
+  | name == "and"      = F.manyAnd <$> traverse astToForm args
+  | name == "or"       = F.manyOr <$> traverse astToForm args
   | name == "+"        = liftMany (F.Add T.Int)
   | name == "*"        = liftMany (F.Mul T.Int)
+  | name == "mod"      = liftMany (F.Mod T.Int)
   | name == "distinct" = liftMany (F.Distinct T.Int)
   | name == "div"      = lift2 (F.Div T.Int)
   | name == "iff"      = lift2 F.Iff
@@ -302,7 +319,7 @@ formFromApp name args range
   | name == ">"        = lift2 (F.Gt T.Int)
   | name == ">="       = lift2 (F.Ge T.Int)
   | name == "="        = F.mkEql T.Int <$> astToForm (head args) <*> astToForm (args !! 1)
-  | name == "not"      = (:@) F.Not <$> astToForm (head args)
+  | name == "not"      = F.mkNot <$> astToForm (head args)
   | name == "-"        = if length args == 1
                          then F.app2 (F.Sub T.Int) (F.LInt 0) <$> astToForm (head args)
                          else lift2 (F.Sub T.Int)
@@ -323,7 +340,7 @@ formFromApp name args range
         liftMany f = F.appMany f <$> traverse astToForm args
 
 -- | Convert a Z3 model to the AST-based formula model.
-modelToModel :: ( MonadState Env z3
+modelToModel :: forall z3. ( MonadState Env z3
                 , MonadZ3 z3
                 , MonadReader DeBrujin z3) => Model -> z3 M.Model
 modelToModel m = M.Model <$> (M.union <$> functions <*> constants)

@@ -25,7 +25,9 @@ main = do
   sol <- solve 2 example
   case sol of
     Left m -> print (pretty m)
-    Right r -> G.display "test" r
+    Right r -> do
+      G.display "test" r
+      print . pretty . M.toList =<< collectAnswer r
 
 i, i', n :: Var
 i  = Free "i"  T.Int

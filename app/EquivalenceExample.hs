@@ -26,8 +26,8 @@ import           Logic.ImplicationGraph.Equivalence
 --   return r;
 -- }
 
-g1 :: ImplGr Integer
-g1 = G.fromLists
+cs0 :: ImplGr Integer
+cs0 = G.fromLists
   [ (0, emptyInst [])
   , (1, emptyInst [n, r])
   , (2, emptyInst [n, r, s, p, i])
@@ -60,8 +60,8 @@ g1 = G.fromLists
 --   return x;
 -- }
 
-g2 :: ImplGr Integer
-g2 = G.fromLists
+cs1 :: ImplGr Integer
+cs1 = G.fromLists
   [ (0, emptyInst [])
   , (1, emptyInst [m, x])
   , (2, emptyInst [m, x, c1, c2, j])
@@ -98,10 +98,35 @@ p' = Free "p'" T.Int
 i  = Free "i" T.Int
 i' = Free "i'" T.Int
 
+ad0 :: ImplGr Integer
+ad0 = G.fromLists
+  [ (0, emptyInst [])
+  , (1, emptyInst [n, r])
+  ]
+  [ (0, 1, Edge [form|r:Int = n:Int - 9 * ((n:Int - 1) / 9)|] M.empty) ]
+
+ad1 :: ImplGr Integer
+ad1 = G.fromLists
+  [ (0, emptyInst [])
+  , (1, emptyInst [m, x])
+  , (2, emptyInst [m, x])
+  ]
+  [ (0, 1, Edge [form|x:Int = m:Int|] M.empty)
+  , (1, 1, Edge [form|x:Int > 9 && x':Int = x:Int / 10 + x:Int % 10|] (M.fromList [(x, x')]))
+  , (1, 2, Edge [form|x:Int <= 9|] M.empty)
+  ]
+
+-- main :: IO ()
+-- main = do
+--   sol <- solve 3 3 [form|n:Int = m:Int -> x:Int = r:Int|] cs0 cs1
+--   case sol of
+--     Left e -> print (pretty e)
+--     Right m ->
+--       G.display "sol" m
 
 main :: IO ()
 main = do
-  sol <- solve 3 3 [(n, m)] [(x, r)] g1 g2
+  sol <- solve 1 2 [form|n:Int > 0 && n:Int = m:Int -> x:Int = r:Int|] ad0 ad1
   case sol of
     Left e -> print (pretty e)
     Right m ->

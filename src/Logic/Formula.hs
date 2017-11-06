@@ -154,6 +154,18 @@ appMany :: Form -> [Form] -> Form
 appMany = foldl (:@)
 
 mkAnd :: Form -> Form -> Form
+mkAnd x@(Ge t1 :@ x1 :@ y1) y@(Le t2 :@ x2 :@ y2)
+  | t1 == t2 && x1 == x2 && y1 == y2 = Eql t1 :@ x1 :@ y1
+  | otherwise                        = app2 And x y
+mkAnd x@(Le t1 :@ x1 :@ y1) y@(Ge t2 :@ x2 :@ y2)
+  | t1 == t2 && x1 == x2 && y1 == y2 = Eql t1 :@ x1 :@ y1
+  | otherwise                        = app2 And x y
+mkAnd x@(Le t1 :@ x1 :@ y1) y@(Le t2 :@ y2 :@ x2)
+  | t1 == t2 && x1 == x2 && y1 == y2 = Eql t1 :@ x1 :@ y1
+  | otherwise                        = app2 And x y
+mkAnd x@(Ge t1 :@ x1 :@ y1) y@(Ge t2 :@ y2 :@ x2)
+  | t1 == t2 && x1 == x2 && y1 == y2 = Eql t1 :@ x1 :@ y1
+  | otherwise                        = app2 And x y
 mkAnd x y
   | x == LBool True = y
   | y == LBool True = x
@@ -166,6 +178,12 @@ mkOr x y
   | y == LBool False = x
   | x == y           = x
   | otherwise        = app2 Or x y
+
+mkNot :: Form -> Form
+mkNot (And :@ x :@ y) = mkOr (mkNot x) (mkNot y)
+mkNot (Or :@ x :@ y) = mkAnd (mkNot x) (mkNot y)
+mkNot (Not :@ y) = y
+mkNot x = Not :@ x
 
 mkEql :: Type -> Form -> Form -> Form
 mkEql t x y

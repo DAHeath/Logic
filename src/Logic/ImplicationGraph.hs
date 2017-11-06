@@ -109,13 +109,13 @@ implGrChc g = concatMap idxRules (G.idxs g)
 interpolate :: MonadIO m => ImplGr Idx -> m (Either Model (ImplGr Idx))
 interpolate g = Z3.solveChc (implGrChc g) >>= \case
   Left m -> return (Left m)
-  Right m -> return (Right $ applyModel m g)
+  Right m -> Right <$> applyModel m g
 
 -- | Replace the fact at each vertex in the graph by the fact in the model.
-applyModel :: Model -> ImplGr Idx -> ImplGr Idx
-applyModel m = G.imapVerts applyVert
+applyModel :: MonadIO m => Model -> ImplGr Idx -> m (ImplGr Idx)
+applyModel m = G.itravVerts applyVert
   where
-    applyVert i = _InstanceV . _2 %~ (\f -> f `mkOr` M.findWithDefault (LBool False) i m')
+    applyVert i = _InstanceV . _2 %%~ (\f -> Z3.superSimplify $ f `mkOr` M.findWithDefault (LBool False) i m')
     m' = M.toList (getModel m)
       & map (traverseOf _1 %%~ interpretName . varName)
       & catMaybes & M.fromList
@@ -135,8 +135,8 @@ runSolve :: Monad m => ExceptT e (StateT (Map k a) m) a1 -> m (Either e a1)
 runSolve ac = evalStateT (runExceptT ac) M.empty
 
 -- | Gather all facts known about each instance of the same index together by disjunction.
-collectAnswer :: ImplGr Idx -> Map Integer Form
-collectAnswer g = execState (G.itravVerts (\i v -> case v of
+collectAnswer :: MonadIO m => ImplGr Idx -> m (Map Integer Form)
+collectAnswer g = traverse Z3.superSimplify $ execState (G.itravVerts (\i v -> case v of
   InstanceV _ f -> modify (M.insertWith mkOr (i ^. idxIden) f)
   _ -> return ()) g) M.empty
 
@@ -159,10 +159,23 @@ unwindAll bes ind end g = do
   where
     compress new g' =
       let compressed = g'
-            & G.filterIdxs (\i -> i `notElem` ind || i `elem` G.idxs new)
+            & flip (foldr replaceInd) ind
             & G.ifilterEdges (\i1 i2 _ -> (i1, i2) `notElem` map fst (G.backEdges g'))
             & G.reaches end
       in G.filterIdxs (`elem` G.idxs compressed) g'
+
+    replaceInd i g =
+      let es = g ^@.. G.iedgesFrom i
+          mv = g ^? ix i . _InstanceV
+      in case mv of
+           Nothing -> G.delIdx i g
+           Just (_, f) ->
+             if f == LBool True || f == LBool False
+             then G.delIdx i g
+             else
+               g & G.delIdx i
+                 & G.addVert i (InstanceV [] f)
+                 & flip (foldr (uncurry (G.addEdge i))) es
 
 -- | Find a fresh instance counter for the given index.
 updateInstance :: MonadState SolveState m => Idx -> m Idx
