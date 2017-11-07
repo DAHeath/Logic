@@ -60,6 +60,7 @@ solve e1 e2 quer g1 g2 = do
 -- check, and unwind further if required.
 step :: Solve (These Edge Edge) m => Idx -> ProdGr Idx -> m (ProdGr Idx)
 step end g = do
+  G.display "step" g
   int <- interp
   indM <- induc end int
   let isInd = M.keys $ M.filter id indM

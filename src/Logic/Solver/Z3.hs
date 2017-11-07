@@ -306,10 +306,10 @@ formFromApp name args range
     e1 <- astToForm (args !! 1)
     e2 <- astToForm (args !! 2)
     return $ F.appMany (F.If (T.typeOf e1)) [c, e1, e2]
-  | name == "and"      = F.manyAnd <$> traverse astToForm args
-  | name == "or"       = F.manyOr <$> traverse astToForm args
-  | name == "+"        = liftMany (F.Add T.Int)
-  | name == "*"        = liftMany (F.Mul T.Int)
+  | name == "and"      = F.manyAnd  <$> traverse astToForm args
+  | name == "or"       = F.manyOr   <$> traverse astToForm args
+  | name == "+"        = F.manyIAdd <$> traverse astToForm args
+  | name == "*"        = F.manyIMul <$> traverse astToForm args
   | name == "mod"      = liftMany (F.Mod T.Int)
   | name == "distinct" = liftMany (F.Distinct T.Int)
   | name == "div"      = lift2 (F.Div T.Int)

@@ -33,6 +33,7 @@ solve end g =
 -- check, and unwind further if required.
 step :: Solve Edge m => Int -> Idx -> ImplGr Idx -> m (ImplGr Idx)
 step c end g = interpolate g >>= either (throwError . Failed) (\interp -> do
+  G.display "step" interp
   indM <- inductive end interp
   let isInd = M.keys $ M.filter id indM
   when (M.lookup end indM == Just True) $ throwError $ Complete interp

@@ -92,16 +92,15 @@ implGrChc g = concatMap idxRules (G.idxs g)
     vertRule i f rhs = \case
       InstanceV [] _   -> Rule [] f rhs
       InstanceV vs _   -> Rule [mkApp ('r':written # i) vs] f rhs
-      InductiveV vs f' -> Rule [] (mkAnd f' f) rhs
+      InductiveV vs f' -> Rule [] (f' `mkAnd` f) rhs
       QueryV _         -> undefined
-
 
     idxRules i = maybe [] (\case
       InstanceV _ _ ->
         mapMaybe (\(i', Edge f mvs) -> do
           rhs <- subst mvs <$> idxApp i
           idxRule i' f rhs) (relevantIncoming i)
-      InductiveV{} -> []
+      InductiveV vs f' -> []
       QueryV f -> queries i f) (g ^? ix i)
 
     queries i f =
@@ -116,10 +115,13 @@ implGrChc g = concatMap idxRules (G.idxs g)
 -- | Interpolate the facts in the graph using CHC solving to label the vertices
 -- with fresh definitions.
 interpolate :: MonadIO m => ImplGr Idx -> m (Either Model (ImplGr Idx))
-interpolate g =
+interpolate g = do
+  liftIO $ print (pretty (implGrChc g))
   Z3.solveChc (implGrChc g) >>= \case
     Left m -> return (Left m)
-    Right m -> Right <$> applyModel m g
+    Right m -> do
+      liftIO $ print m
+      Right <$> applyModel m g
 
 -- | Augment the fact at each vertex in the graph by the fact in the model.
 applyModel :: MonadIO m => Model -> ImplGr Idx -> m (ImplGr Idx)
@@ -172,29 +174,13 @@ unwindAll bes ind end g = do
     else do (i, g'') <- unwind i1 i2 e g'
             return (i:is, g'')) ([], g) bes
   let g'' = G.ifilterEdges (\i1 i2 _ -> (i1, i2) `notElem` map fst bes) g'
-  return (compress g'')
+  return (reachEndWithoutBackedge g'')
   where
-    compress g' =
+    reachEndWithoutBackedge g' =
       let compressed = g'
-            -- & flip (foldr replaceInd) ind
             & G.ifilterEdges (\i1 i2 _ -> (i1, i2) `notElem` map fst (G.backEdges g'))
             & G.reaches end
-      in
-      -- flip (foldr replaceInd) ind $
-        G.filterIdxs (`elem` G.idxs compressed) g'
-
-    replaceInd i g =
-      let es = g ^@.. G.iedgesFrom i
-          mv = g ^? ix i . _InstanceV
-      in case mv of
-           Nothing -> g
-           Just (vs, f) ->
-             if f == LBool False
-             then g
-             else
-               g & G.delIdx i
-                 & G.addVert i (InductiveV vs f)
-                 & flip (foldr (uncurry (G.addEdge i))) es
+      in G.filterIdxs (`elem` G.idxs compressed) g'
 
 -- | Find a fresh instance counter for the given index.
 updateInstance :: MonadState SolveState m => Idx -> m Idx
