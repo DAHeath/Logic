@@ -13,7 +13,7 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  ghc-options: -Wall
+  ghc-options: -Wall, -O2
   exposed-modules:     Logic.Formula
                      , Logic.Formula.Parser
                      , Logic.Var

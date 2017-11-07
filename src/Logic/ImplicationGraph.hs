@@ -27,6 +27,7 @@ import           Text.Read (readMaybe)
 
 data Vert
   = InstanceV [Var] Form
+  | InductiveV [Var] Form
   | QueryV Form
   deriving (Show, Read, Eq, Ord, Data)
 makePrisms ''Vert
@@ -46,6 +47,7 @@ instance Pretty Edge where
 instance Pretty Vert where
   pretty = \case
     InstanceV vs f -> pretty vs <+> pretty f
+    InductiveV vs f -> pretty "IND" <+> pretty vs <+> pretty f
     QueryV f -> pretty f
 
 data Idx = Idx { _idxIden :: Integer, _idxInst :: Integer }
@@ -86,13 +88,20 @@ implGrChc g = concatMap idxRules (G.idxs g)
     instApp _ ([], _) = Nothing
     instApp i (vs, _) = Just $ mkApp ('r' : written # i) vs
 
+    idxRule i f rhs = vertRule i f rhs <$> g ^? ix i
+    vertRule i f rhs = \case
+      InstanceV [] _   -> Rule [] f rhs
+      InstanceV vs _   -> Rule [mkApp ('r':written # i) vs] f rhs
+      InductiveV vs f' -> Rule [] (mkAnd f' f) rhs
+      QueryV _         -> undefined
+
+
     idxRules i = maybe [] (\case
       InstanceV _ _ ->
         mapMaybe (\(i', Edge f mvs) -> do
           rhs <- subst mvs <$> idxApp i
-          case idxApp i' of
-            Nothing -> Just (Rule [] f rhs)
-            Just lhs -> Just (Rule [lhs] f rhs)) (relevantIncoming i)
+          idxRule i' f rhs) (relevantIncoming i)
+      InductiveV{} -> []
       QueryV f -> queries i f) (g ^? ix i)
 
     queries i f =
@@ -107,15 +116,21 @@ implGrChc g = concatMap idxRules (G.idxs g)
 -- | Interpolate the facts in the graph using CHC solving to label the vertices
 -- with fresh definitions.
 interpolate :: MonadIO m => ImplGr Idx -> m (Either Model (ImplGr Idx))
-interpolate g = Z3.solveChc (implGrChc g) >>= \case
-  Left m -> return (Left m)
-  Right m -> Right <$> applyModel m g
+interpolate g =
+  Z3.solveChc (implGrChc g) >>= \case
+    Left m -> return (Left m)
+    Right m -> Right <$> applyModel m g
 
--- | Replace the fact at each vertex in the graph by the fact in the model.
+-- | Augment the fact at each vertex in the graph by the fact in the model.
 applyModel :: MonadIO m => Model -> ImplGr Idx -> m (ImplGr Idx)
 applyModel m = G.itravVerts applyVert
   where
-    applyVert i = _InstanceV . _2 %%~ (\f -> Z3.superSimplify $ f `mkOr` M.findWithDefault (LBool False) i m')
+    applyVert i = _InstanceV %%~ applyInst i
+    applyInst i (vs, f) = do
+      let found = M.findWithDefault (LBool False) i m'
+      f' <- Z3.superSimplify (instantiate vs found)
+      return (vs, f')
+
     m' = M.toList (getModel m)
       & map (traverseOf _1 %%~ interpretName . varName)
       & catMaybes & M.fromList
@@ -137,7 +152,9 @@ runSolve ac = evalStateT (runExceptT ac) M.empty
 -- | Gather all facts known about each instance of the same index together by disjunction.
 collectAnswer :: MonadIO m => ImplGr Idx -> m (Map Integer Form)
 collectAnswer g = traverse Z3.superSimplify $ execState (G.itravVerts (\i v -> case v of
-  InstanceV _ f -> modify (M.insertWith mkOr (i ^. idxIden) f)
+  InstanceV _ f ->
+    if f == LBool True then return ()
+    else modify (M.insertWith mkOr (i ^. idxIden) f)
   _ -> return ()) g) M.empty
 
 -- | Unwind the graph on the given backedge and update all instances in the unwinding.
@@ -155,26 +172,28 @@ unwindAll bes ind end g = do
     else do (i, g'') <- unwind i1 i2 e g'
             return (i:is, g'')) ([], g) bes
   let g'' = G.ifilterEdges (\i1 i2 _ -> (i1, i2) `notElem` map fst bes) g'
-  return (compress (mconcat $ map (`G.reached` g'') is) g'')
+  return (compress g'')
   where
-    compress new g' =
+    compress g' =
       let compressed = g'
-            & flip (foldr replaceInd) ind
+            -- & flip (foldr replaceInd) ind
             & G.ifilterEdges (\i1 i2 _ -> (i1, i2) `notElem` map fst (G.backEdges g'))
             & G.reaches end
-      in G.filterIdxs (`elem` G.idxs compressed) g'
+      in
+      -- flip (foldr replaceInd) ind $
+        G.filterIdxs (`elem` G.idxs compressed) g'
 
     replaceInd i g =
       let es = g ^@.. G.iedgesFrom i
           mv = g ^? ix i . _InstanceV
       in case mv of
-           Nothing -> G.delIdx i g
-           Just (_, f) ->
-             if f == LBool True || f == LBool False
-             then G.delIdx i g
+           Nothing -> g
+           Just (vs, f) ->
+             if f == LBool False
+             then g
              else
                g & G.delIdx i
-                 & G.addVert i (InstanceV [] f)
+                 & G.addVert i (InductiveV vs f)
                  & flip (foldr (uncurry (G.addEdge i))) es
 
 -- | Find a fresh instance counter for the given index.

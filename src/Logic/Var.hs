@@ -73,6 +73,8 @@ abstract vs f =
 
 -- | Replace bound variables in the structure by those in the list.
 instantiate :: Data a => [Var] -> a -> a
-instantiate vs f =
-  let m = foldl (\(n, m') v -> (n + 1, M.insert (Bound n (T.typeOf v)) v m')) (0, M.empty) vs
-  in subst (snd m) f
+instantiate vs =
+  let ts = map T.typeOf vs
+      bs = zipWith Bound [0..] ts
+      m = M.fromList (zip bs vs)
+  in subst m

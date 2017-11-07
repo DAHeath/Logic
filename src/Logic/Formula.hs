@@ -167,21 +167,23 @@ mkAnd x@(Ge t1 :@ x1 :@ y1) y@(Ge t2 :@ y2 :@ x2)
   | t1 == t2 && x1 == x2 && y1 == y2 = Eql t1 :@ x1 :@ y1
   | otherwise                        = app2 And x y
 mkAnd x y
-  | x == LBool True = y
-  | y == LBool True = x
-  | x == y          = x
-  | otherwise       = app2 And x y
+  | x == LBool False = LBool False
+  | y == LBool False = LBool False
+  | x == LBool True  = y
+  | y == LBool True  = x
+  | x == y           = x
+  | otherwise        = app2 And x y
 
 mkOr :: Form -> Form -> Form
 mkOr x y
+  | x == LBool True  = LBool True
+  | y == LBool True  = LBool True
   | x == LBool False = y
   | y == LBool False = x
   | x == y           = x
   | otherwise        = app2 Or x y
 
 mkNot :: Form -> Form
-mkNot (And :@ x :@ y) = mkOr (mkNot x) (mkNot y)
-mkNot (Or :@ x :@ y) = mkAnd (mkNot x) (mkNot y)
 mkNot (Not :@ y) = y
 mkNot x = Not :@ x
 

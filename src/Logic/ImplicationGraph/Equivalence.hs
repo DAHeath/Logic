@@ -60,7 +60,6 @@ solve e1 e2 quer g1 g2 = do
 -- check, and unwind further if required.
 step :: Solve (These Edge Edge) m => Idx -> ProdGr Idx -> m (ProdGr Idx)
 step end g = do
-  -- G.display "step" g
   int <- interp
   indM <- induc end int
   let isInd = M.keys $ M.filter id indM
@@ -93,7 +92,7 @@ induc = inductive' predInd
       let (ls, rs) = preds g i
       lInd <- allInd predInd g i ls
       rInd <- allInd predInd g i rs
-      return [lInd && not (null ls), rInd && not (null rs)]
+      return [lInd && not (null ls), rInd && not (null rs), null ls && null rs]
 
     preds g i = mconcat $ map (\(i', e) ->
       fromThese [] [] $ bimap (const [i']) (const [i']) e) $ g ^@.. G.iedgesTo i

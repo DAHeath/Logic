@@ -36,6 +36,7 @@ computeInd pc g i =
     psInd <- pc g i
     case v of
       QueryV _ -> return (or psInd)
+      InductiveV{}  -> return True
       InstanceV _ f ->
         or <$> sequence ([ return $ f == LBool True
                          , anyM (`Z3.entails` f) (descendantInstanceVs g i)

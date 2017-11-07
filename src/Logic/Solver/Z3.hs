@@ -48,7 +48,6 @@ solveChc hcs = runEnvZ3 sc
         rids' <- traverse mkStringSymbol rids
         zipWithM_ fixedpointAddRule forms rids'
 
-        -- let quers = map (`Free` T.Bool) qids
         let quers = [Free "q" T.Bool]
         quers' <- traverse funcToDecl quers
         res <- fixedpointQueryRelations quers'
@@ -179,7 +178,7 @@ superSimplify f = runEnvZ3 $ astToForm =<< superSimp =<< formToAst f
       asts <- concat <$> mapM getGoalFormulas rs
       case asts of
         (f : _) -> return f
-        _ -> mkFalse
+        _ -> return ast
 
 -- | A monadic context for Z3 actions which caches the variables and functions
 -- which have already been created. It also resolve DeBrujin indices which Z3
@@ -296,10 +295,12 @@ funcToDecl r = do
 
 formFromApp :: (MonadReader DeBrujin z3, MonadZ3 z3) => String -> [AST] -> Sort -> z3 Form
 formFromApp name args range
-  | name == "true"     = return $ F.LBool True
-  | name == "false"    = return $ F.LBool False
+  | name == "true"  = return $ F.LBool True
+  | name == "false" = return $ F.LBool False
   -- The 'app' is just a variable
-  | null args          = F.V <$> (Free name <$> sortToType range)
+  | null args = do
+    typ <- sortToType range
+    return $ F.V $ varForName name typ
   | name == "ite" || name == "if" = do
     c <- astToForm (head args)
     e1 <- astToForm (args !! 1)
@@ -331,7 +332,7 @@ formFromApp name args range
     args' <- traverse astToForm args
     domain <- traverse getType args
     range' <- sortToType range
-    let f = Free name (T.curryType domain range')
+    let f = varForName name (T.curryType domain range')
     return $ F.appMany (F.V f) args'
   where lift2 f = F.app2 f <$> astToForm (head args) <*> astToForm (args !! 1)
         lift3 f = F.app3 f <$> astToForm (head args)
@@ -363,7 +364,7 @@ modelToModel m = M.Model <$> (M.union <$> functions <*> constants)
       name <- declName fd
       domain <- traverse sortToType =<< getDomain fd
       range  <- sortToType =<< getRange fd
-      return $ Free name (T.curryType domain range)
+      return $ varForName name (T.curryType domain range)
 
 -- | Convert the Z3 internal representation of a formula to the AST representation.
 astToForm :: (MonadReader DeBrujin z3, MonadZ3 z3) => AST -> z3 Form
@@ -392,7 +393,7 @@ astToForm arg = do
          n <- lookupDeBrujin idx
          return $ F.V $ case n of
            Nothing -> Bound idx typ
-           Just n' -> Free n' typ
+           Just n' -> varForName n' typ
 
     Z3_QUANTIFIER_AST -> do liftIO $ putStrLn "quantifier!"
                             undefined
@@ -411,6 +412,11 @@ astToForm arg = do
       return $ if i >= length listing
                then Nothing
                else Just $ listing !! i
+
+varForName :: Name -> Type -> Var
+varForName n t = case n of
+  '!' : n' -> Bound (read n') t
+  n' -> Free n' t
 
 typeToSort :: MonadZ3 z3 => Type -> z3 Sort
 typeToSort = \case

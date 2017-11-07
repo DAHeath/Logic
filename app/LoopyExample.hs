@@ -37,20 +37,20 @@ example = G.fromLists
   [ (0, emptyInst [])
   , (1, emptyInst [i, c])
   , (2, emptyInst [i, j, c])
-  , (3, QueryV [form|c:Int = 9|])
+  , (3, QueryV [form|c:Int = 1|])
   ]
 
   [ (0, 1, Edge [form|i:Int = 0 && c:Int = 0|] M.empty)
   , (1, 2,
-    Edge [form|i:Int < 3
+    Edge [form|i:Int < 1
             && j:Int = 0
             && i':Int = i:Int+1|] (M.fromList [(i, i')]))
-  , (1, 3, Edge [form|i:Int >= 3|] M.empty)
+  , (1, 3, Edge [form|i:Int >= 1|] M.empty)
   , (2, 2,
-    Edge [form|j:Int < 3
+    Edge [form|j:Int < 1
             && c':Int = c:Int+1
             && j':Int = j:Int+1 |] (M.fromList [(c, c'), (j, j')]))
-  , (2, 1, Edge [form|j:Int >= 3|] M.empty)
+  , (2, 1, Edge [form|j:Int >= 1|] M.empty)
   ]
 
 -- steppy :: IO ()
