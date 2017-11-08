@@ -178,11 +178,11 @@ let java_to_var
     )
   in
   let name = qid_var_name loc name "0" in
-  (Ir.Var (Ir.Free (name, kind)), kind)
+  (Ir.Free (name, kind), kind)
 
 
 let rename_var f = function
-  | Ir.Var (Ir.Free (name, t)) -> Ir.Var (Ir.Free (f name, t))
+  | Ir.Free (name, t) -> Ir.Free (f name, t)
   | other -> other
 
 
@@ -197,7 +197,9 @@ let rec java_to_expr vartable loc = function
       | `Class _
       | `String _ -> unimplemented ()
      )
-  | JBir.Var (value_type, var) -> java_to_var vartable loc (Some value_type) var
+  | JBir.Var (value_type, var) ->
+    let (var, kind) = java_to_var vartable loc (Some value_type) var in
+    (Ir.Var var, kind)
   | JBir.Unop (op, expr) ->
      let (ir_expr, t) = java_to_expr vartable loc expr in
      (match op with
@@ -271,13 +273,11 @@ let instr_to_expr vartable loc = function
      in
      if is_redefined
      then
-       let vname = var_name var in
-       let name = qid_var_name loc vname "0" in
-       let name' = qid_var_name loc vname "1" in
+       let name' = qid_var_name loc (var_name var) "1" in
        let irvar' = rename_var (fun _ -> name') irvar in
-       Some ((Ir.Eql kind) $:: irvar' $:: irexpr, [(name, name')])
+       Some ((Ir.Eql kind) $:: (Ir.Var irvar') $:: irexpr, [(irvar, irvar')])
      else
-       Some ((Ir.Eql kind) $:: irvar $:: irexpr, [])
+       Some ((Ir.Eql kind) $:: (Ir.Var irvar) $:: irexpr, [])
   | JBir.Ifd ((comp, a, b), i) ->
      Some (java_to_condition vartable loc comp a b, [])
   | JBir.Nop -> None

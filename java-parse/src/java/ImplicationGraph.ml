@@ -6,7 +6,7 @@ module Env = Sawja_pack.Live_bir.Env
 module Edge = struct
   type t = {
       formula: Ir.expr;
-      rename: (QID.t * QID.t) list;
+      rename: (Ir.var * Ir.var) list;
     }
   [@@deriving hash, compare]
 
@@ -75,7 +75,7 @@ let serialize (graph: t) =
   let vlist = String.concat vertices ~sep:"," |> Printf.sprintf "{%s}" in
   let rename_str r =
     List.map ~f:(fun (a, b) -> Printf.sprintf "[%s,%s]"
-                    (Ir.jsonsexp_qid a) (Ir.jsonsexp_qid b)) r
+                    (Ir.jsonsexp_var a) (Ir.jsonsexp_var b)) r
     |> String.concat ~sep:","
     |> Printf.sprintf "[%s]"
   in

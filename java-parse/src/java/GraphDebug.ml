@@ -70,12 +70,16 @@ module ImplicationDot = struct
       |> String.substr_replace_all ~pattern:"||" ~with_:"&or;"
       |> String.substr_replace_all ~pattern:"&&" ~with_:"&and;"
     in
+    let var_disp = function
+      | Ir.Free (qid, _) -> QID.as_path qid
+      | v -> Ir.sexp_of_var v |> Sexp.to_string
+    in
     if List.hd edge.rename |> Option.is_some
     then
       let rename =
         edge.rename
         |> List.map ~f:(fun (a, b) -> Printf.sprintf "%s &rarr; %s"
-                           (QID.as_path a) (QID.as_path b))
+                           (var_disp a) (var_disp b))
         |> String.concat ~sep:", "
       in
       Printf.sprintf "%s\n{%s}" formula rename
