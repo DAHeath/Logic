@@ -28,12 +28,20 @@ parseGraphFromJSON :: BS.ByteString -> ImplGr String
 parseGraphFromJSON str = maybe G.empty getParsedGraph (decode str)
 
 newtype ParsedGraph = ParsedGraph { getParsedGraph :: ImplGr String }
+type Vertex = Text
 
+-- | Maps an edge (defined by a start and an end index) to its label.
 data EdgeHolder = EdgeHolder
-  { _ehStart :: Text
-  , _ehEnd :: Text
+  { _ehStart :: Vertex
+  , _ehEnd :: Vertex
   , _ehEdge :: Edge
   } deriving (Show, Data)
+
+-- | A map from each vertex to its neighbors. (Defines the graph topology.)
+type VertexMap = Map Vertex [Vertex]
+
+-- | Represents a variable renaming.
+data VarRenaming = VarRenaming Var Var
 
 buildGraph :: [EdgeHolder] -> VertexMap -> ImplGr String
 buildGraph edgeHolders verticesMap =
@@ -52,8 +60,6 @@ instance FromJSON ParsedGraph where
                                 <*> (parseJSON =<< o .: "vertices"))
   parseJSON _ = mzero
 
-type VertexMap = Map Text [Text]
-
 instance Pretty EdgeHolder where
   pretty (EdgeHolder t t' e) = pretty t <+> pretty t' <+> pretty e
 
@@ -65,32 +71,6 @@ instance FromJSON EdgeHolder where
                   <*> (o .: "end")
                   <*> (Edge form <$> (mapVarRenamings form <$> parseJSON renamings))
   parseJSON _ = mzero
-
--- | A variable renaming is a substitution of one free variable name to another
--- while preserving type.
-data VarRenaming = VarRenaming Text Text
-
-instance FromJSON VarRenaming where
-  parseJSON (Object o) =
-    let (a, b) = head (HML.toList o) in
-    VarRenaming a <$> parseJSON b
-  parseJSON _ = mzero
-
--- | Construct a mapping of variable names to the variables themselves for every
--- variable in the data structure.
-varNameMap :: Data a => a -> Map String Var
-varNameMap f = M.fromList $ map (\(n, t) -> (n, Free n t)) (f ^.. vars . _Free)
-
--- | Given a list of variable renamings for a formula, construct a variable
--- substitution map.
-mapVarRenamings :: Form -> [VarRenaming] -> Map Var Var
-mapVarRenamings form =
-  let formVars = varNameMap form
-  in M.fromList . mapMaybe
-      (\(VarRenaming a b) -> do
-        va <- M.lookup (unpack a) formVars
-        vb <- M.lookup (unpack b) formVars
-        return (va, vb))
 
 instance FromJSON Form where
   parseJSON (Object o) = case Prelude.head (HML.toList o) of
@@ -129,9 +109,23 @@ instance FromJSON Form where
 instance FromJSON Var where
   parseJSON (Object o) =
     case Prelude.head (HML.toList o) of
-      ("free", Data.Aeson.Array val) ->
-        Free <$> parseJSON (V.head val) <*> parseJSON (V.last val)
-      _ -> return $ Free "" Logic.Type.Unit
+      ("free", Data.Aeson.Array val) -> do
+          qid <- parseJSON $ V.head val
+          kind <- parseJSON $ V.last val
+          return $ (uncurry Free) (unpackQID qid) kind
+      _ -> mzero
+  parseJSON _ = mzero
+
+data QID = QID [String] Int
+unpackQID (QID path temporality) = (path, temporality)
+
+instance FromJSON QID where
+  parseJSON (Object o) =
+    case (HML.toList o) of
+      ("qid", Data.Aeson.Array val) : _ ->
+        let path = mapM parseJSON ((V.toList . V.init) val) in
+        QID <$> path <*> parseJSON (V.last val)
+      _ -> mzero
   parseJSON _ = mzero
 
 instance FromJSON Type where

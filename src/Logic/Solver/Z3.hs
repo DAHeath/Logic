@@ -48,7 +48,7 @@ solveChc hcs = runEnvZ3 sc
         rids' <- traverse mkStringSymbol rids
         zipWithM_ fixedpointAddRule forms rids'
 
-        let quers = [Free "q" T.Bool]
+        let quers = [Free ["q"] 0 T.Bool]
         quers' <- traverse funcToDecl quers
         res <- fixedpointQueryRelations quers'
         case res of
@@ -56,7 +56,7 @@ solveChc hcs = runEnvZ3 sc
           _     -> Left <$> (modelToModel =<< fixedpointGetRefutation)
 
     mkQuery q n =
-      let theQuery = F.V $ Free n T.Bool in
+      let theQuery = F.V $ Free [n] 0 T.Bool in
       F.app2 F.Impl (F.mkNot $ F.toForm q) theQuery
 
     useDuality = do
@@ -416,7 +416,7 @@ astToForm arg = do
 varForName :: Name -> Type -> Var
 varForName n t = case n of
   '!' : n' -> Bound (read n') t
-  n' -> Free n' t
+  n' -> Free [n'] 0 t
 
 typeToSort :: MonadZ3 z3 => Type -> z3 Sort
 typeToSort = \case
