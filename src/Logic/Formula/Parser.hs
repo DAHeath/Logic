@@ -64,7 +64,7 @@ atom = try app <|> nonapp
               t <- typ
               args <- many1 nonapp
               let ts = map T.typeOf args
-              return $ appMany (V $ Free n (T.curryType ts t)) args)
+              return $ appMany (V $ Free [n] 0 (T.curryType ts t)) args)
 
 bool :: CharParser st Form
 bool = const (LBool True)  <$> res "true"
@@ -88,7 +88,7 @@ var = do
   i <- ident
   op ":"
   t <- typ
-  return $ Free i t
+  return $ Free [i] 0 t
 
 impop, compareop, mulop, addop :: CharParser st (Form -> Form -> Form)
 
@@ -134,7 +134,7 @@ parseChc = many parseChc'
     app = braces $ do n <- ident
                       args <- many var
                       let ts = map T.typeOf args
-                      return $ App (Free n (T.curryType ts T.Bool)) args
+                      return $ App (Free [n] 0 (T.curryType ts T.Bool)) args
 
 promote :: Monad m => CharParser () a -> (String, Int, Int) -> String -> m a
 promote par (file, line, col) s =
@@ -180,7 +180,7 @@ quoteFormExp par s = do pos <- thPos
                         dataToExpQ (const Nothing `extQ` metaExp) ex
 
 metaExp :: Form -> Maybe TH.ExpQ
-metaExp (V (Free x _))
+metaExp (V (Free (x:_) _ _))
   | head x == '$' = Just [| $(TH.varE (TH.mkName (tail x))) |]
   | head x == '@' = Just [| V $ $(TH.varE (TH.mkName (tail x))) |]
 metaExp _ = Nothing

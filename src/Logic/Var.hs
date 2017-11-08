@@ -10,6 +10,7 @@ import qualified Data.Map as M
 import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Text.Prettyprint.Doc
+import           Data.List (intercalate)
 
 import           Logic.Type (Type, Typed)
 import qualified Logic.Type as T
@@ -18,13 +19,13 @@ type Name = String
 
 data Var
   = Bound Int Type
-  | Free Name Type
+  | Free [String] Int Type
   deriving (Show, Read, Eq, Ord, Data)
 makePrisms ''Var
 
 instance Typed Var
   where typeOf (Bound _ t) = t
-        typeOf (Free _ t) = t
+        typeOf (Free _ _ t) = t
 
 instance Pretty Var
   where pretty = pretty . varName
@@ -33,7 +34,10 @@ instance Pretty Var
 -- representation of the index. Otherwise, it is just the variable name.
 varName :: Var -> Name
 varName (Bound i _) = "!" ++ show i
-varName (Free n _) = n
+varName (Free ns i _) = path ns ++ "/" ++ (show i)
+  where
+    path :: [String] -> Name
+    path ns = intercalate "/" ns
 
 -- | A traversal which targets all of the variables in a given expression.
 vars :: Data a => Traversal' a Var
@@ -53,12 +57,12 @@ varSet x = S.fromList (x ^.. vars)
 -- number which is as close to 0 as possible.
 fresh :: Set Var -> Var -> Var
 fresh s = \case
-  Free n t -> tryFree n 0 t
+  Free ns i t -> tryFree ns (i + 1) t
   Bound n t -> tryBound n t
   where
-    tryFree :: Name -> Int -> Type -> Var
-    tryFree n c t = let v' = Free (n ++ show c) t
-                    in if v' `elem` s then tryFree n (c+1) t
+    tryFree :: [String] -> Int -> Type -> Var
+    tryFree ns c t = let v' = Free ns c t
+                    in if v' `elem` s then tryFree ns (c + 1) t
                        else v'
     tryBound :: Int -> Type -> Var
     tryBound n t = let v' = Bound n t
