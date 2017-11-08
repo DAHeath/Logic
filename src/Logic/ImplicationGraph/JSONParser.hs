@@ -38,38 +38,54 @@ data EdgeHolder = EdgeHolder
   } deriving (Show, Data)
 
 -- | A map from each vertex to its neighbors. (Defines the graph topology.)
-type VertexMap = Map Vertex [Vertex]
+type VertexMap = Map Vertex [Var]
 
 -- | Represents a variable renaming.
 data VarRenaming = VarRenaming Var Var
 
+renameMap :: [VarRenaming] -> Map Var Var
+renameMap renames =
+  M.fromList $ map tupelize renames
+  where tupelize (VarRenaming a b) = (a, b)
+
 buildGraph :: [EdgeHolder] -> VertexMap -> ImplGr String
 buildGraph edgeHolders verticesMap =
-  let vertices = map (uncurry vertex) (M.toList verticesMap)
-      edges = map (\(EdgeHolder v1 v2 edge) -> (unpack v1, unpack v2, edge)) edgeHolders
-  in G.fromLists vertices edges
+  let
+    vertices = map vertex $ M.toList verticesMap
+    edges = map edge edgeHolders
+  in
+    G.fromLists vertices edges
   where
-    varsMap = varNameMap edgeHolders
-    vertex idV varsList =
-      ( unpack idV
-      , InstanceV (mapMaybe (\v -> M.lookup (unpack v) varsMap) varsList) (LBool False))
+    vertex (idV, varsList) = (unpack idV, InstanceV varsList (LBool False))
+    edge (EdgeHolder v1 v2 e) = (unpack v1, unpack v2, e)
 
 instance FromJSON ParsedGraph where
-  parseJSON (Object o) =
-    ParsedGraph <$> (buildGraph <$> (parseJSON =<< o .: "edges")
-                                <*> (parseJSON =<< o .: "vertices"))
+  parseJSON (Object o) = do
+    edges <- o .: "edges" >>= parseJSON
+    vertices <- o .: "vertices" >>= parseJSON
+    return $ ParsedGraph $ buildGraph edges vertices
   parseJSON _ = mzero
 
 instance Pretty EdgeHolder where
   pretty (EdgeHolder t t' e) = pretty t <+> pretty t' <+> pretty e
 
 instance FromJSON EdgeHolder where
-  parseJSON (Object o) =
-    do form <- parseJSON =<< o .: "formula"
-       renamings <- o .: "rename"
-       EdgeHolder <$> (o .: "start")
-                  <*> (o .: "end")
-                  <*> (Edge form <$> (mapVarRenamings form <$> parseJSON renamings))
+  parseJSON (Object o) = do
+    start <- o .: "start"
+    end <- o .: "end"
+    formula <- o .: "formula" >>= parseJSON
+    renamings <- o .: "rename" >>= parseJSON
+    return $ EdgeHolder start end $ Edge formula $ renameMap renamings
+  parseJSON _ = mzero
+
+instance FromJSON VarRenaming where
+  parseJSON (Data.Aeson.Array array) =
+    case V.toList array of
+      [v, v'] -> do
+        original <- parseJSON v
+        renamed <- parseJSON v'
+        return $ VarRenaming original renamed
+      _ -> mzero
   parseJSON _ = mzero
 
 instance FromJSON Form where
@@ -79,8 +95,7 @@ instance FromJSON Form where
             [t] <- parseJSON val
             return (f t)
       in case str of
-           "exprcons" -> do [lhs,rhs] <- parseJSON val
-                            return $ lhs :@ rhs
+           "exprcons" -> (\[lhs, rhs] -> lhs :@ rhs) <$> parseJSON val
            "var"      -> withArg V
            "if"       -> withArg If
            "not"      -> return Not
@@ -112,16 +127,18 @@ instance FromJSON Var where
       ("free", Data.Aeson.Array val) -> do
           qid <- parseJSON $ V.head val
           kind <- parseJSON $ V.last val
-          return $ (uncurry Free) (unpackQID qid) kind
+          return $ uncurry Free (unpackQID qid) kind
       _ -> mzero
   parseJSON _ = mzero
 
 data QID = QID [String] Int
+
+unpackQID :: QID -> ([String], Int)
 unpackQID (QID path temporality) = (path, temporality)
 
 instance FromJSON QID where
   parseJSON (Object o) =
-    case (HML.toList o) of
+    case HML.toList o of
       ("qid", Data.Aeson.Array val) : _ ->
         let path = mapM parseJSON ((V.toList . V.init) val) in
         QID <$> path <*> parseJSON (V.last val)
