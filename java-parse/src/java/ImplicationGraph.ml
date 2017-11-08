@@ -17,7 +17,7 @@ end
 module Vertex = struct
   type t = {
       loc: QualifiedIdentity.t;
-      live: string list;
+      live: Ir.var list;
     }
   [@@deriving hash, compare]
 
@@ -36,7 +36,8 @@ let to_implication
         (graph: t) =
     let open Vertex in
     let open Edge in
-    let live_names env = env |> Env.elements |> List.map ~f:InstrGraph.var_name in
+    let get_var var = InstrGraph.java_to_var vartable v.InstrGraph.Instr.loc None var |> fst in
+    let live_names env = env |> Env.elements |> List.map ~f:get_var in
     let start = {
         loc = v.InstrGraph.Instr.loc;
         live = live_names v.InstrGraph.Instr.live;
@@ -66,7 +67,7 @@ let serialize (graph: t) =
   let collect_vertices v l =
     let open Vertex in
     let lives = v.live
-                |> List.map ~f:(fun var -> Printf.sprintf "\"%s\"" var)
+                |> List.map ~f:Ir.jsonsexp_var
                 |> String.concat ~sep:","
     in
     (Printf.sprintf "\"%s\":[%s]" (QID.as_path v.loc) lives) :: l
