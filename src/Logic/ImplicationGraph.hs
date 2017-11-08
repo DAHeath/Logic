@@ -27,7 +27,6 @@ import           Text.Read (readMaybe)
 
 data Vert
   = InstanceV [Var] Form
-  | InductiveV [Var] Form
   | QueryV Form
   deriving (Show, Read, Eq, Ord, Data)
 makePrisms ''Vert
@@ -47,7 +46,6 @@ instance Pretty Edge where
 instance Pretty Vert where
   pretty = \case
     InstanceV vs f -> pretty vs <+> pretty f
-    InductiveV vs f -> pretty "IND" <+> pretty vs <+> pretty f
     QueryV f -> pretty f
 
 data Idx = Idx { _idxIden :: Integer, _idxInst :: Integer }
@@ -92,7 +90,6 @@ implGrChc g = concatMap idxRules (G.idxs g)
     vertRule i f rhs = \case
       InstanceV [] _   -> Rule [] f rhs
       InstanceV vs _   -> Rule [mkApp ('r':written # i) vs] f rhs
-      InductiveV vs f' -> Rule [] (f' `mkAnd` f) rhs
       QueryV _         -> undefined
 
     idxRules i = maybe [] (\case
@@ -100,7 +97,6 @@ implGrChc g = concatMap idxRules (G.idxs g)
         mapMaybe (\(i', Edge f mvs) -> do
           rhs <- subst mvs <$> idxApp i
           idxRule i' f rhs) (relevantIncoming i)
-      InductiveV vs f' -> []
       QueryV f -> queries i f) (g ^? ix i)
 
     queries i f =
@@ -115,23 +111,15 @@ implGrChc g = concatMap idxRules (G.idxs g)
 -- | Interpolate the facts in the graph using CHC solving to label the vertices
 -- with fresh definitions.
 interpolate :: MonadIO m => ImplGr Idx -> m (Either Model (ImplGr Idx))
-interpolate g = do
-  liftIO $ print (pretty (implGrChc g))
-  Z3.solveChc (implGrChc g) >>= \case
-    Left m -> return (Left m)
-    Right m -> do
-      liftIO $ print m
-      Right <$> applyModel m g
+interpolate g = fmap (fmap (`applyModel` g)) (Z3.solveChc (implGrChc g))
 
 -- | Augment the fact at each vertex in the graph by the fact in the model.
-applyModel :: MonadIO m => Model -> ImplGr Idx -> m (ImplGr Idx)
-applyModel m = G.itravVerts applyVert
+applyModel :: Model -> ImplGr Idx -> ImplGr Idx
+applyModel m = G.imapVerts applyVert
   where
-    applyVert i = _InstanceV %%~ applyInst i
-    applyInst i (vs, f) = do
-      let found = M.findWithDefault (LBool False) i m'
-      f' <- Z3.superSimplify (instantiate vs found)
-      return (vs, f')
+    applyVert i = _InstanceV %~ applyInst i
+    applyInst i inst =
+      inst & _2 .~ instantiate (fst inst) (M.findWithDefault (LBool False) i m')
 
     m' = M.toList (getModel m)
       & map (traverseOf _1 %%~ interpretName . varName)
@@ -161,7 +149,8 @@ collectAnswer g = traverse Z3.superSimplify $ execState (G.itravVerts (\i v -> c
 
 -- | Unwind the graph on the given backedge and update all instances in the unwinding.
 unwind :: Solve e m => Idx -> Idx -> e -> Graph Idx e Vert -> m (Idx, Graph Idx e Vert)
-unwind = G.unwind updateInstance (\_ _ -> return) (\_ v -> return $ v & _InstanceV . _2 .~ LBool False)
+unwind = G.unwind updateInstance (\_ _ -> return)
+  (\_ v -> return $ v & _InstanceV . _2 .~ LBool False)
 
 unwindAll :: Solve e m
           => [((Idx, Idx), e)]

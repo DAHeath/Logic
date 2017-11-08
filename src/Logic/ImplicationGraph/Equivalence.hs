@@ -36,84 +36,52 @@ solve :: MonadIO m
       -> ImplGr Integer
       -> ImplGr Integer
       -> m (Either Model (ProdGr Idx))
-solve e1 e2 quer g1 g2 = do
-  let g' = G.mapIdxs firstInst wQuery
-  runSolve (loop g') >>= \case
-    Left (Failed m) -> return (Left m)
-    Left (Complete res) -> return (Right res)
-    Right _ -> error "infinite loop terminated successfully?"
+solve e1 e2 quer g1 g2 = G.display "before" wQuery >> loop equivStrat end wQuery
   where
-    loop gr = loop =<< step (firstInst (end+1)) gr
-
     wQuery =
       equivProduct g1 g2
-      & G.addVert (end+1) (QueryV quer)
-      & G.addEdge end (end+1) (This $ Edge (LBool True) M.empty)
+      & G.addVert end (QueryV quer)
+      & G.addEdge (end-1) end (This $ Edge (LBool True) M.empty)
 
     locMerge i j = j + i * (maxJ + 1)
     maxJ = maximum (G.idxs g2)
-    end = locMerge e1 e2
+    end = locMerge e1 e2 + 1
     equate (v1, v2) = mkEql (T.typeOf v1) (V v1) (V v2)
 
+    equivProduct g1 g2 =
+      G.cartesianProductWith edgeMerge const locMerge vertMerge
+        (G.mapEdges This g1) (G.mapEdges That g2)
 
--- | Perform interpolation on the graph (exiting on failure), perform and induction
--- check, and unwind further if required.
-step :: Solve (These Edge Edge) m => Idx -> ProdGr Idx -> m (ProdGr Idx)
-step end g = do
-  G.display "step" g
-  int <- interp
-  indM <- induc end int
-  let isInd = M.keys $ M.filter id indM
-  when (M.lookup end indM == Just True) $ throwError $ Complete int
-  unwindAll (backs g) isInd end int
-
-  where
-    interp = do
-      sol <- interpolate (G.mapEdges edge g)
-      case sol of
-        Left e -> throwError (Failed e)
-        Right g' -> do
-          let vs = g' ^@.. G.iallVerts
-          return $ foldr (uncurry G.addVert) g vs
-
-    edge = \case
-      This e -> e
-      That e -> e
-      These _ _ -> undefined
-
-    backs = concatMap allEs . G.backEdges
-    allEs ((i1, i2), e) = case e of
-      These e1 e2 -> [((i1, i2), This e1), ((i1, i2), That e2)]
-      e' -> [((i1, i2), e')]
-
-induc :: MonadIO m => Idx -> ProdGr Idx -> m (Map Idx Bool)
-induc = inductive' predInd
-  where
-    predInd g i = do
-      let (ls, rs) = preds g i
-      lInd <- allInd predInd g i ls
-      rInd <- allInd predInd g i rs
-      return [lInd && not (null ls), rInd && not (null rs), null ls && null rs]
-
-    preds g i = mconcat $ map (\(i', e) ->
-      fromThese [] [] $ bimap (const [i']) (const [i']) e) $ g ^@.. G.iedgesTo i
-
-equivProduct :: ImplGr Integer -> ImplGr Integer -> ProdGr Integer
-equivProduct g1 g2 =
-  G.cartesianProductWith
-    edgeMerge
-    const
-    locMerge
-    vertMerge
-    (G.mapEdges This g1)
-    (G.mapEdges That g2)
-  where
     edgeMerge (This e1) (That e2) = These e1 e2
     edgeMerge e1 _ = e1
-
-    locMerge i j = j + i * (maxJ + 1)
-    maxJ = maximum (G.idxs g2)
 
     vertMerge v1 v2 = case (v1, v2) of
       (InstanceV vs1 _, InstanceV vs2 _) -> emptyInst (vs1 ++ vs2)
       _ -> error "query in middle of equivalence graph"
+
+equivStrat :: Strategy (These Edge Edge)
+equivStrat =
+  let theStrat = Strategy
+        { backs = concatMap allEs . G.backEdges
+        , interp = \g -> do
+            sol <- interpolate (G.mapEdges edge g)
+            return $ fmap (\g' ->
+              let vs = g' ^@.. G.iallVerts
+              in foldr (uncurry G.addVert) g vs) sol
+        , predInd = \g i -> do
+            let (ls, rs) = preds g i
+            lInd <- allInd (predInd theStrat) g i ls
+            rInd <- allInd (predInd theStrat) g i rs
+            return [lInd && not (null ls), rInd && not (null rs), null ls && null rs]
+        }
+  in theStrat
+  where
+    edge = \case
+      This e -> e
+      That e -> e
+      These _ _ -> undefined
+    allEs ((i1, i2), e) = case e of
+      These e1 e2 -> [((i1, i2), This e1), ((i1, i2), That e2)]
+      e' -> [((i1, i2), e')]
+    preds g i = mconcat $ map (\(i', e) ->
+      fromThese [] [] $ bimap (const [i']) (const [i']) e) $ g ^@.. G.iedgesTo i

@@ -344,7 +344,7 @@ formFromApp name args range
 modelToModel :: forall z3. ( MonadState Env z3
                 , MonadZ3 z3
                 , MonadReader DeBrujin z3) => Model -> z3 M.Model
-modelToModel m = M.Model <$> (M.union <$> functions <*> constants)
+modelToModel m = M.Model <$> (traverse superSimplify =<< M.union <$> functions <*> constants)
   where
     functions = do
       fds <- modelGetFuncDecls m
