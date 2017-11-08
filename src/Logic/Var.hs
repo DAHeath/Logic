@@ -82,3 +82,21 @@ instantiate vs =
       bs = zipWith Bound [0..] ts
       m = M.fromList (zip bs vs)
   in subst m
+
+-- | Get the path of a var
+path :: Var -> Maybe [String]
+path = \case
+  Free p _ _ -> Just p
+  _ -> Nothing
+
+-- | Get the alias count of a var
+aliasCount :: Var -> Maybe Int
+aliasCount = \case
+  Free _ c _ -> Just c
+  _ -> Nothing
+
+-- | Increase var alias count
+bumpVar :: (Int -> Int) -> Var -> Var
+bumpVar f = \case
+  Free p a t -> Free p (f a) t
+  other -> other
