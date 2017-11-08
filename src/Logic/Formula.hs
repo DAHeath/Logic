@@ -3,6 +3,7 @@ module Logic.Formula where
 
 import           Control.Lens
 
+import qualified Data.Set as Set
 import           Data.Data (Data)
 import           Data.Data.Lens (uniplate)
 import           Data.List (sort)
@@ -247,3 +248,18 @@ isBinaryInfix = \case
     Gt _  -> True
     Ge _  -> True
     _     -> False
+
+-- | Collect all the variables in this formula
+collectVars :: Form -> Set.Set Var
+collectVars = \case
+    V var -> Set.singleton var
+    left :@ right -> Set.union (collectVars left) (collectVars right)
+    _ -> Set.empty
+
+
+-- | Map vars to something else
+mapVar :: (Var -> Var) -> Form -> Form
+mapVar f = \case
+    V var -> V $ f var
+    left :@ right -> mapVar f left :@ mapVar f right
+    other -> other

@@ -24,6 +24,7 @@ library
                      , Logic.ImplicationGraph.Induction
                      , Logic.ImplicationGraph.Equivalence
                      , Logic.ImplicationGraph.Safety
+                     , Logic.ImplicationGraph.Simplify
                      , Logic.Solver.Z3
                      , Data.Optic.Graph.Extras
                      , Logic.ImplicationGraph.JSONParser
