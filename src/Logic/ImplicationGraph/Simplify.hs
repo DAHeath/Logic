@@ -22,10 +22,13 @@ irreducible graph = [startIndex, queryIndex] ++ loopHeaders where
   loopHeaders = map (\((_, s), _) -> s) $ G.backEdges graph
 
 
+-- | Takes the Cartesian product of two lists and with the product function.
 cartesianProduct :: (a -> b -> c) -> [a] -> [b] -> [c]
 cartesianProduct f as bs = [ f a b | a <- as, b <- bs ]
 
 
+-- | Combine edges that 'execute' after one another, the first argument is
+-- the edge that runs first.
 conjunction :: Edge -> Edge -> Edge
 conjunction edge edge' =
   let
@@ -48,6 +51,7 @@ disjunction :: Edge -> Edge -> Edge
 disjunction = undefined
 
 
+-- | Remove all reducible vertices and combine edges through {dis/con}junction.
 prune :: (Ord i) => ImplGr i -> ImplGr i
 prune graph = foldr removeVertex graph reducible where
   andEdge (start, e) (end, e') =
