@@ -6,7 +6,7 @@ import qualified Data.Optic.Graph.Extras as G
 import qualified Data.Map as M
 
 import           Logic.ImplicationGraph
-import           Logic.ImplicationGraph.Optimize (irreducible)
+import           Logic.ImplicationGraph.Simplify (irreducible)
 import qualified Logic.Type as T
 import           Logic.Formula.Parser
 import           Logic.Var
@@ -16,7 +16,7 @@ main = do
     print $ irreducible example
 
 i :: Var
-i  = Free "i" T.Int
+i  = Free ["i"] 0 T.Int
 
 emptyEdge :: (Ord i) => i -> i -> (i, i, Edge)
 emptyEdge s d = (s, d, Edge [form|i:Int = 0|] M.empty)
