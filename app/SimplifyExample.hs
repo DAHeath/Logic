@@ -5,32 +5,39 @@ import qualified Data.Optic.Graph as G
 import qualified Data.Optic.Graph.Extras as G
 import qualified Data.Map as M
 import           Data.Text.Prettyprint.Doc
+import qualified Data.ByteString.Lazy.Char8 as BS
 
 import           Logic.ImplicationGraph
 import           Logic.ImplicationGraph.Simplify as S
+import           Logic.ImplicationGraph.JSONParser (parseGraphFromJSON)
 import qualified Logic.Type as T
 import           Logic.Formula
 import           Logic.Formula.Parser
 import           Logic.Var
 
 main :: IO ()
-main = let 
+main = let
         ir = S.irreducible irreducibleExample
-        dj = uncurry S.disjunction $ disjunctionExample
+        dj = uncurry S.disjunction disjunctionExample
     in do
         print "Irreducible example:"
-        print $ ir
+        print ir
 
         print "Disjunction example:"
         print $ _edgeMap dj
         print $ pretty $ _edgeForm dj
 
+        parsedGraph <- parseGraphFromJSON <$> BS.readFile "test.json"
+        putStrLn "Trying to simplify JSON:"
+        G.display "before.dot" parsedGraph
+        G.display "simplified.dot" $ S.prune parsedGraph
+
 i :: Var
 i  = Free ["i"] 0 T.Int
 
 bump :: Var -> Int -> Var
-bump (Free p i t) b = Free p (i + b) t
-bump o b = o
+bump (Free p c t) b = Free p (c + b) t
+bump o _ = o
 
 emptyEdge :: (Ord i) => i -> i -> (i, i, Edge)
 emptyEdge s d = (s, d, Edge [form|i:Int = 0|] M.empty)
