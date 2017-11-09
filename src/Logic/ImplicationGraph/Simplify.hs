@@ -88,4 +88,4 @@ prune graph = foldr removeVertex graph reducible where
 
   removeVertex i g = foldr ($) (G.delIdx i g) $ newEdges i g
 
-  reducible = filter (`elem` irreducible graph) $ G.idxs graph
+  reducible = filter (not . flip elem (irreducible graph)) $ G.idxs graph
