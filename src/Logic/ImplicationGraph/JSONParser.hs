@@ -2,13 +2,13 @@
 
 module Logic.ImplicationGraph.JSONParser where
 
-import           Control.Lens
 import           Control.Monad
 
 import           Data.Data (Data)
 import           Data.Map (Map)
 import qualified Data.Map as M
-import           Data.Maybe (mapMaybe)
+import qualified Data.List as L
+import           Data.List.Split
 import           Data.Text (Text, unpack)
 import           Data.Aeson
 import qualified Data.HashMap.Lazy as HML
@@ -24,21 +24,30 @@ import           Logic.Type
 
 -- | Read a bytestring containing JSON into a graph where the indices are names
 -- for the program position.
-parseGraphFromJSON :: BS.ByteString -> ImplGr String
+parseGraphFromJSON :: BS.ByteString -> ImplGr Line
 parseGraphFromJSON str = maybe G.empty getParsedGraph (decode str)
 
-newtype ParsedGraph = ParsedGraph { getParsedGraph :: ImplGr String }
-type Vertex = Text
+data Line = LineNo [String] Int
+  deriving (Data, Eq)
+
+-- TODO: parse into int safely
+textToLine :: Text -> Line
+textToLine txt = LineNo path num
+      where components = splitOn "/" $ unpack txt
+            path = init components
+            num = read $ last components
+
+newtype ParsedGraph = ParsedGraph { getParsedGraph :: ImplGr Line }
 
 -- | Maps an edge (defined by a start and an end index) to its label.
 data EdgeHolder = EdgeHolder
-  { _ehStart :: Vertex
-  , _ehEnd :: Vertex
+  { _ehStart :: Line
+  , _ehEnd :: Line
   , _ehEdge :: Edge
   } deriving (Show, Data)
 
 -- | A map from each vertex to its neighbors. (Defines the graph topology.)
-type VertexMap = Map Vertex [Var]
+type VertexMap = Map Line [Var]
 
 -- | Represents a variable renaming.
 data VarRenaming = VarRenaming Var Var
@@ -48,7 +57,7 @@ renameMap renames =
   M.fromList $ map tupelize renames
   where tupelize (VarRenaming a b) = (a, b)
 
-buildGraph :: [EdgeHolder] -> VertexMap -> ImplGr String
+buildGraph :: [EdgeHolder] -> VertexMap -> ImplGr Line
 buildGraph edgeHolders verticesMap =
   let
     vertices = map vertex $ M.toList verticesMap
@@ -56,8 +65,29 @@ buildGraph edgeHolders verticesMap =
   in
     G.fromLists vertices edges
   where
-    vertex (idV, varsList) = (unpack idV, InstanceV varsList (LBool False))
-    edge (EdgeHolder v1 v2 e) = (unpack v1, unpack v2, e)
+    vertex (idV, varsList) = (idV, InstanceV varsList (LBool False))
+    edge (EdgeHolder v1 v2 e) = (v1, v2, e)
+
+instance Ord Line where
+  compare (LineNo path num) (LineNo path' num') = case compare path path' of
+    EQ -> compare num num'
+    other -> other
+
+instance Show Line where
+  show (LineNo path num) = L.intercalate "/" $ path ++ [show num]
+
+instance Pretty Line where
+  pretty = pretty . show
+
+instance Pretty EdgeHolder where
+  pretty (EdgeHolder t t' e) = pretty t <+> pretty t' <+> pretty e
+
+instance FromJSONKey Line where
+  fromJSONKey = FromJSONKeyText textToLine
+
+instance FromJSON Line where
+  parseJSON (String txt) = return $ textToLine txt
+  parseJSON _ = mzero
 
 instance FromJSON ParsedGraph where
   parseJSON (Object o) = do
@@ -65,9 +95,6 @@ instance FromJSON ParsedGraph where
     vertices <- o .: "vertices" >>= parseJSON
     return $ ParsedGraph $ buildGraph edges vertices
   parseJSON _ = mzero
-
-instance Pretty EdgeHolder where
-  pretty (EdgeHolder t t' e) = pretty t <+> pretty t' <+> pretty e
 
 instance FromJSON EdgeHolder where
   parseJSON (Object o) = do

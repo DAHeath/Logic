@@ -84,8 +84,8 @@ instantiate vs =
   in subst m
 
 -- | Get the path of a var
-path :: Var -> Maybe [String]
-path = \case
+varPath :: Var -> Maybe [String]
+varPath = \case
   Free p _ _ -> Just p
   _ -> Nothing
 

@@ -37,9 +37,9 @@ conjunction :: Edge -> Edge -> Edge
 conjunction edge edge' =
   let
     bumpVarBy bumper var =
-      V.bumpVar ((+) $ fromMaybe 0 $ Map.lookup (V.path var) bumper) var
+      V.bumpVar ((+) $ fromMaybe 0 $ Map.lookup (V.varPath var) bumper) var
 
-    conflicts = Map.mapKeys V.path $
+    conflicts = Map.mapKeys V.varPath $
                 Map.mapMaybe V.aliasCount $ _edgeMap edge
   in Edge {
     _edgeForm = mkAnd
