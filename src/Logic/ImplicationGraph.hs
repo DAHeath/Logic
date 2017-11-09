@@ -111,7 +111,7 @@ implGrChc g = concatMap idxRules (G.idxs g)
 -- | Interpolate the facts in the graph using CHC solving to label the vertices
 -- with fresh definitions.
 interpolate :: MonadIO m => ImplGr Idx -> m (Either Model (ImplGr Idx))
-interpolate g = fmap (fmap (`applyModel` g)) (Z3.solveChc (implGrChc g))
+interpolate g = (fmap . fmap) (`applyModel` g) (Z3.solveChc (implGrChc g))
 
 -- | Augment the fact at each vertex in the graph by the fact in the model.
 applyModel :: Model -> ImplGr Idx -> ImplGr Idx

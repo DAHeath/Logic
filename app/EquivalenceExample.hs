@@ -37,10 +37,10 @@ cs0 = G.fromLists
   , (1, 3, Edge [form|n:Int <= 1 && r':Int = 1|] (M.fromList [(r, r')]))
   , (1, 2, Edge [form|n:Int > 1 && s:Int = 2 && p:Int = 1 && i:Int = 2|] M.empty)
   , (2, 2, Edge [form|i:Int < n:Int
-                   && i':Int = i:Int+1
-                   && s':Int = s:Int + p:Int
-                   && p':Int = s:Int |] (M.fromList [(i, i'), (s, s'), (p, p')]))
-  , (2, 3 , Edge [form|i:Int >= n:Int && r':Int = s:Int|] (M.fromList [(r, r')]))
+                   && i/1:Int = i:Int+1
+                   && s/1:Int = s:Int + p:Int
+                   && p/1:Int = s:Int |] (M.fromList [(i, i'), (s, s'), (p, p')]))
+  , (2, 3 , Edge [form|i:Int >= n:Int && r/1:Int = s:Int|] (M.fromList [(r, r')]))
   ]
 
 
@@ -112,7 +112,7 @@ ad1 = G.fromLists
   , (2, emptyInst [m, x])
   ]
   [ (0, 1, Edge [form|x:Int = m:Int|] M.empty)
-  , (1, 1, Edge [form|x:Int > 9 && x':Int = x:Int / 10 + x:Int % 10|] (M.fromList [(x, x')]))
+  , (1, 1, Edge [form|x:Int > 9 && x/1:Int = x:Int / 10 + x:Int % 10|] (M.fromList [(x, x')]))
   , (1, 2, Edge [form|x:Int <= 9|] M.empty)
   ]
 

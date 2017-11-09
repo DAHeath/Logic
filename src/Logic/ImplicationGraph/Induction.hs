@@ -8,6 +8,7 @@ import           Control.Monad.Loops (anyM)
 
 import           Data.Optic.Graph (Graph)
 import qualified Data.Optic.Graph as G
+import qualified Data.Optic.Graph.Extras as G
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe (mapMaybe)
@@ -16,6 +17,7 @@ import           Logic.Formula
 import           Logic.Model
 import qualified Logic.Solver.Z3 as Z3
 import           Logic.ImplicationGraph
+
 
 type PredInd e m = Graph Idx e Vert -> Idx -> m [Bool]
 

@@ -34,10 +34,10 @@ instance Pretty Var
 -- representation of the index. Otherwise, it is just the variable name.
 varName :: Var -> Name
 varName (Bound i _) = "!" ++ show i
-varName (Free ns i _) = path ns ++ "/" ++ (show i)
-  where
-    path :: [String] -> Name
-    path ns = intercalate "/" ns
+varName (Free ns i _) = case i of
+  0 -> path ns
+  _ -> path ns ++ "/" ++ show i
+  where path = intercalate "/"
 
 -- | A traversal which targets all of the variables in a given expression.
 vars :: Data a => Traversal' a Var

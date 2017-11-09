@@ -19,8 +19,6 @@ import qualified Data.ByteString.Lazy.Char8 as BS
 
 main :: IO ()
 main = do
-  parsedGraph <- parseGraphFromJSON <$> BS.readFile "test.json"
-  G.display "parsed.dot" parsedGraph
   G.display "before.dot" example
   sol <- solve 2 example
   case sol of
@@ -43,6 +41,6 @@ example = G.fromLists
   , (1, emptyInst s)
   , (2, QueryV [form|not (i:Int = 11)|])]
   [ ( 0, 1, Edge [form|i:Int = 0|] M.empty)
-  , ( 1, 1, Edge [form|i':Int = i:Int + 2 && i:Int < n:Int|] (M.singleton i i'))
+  , ( 1, 1, Edge [form|i/1:Int = i:Int + 2 && i:Int < n:Int|] (M.singleton i i'))
   , ( 1, 2, Edge [form|i:Int >= n:Int|] M.empty)
   ]
