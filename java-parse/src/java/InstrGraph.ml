@@ -262,22 +262,14 @@ let java_to_condition vartable loc cond a b =
 
 let instr_to_expr vartable loc = function
   | JBir.AffectVar (var, expr) ->
-     let is_redefined = collect_vars expr
-                        |> List.exists ~f:(fun v -> JBir.var_equal v var)
-     in
      let (irvar, t_a) = java_to_var vartable loc None var in
      let (irexpr, t_b) = java_to_expr vartable loc expr in
      let kind = if t_a = t_b
-                then t_a
-                else failwith "Mismatched types in condition."
+       then t_a
+       else failwith "Mismatched types in condition."
      in
-     if is_redefined
-     then
-       let name' = qid_var_name loc (var_name var) "1" in
-       let irvar' = rename_var (fun _ -> name') irvar in
-       Some ((Ir.Eql kind) $:: (Ir.Var irvar') $:: irexpr, [(irvar, irvar')])
-     else
-       Some ((Ir.Eql kind) $:: (Ir.Var irvar) $:: irexpr, [])
+     let irvar' = rename_var (fun v -> QID.specify (QID.unspecify v) "1") irvar in
+     Some ((Ir.Eql kind) $:: (Ir.Var irvar') $:: irexpr, [(irvar, irvar')])
   | JBir.Ifd ((comp, a, b), i) ->
      Some (java_to_condition vartable loc comp a b, [])
   | JBir.Nop -> None
