@@ -56,6 +56,10 @@ module ImplicationDot = struct
 
   let get_subgraph _ = None
 
+  let var_disp = function
+    | Ir.Free (qid, _) -> QID.as_path qid
+    | v -> Ir.sexp_of_var v |> Sexp.to_string
+
   let formula_to_str (edge: ImplicationGraph.Edge.t) =
     let open ImplicationGraph.Edge in
     let formula =
@@ -74,7 +78,8 @@ module ImplicationDot = struct
     then
       let rename =
         edge.rename
-        |> List.map ~f:(fun (a, b) -> Printf.sprintf "%s &rarr; %s" a b)
+        |> List.map ~f:(fun (a, b) -> Printf.sprintf "%s &rarr; %s"
+                           (var_disp a) (var_disp b))
         |> String.concat ~sep:", "
       in
       Printf.sprintf "%s\n{%s}" formula rename
@@ -95,7 +100,7 @@ module ImplicationDot = struct
     let open ImplicationGraph.Vertex in
     let path = QID.as_path vertex.loc in
     Printf.sprintf "<font color=\"grey\" point-size=\"10\">%s</font><br/>{%s}"
-                   path (vertex.live |> String.concat ~sep:", ")
+                   path (vertex.live |> List.map ~f:var_disp |> String.concat ~sep:", ")
 
   let vertex_attributes v = [
       `Shape `Box;

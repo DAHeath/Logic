@@ -10,3 +10,8 @@ dist/
 out/
 *.iml
 cabal.config
+
+# Generated
+*.dot
+*.pdf
+test.json

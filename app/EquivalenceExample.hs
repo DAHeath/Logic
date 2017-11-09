@@ -78,25 +78,25 @@ cs1 = G.fromLists
   , (2, 3, Edge [form|j:Int > m:Int && x':Int = c2:Int|] (M.fromList [(x, x')]))
   ]
 
-x   = Free "x" T.Int
-x'  = Free "x'" T.Int
-c1  = Free "c1" T.Int
-c1' = Free "c1'" T.Int
-m   = Free "m" T.Int
-c2  = Free "c2" T.Int
-c2' = Free "c2'" T.Int
-j   = Free "j" T.Int
-j'  = Free "j'" T.Int
+x   = Free ["x"] 0 T.Int
+x'  = Free ["x"] 1 T.Int
+c1  = Free ["c1"] 0 T.Int
+c1' = Free ["c1"] 1 T.Int
+m   = Free ["m"] 0 T.Int
+c2  = Free ["c2"] 0 T.Int
+c2' = Free ["c2"] 1 T.Int
+j   = Free ["j"] 0 T.Int
+j'  = Free ["j"] 1 T.Int
 
-r  = Free "r" T.Int
-r' = Free "r'" T.Int
-s  = Free "s" T.Int
-s' = Free "s'" T.Int
-n  = Free "n" T.Int
-p  = Free "p" T.Int
-p' = Free "p'" T.Int
-i  = Free "i" T.Int
-i' = Free "i'" T.Int
+r  = Free ["r"] 0 T.Int
+r' = Free ["r"] 1 T.Int
+s  = Free ["s"] 0 T.Int
+s' = Free ["s"] 1 T.Int
+n  = Free ["n"] 0 T.Int
+p  = Free ["p"] 0 T.Int
+p' = Free ["p"] 1 T.Int
+i  = Free ["i"] 0 T.Int
+i' = Free ["i"] 1 T.Int
 
 ad0 :: ImplGr Integer
 ad0 = G.fromLists

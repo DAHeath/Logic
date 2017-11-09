@@ -4,7 +4,7 @@ open Core
    The id consists of a list of sub-ids which become increasingly specific as
    the list is traversed from left to right. *)
 type t = QID of string list
-[@@deriving hash, compare]
+[@@deriving hash, compare, sexp]
 
 type store = t list
 

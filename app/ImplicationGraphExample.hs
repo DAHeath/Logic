@@ -20,19 +20,19 @@ import qualified Data.ByteString.Lazy.Char8 as BS
 main :: IO ()
 main = do
   parsedGraph <- parseGraphFromJSON <$> BS.readFile "test.json"
-  G.display "parsed" parsedGraph
-  G.display "before" example
+  G.display "parsed.dot" parsedGraph
+  G.display "before.dot" example
   sol <- solve 2 example
   case sol of
     Left m -> print (pretty m)
     Right r -> do
-      G.display "test" r
+      G.display "test.dot" r
       print . pretty . M.toList =<< collectAnswer r
 
 i, i', n :: Var
-i  = Free "i"  T.Int
-i' = Free "i'" T.Int
-n  = Free "n"  T.Int
+i  = Free ["i"] 0 T.Int
+i' = Free ["i"] 1 T.Int
+n  = Free ["n"] 0 T.Int
 
 s :: [Var]
 s = [i, n]
