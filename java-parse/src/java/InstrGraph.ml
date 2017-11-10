@@ -206,9 +206,22 @@ let java_to_var
   (Ir.Free (name, kind), kind)
 
 
+let resolve_types = function
+  | (Ir.Bool, Ir.Int)
+  | (Ir.Int, Ir.Bool) -> Ir.Bool
+  | (a, b) when a = b -> a
+  | _ -> failwith "Mismatched types in condition."
+
+
 let rename_var f = function
   | Ir.Free (name, t) -> Ir.Free (f name, t)
   | other -> other
+
+
+let invoke cn ms v args =
+  match BuiltIn.call_built_in_method cn ms v args with
+  | Some i -> i
+  | None -> failwith "Non-builtin functions not supported yet."
 
 
 let rec java_to_expr vartable loc = function
@@ -289,25 +302,27 @@ let instr_to_expr vartable loc = function
   | JBir.AffectVar (var, expr) ->
      let (irvar, t_a) = java_to_var vartable loc None var in
      let (irexpr, t_b) = java_to_expr vartable loc expr in
-     let kind = if t_a = t_b
-       then t_a
-       else failwith "Mismatched types in condition."
-     in
+     let kind = resolve_types (t_a, t_b) in
      let irvar' = rename_var (fun v -> QID.specify (QID.unspecify v) "1") irvar in
-     Some ((Ir.Eql kind) $:: (Ir.Var irvar') $:: irexpr, [(irvar, irvar')])
+     let expr = (Ir.Eql kind) $:: (Ir.Var irvar') $:: irexpr in
+     Some (expr, [(irvar, irvar')], Ir.Instance)
   | JBir.Ifd ((comp, a, b), i) ->
-     Some (java_to_condition vartable loc comp a b, [])
+     Some (java_to_condition vartable loc comp a b, [], Ir.Instance)
   | JBir.Nop -> None
   (* we're in a graph we can just delete this vertex *)
   | JBir.Goto i -> None
+  (* Static methods! These include `ensure` and friends *)
+  | JBir.InvokeStatic (v, cn, ms, args) ->
+    let args = List.map ~f:(java_to_expr vartable loc) args in
+    let (kind, ir) = invoke cn ms v args in
+    Some (kind, [], ir)
   (* things we haven't translated yet *)
+  | JBir.InvokeNonVirtual _
+  | JBir.InvokeVirtual _
   | JBir.Return _
   | JBir.Throw _
   | JBir.New _
   | JBir.NewArray _
-  | JBir.InvokeStatic _
-  | JBir.InvokeVirtual _
-  | JBir.InvokeNonVirtual _
   | JBir.MonitorEnter _
   | JBir.MonitorExit _
   | JBir.MayInit _
