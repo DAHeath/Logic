@@ -19,7 +19,7 @@ Library java
   BuildDepends: core, sawja, ocamlgraph, util, ppx_hash, ppx_compare, ppx_sexp_conv, ppx_deriving
   ByteOpt:      -thread
   NativeOpt:    -thread
-  Modules:      ParseJava, InstrGraph, GraphDebug, Ir, ImplicationGraph
+  Modules:      ParseJava, InstrGraph, GraphDebug, Ir, ImplicationGraph, BuiltIn
 
 Executable equivalencecheck
   Path:         src
