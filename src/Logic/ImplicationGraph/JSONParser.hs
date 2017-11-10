@@ -75,6 +75,9 @@ instance Ord Line where
 instance Show Line where
   show (LineNo path num) = L.intercalate "/" $ path ++ [show num]
 
+instance IntoIdx Line where
+  intoIdx (LineNo _ n) = Idx (toInteger n) 0
+
 instance Pretty Line where
   pretty = pretty . show
 

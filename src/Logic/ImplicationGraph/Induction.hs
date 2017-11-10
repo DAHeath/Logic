@@ -68,16 +68,16 @@ descendantInstanceVs g i =
 
 -- | Apply the strategy to the graph until a either a counterxample or an inductive
 -- solution is found.
-loop :: MonadIO m
+loop :: (IntoIdx i, MonadIO m)
      => Strategy e
-     -> Integer -> Graph Integer e Vert -> m (Either Model (Graph Idx e Vert))
+     -> i -> Graph i e Vert -> m (Either Model (Graph Idx e Vert))
 loop strat end g =
-  runSolve (loop' (G.mapIdxs firstInst g)) >>= \case
+  runSolve (loop' (G.mapIdxs intoIdx g)) >>= \case
     Left (Failed m) -> return (Left m)
     Left (Complete res) -> return (Right res)
     Right _ -> error "infinite loop terminated successfully?"
   where
-    loop' gr = loop' =<< step strat (firstInst end) gr
+    loop' gr = loop' =<< step strat (intoIdx end) gr
 
 -- | Perform a step of the unwinding by
 -- 1. interpolating over the current graph

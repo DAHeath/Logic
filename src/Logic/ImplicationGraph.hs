@@ -52,8 +52,11 @@ data Idx = Idx { _idxIden :: Integer, _idxInst :: Integer }
   deriving (Show, Read, Eq, Data)
 makeLenses ''Idx
 
-firstInst :: Integer -> Idx
-firstInst i = Idx i 0
+class (Eq a, Ord a) => IntoIdx a where
+  intoIdx :: a -> Idx
+
+instance IntoIdx Integer where
+  intoIdx i = Idx i 0
 
 match :: Idx -> Idx -> Bool
 match x y = x ^. idxIden == y ^. idxIden
