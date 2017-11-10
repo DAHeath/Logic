@@ -75,10 +75,16 @@ let serialize (graph: t) =
                 |> List.map ~f:Ir.jsonsexp_var
                 |> String.concat ~sep:","
     in
-    (Printf.sprintf "\"%s\":{\"type\":\"%s\",\"live\":[%s]}"
-       (QID.as_path v.loc)
-       (Ir.string_of_vkind v.kind)
-       lives
+    (match v.kind with
+     | Ir.Instance -> Printf.sprintf "\"%s\":{\"type\":\"%s\",\"live\":[%s]}"
+                        (QID.as_path v.loc)
+                        (Ir.string_of_vkind v.kind)
+                        lives
+     | Ir.Query ex -> Printf.sprintf "\"%s\":{\"type\":\"%s\",\"query\":%s,\"live\":[%s]}"
+                        (QID.as_path v.loc)
+                        (Ir.string_of_vkind v.kind)
+                        (Ir.jsonsexp_expr ex)
+                        lives
     ) :: l
   in
   let vertices = fold_vertex collect_vertices graph [] in

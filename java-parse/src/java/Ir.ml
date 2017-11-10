@@ -6,11 +6,6 @@ type name = string
 [@@deriving hash, compare, sexp]
 
 
-type vkind = Query
-           | Instance
-[@@deriving hash, compare, sexp]
-
-
 type kind = Unit
           | Bool
           | Int
@@ -63,6 +58,11 @@ type expr = Var of var
 [@@deriving hash, compare, sexp]
 
 
+type vkind = Query of expr
+           | Instance
+[@@deriving hash, compare, sexp]
+
+
 (* -- | The right hand side of an assignment. *)
 type rhs = Expr of expr
          | Arbitrary of kind
@@ -83,7 +83,7 @@ type command = Seq of command * command
 [@@deriving hash, compare, sexp]
 
 let string_of_vkind = function
-  | Query -> "query"
+  | Query _ -> "query"
   | Instance -> "instance"
 
 let rec pprint_kind = function

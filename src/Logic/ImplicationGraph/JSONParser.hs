@@ -103,7 +103,7 @@ instance FromJSON JSONVertex where
       (String t) | t == "instance" ->
                    return $ JVertex $ InstanceV live (LBool False)
       (String t) | t == "query" ->
-                   return $ JVertex $ QueryV (LBool False)
+                   (JVertex . QueryV) <$> (o .: "query" >>= parseJSON)
       _ -> mzero
   parseJSON _ = mzero
 
