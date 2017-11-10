@@ -43,6 +43,14 @@ let cms_to_qid cms =
   let (jclass, jmethod) = JBasics.cms_split cms in
   QID.QID [JBasics.cn_name jclass; JBasics.ms_name jmethod]
 
+let var_name var =
+  JBir.var_name_debug var
+  |> Option.value ~default:(JBir.var_name var)
+
+let qid_var_name loc var prime =
+  var
+  |> QID.specify (QID.unspecify loc)
+  |> (Fn.flip QID.specify) prime
 
 let cms_to_instrs program cms =
   let open JProgram in
@@ -110,6 +118,32 @@ let squash_gotos (graph: t) =
   fold_edges_e remove_gotos graph empty
 
 
+let infer_bools
+    (vartable: (int * int * string * JBasics.value_type * int) list)
+    (graph: t)
+  =
+  let bool_assigns v m =
+    match v.Instr.instr with
+    | JBir.AffectVar (var, expr) ->
+      let vname = var_name var in
+      if List.exists vartable ~f:(fun (_, _, n, _, _) -> n = vname)
+      then m
+      else (match (expr, Map.find m vname) with
+          | (JBir.Const (`Int n), None) when n = Int32.zero || n = Int32.one ->
+            Map.add m ~key:vname ~data:true
+          | (_, None)
+          | (_, Some true) -> Map.add m ~key:vname ~data:false
+          | (_, Some false) -> m
+        )
+    | _ -> m
+  in
+  let append_vartable ~key:key ~data:data vtable =
+    (0, 0, key, JBasics.TBasic `Bool, 0) :: vtable
+  in
+  let found_bools = fold_vertex bool_assigns graph String.Map.empty in
+  Map.fold found_bools ~init:vartable ~f:append_vartable
+
+
 let build_graph
       (program: JBir.t JProgram.program)
       (method_sig: JBasics.class_method_signature)
@@ -137,15 +171,6 @@ let rec collect_vars = function
 
 
 let ( $:: ) a b = Ir.ExprCons (a, b)
-
-let var_name var =
-  JBir.var_name_debug var
-  |> Option.value ~default:(JBir.var_name var)
-
-let qid_var_name loc var prime =
-  var
-  |> QID.specify (QID.unspecify loc)
-  |> (Fn.flip QID.specify) prime
 
 
 let java_to_kind = function
