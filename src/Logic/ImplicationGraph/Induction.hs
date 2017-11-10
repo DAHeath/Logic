@@ -11,8 +11,7 @@ import qualified Data.Optic.Graph as G
 import qualified Data.Optic.Graph.Extras as G
 import           Data.Map (Map)
 import qualified Data.Map as M
-import           Data.Maybe (mapMaybe, isJust, fromMaybe)
-import           Data.List (find)
+import           Data.Maybe (mapMaybe, fromMaybe)
 
 import           Logic.Formula
 import           Logic.Model
@@ -66,14 +65,6 @@ descendantInstanceVs g i =
     & filter (match i)
     & filter (/= i)
     & mapMaybe (\i' -> g ^? ix i' . _InstanceV . _2)
-
--- | Find the first query node of a graph
-findQuery :: Graph i e Vert -> Maybe i
-findQuery = fmap fst . find (isJust . preview _QueryV . view _2) . M.assocs . G._vertMap
-
--- | Find the entry node (one without edges going into it)
-findEntry :: Ord i => Graph i e v -> i
-findEntry = minimum . G.idxs
 
 -- | Apply the strategy to the graph until a either a counterxample or an inductive
 -- solution is found.

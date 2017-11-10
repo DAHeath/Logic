@@ -12,8 +12,9 @@ import qualified Data.Optic.Graph as G
 import qualified Data.Optic.Graph.Extras as G
 import           Data.Map (Map)
 import qualified Data.Map as M
-import           Data.Maybe (mapMaybe, catMaybes)
+import           Data.Maybe (mapMaybe, catMaybes, isJust)
 import           Data.List.Split (splitOn)
+import           Data.List (find)
 import           Data.Foldable (foldrM)
 import           Data.Text.Prettyprint.Doc
 
@@ -85,13 +86,14 @@ type ImplGr idx = Graph idx Edge Vert
 implGrChc :: ImplGr Idx -> [Chc]
 implGrChc g = concatMap idxRules (G.idxs g)
   where
+    start = findEntry g
     idxApp i = instApp i =<< g ^? ix i . _InstanceV
     instApp _ ([], _) = Nothing
     instApp i (vs, _) = Just $ mkApp ('r' : written # i) vs
 
     idxRule i f rhs = vertRule i f rhs <$> g ^? ix i
     vertRule i f rhs = \case
-      InstanceV [] _   -> Rule [] f rhs
+      InstanceV _ _ | i == start -> Rule [] f rhs
       InstanceV vs _   -> Rule [mkApp ('r':written # i) vs] f rhs
       QueryV _         -> undefined
 
@@ -133,6 +135,14 @@ data Result e
   = Failed Model
   | Complete (Graph Idx e Vert)
   deriving (Show, Read, Eq)
+
+-- | Find the first query node of a graph
+findQuery :: Graph i e Vert -> Maybe i
+findQuery = fmap fst . find (isJust . preview _QueryV . view _2) . M.assocs . G._vertMap
+
+-- | Find the entry node (one without edges going into it)
+findEntry :: Ord i => Graph i e v -> i
+findEntry = minimum . G.idxs
 
 type SolveState = Map Integer Integer
 

@@ -29,11 +29,12 @@ main = let
         print $ pretty $ _edgeForm dj
 
         parsedGraph <- parseGraphFromJSON <$> BS.readFile "test.json"
-        -- putStrLn "Trying to simplify JSON..."
-        -- G.display "before.dot" parsedGraph
-        -- G.display "simplified.dot" $ S.prune parsedGraph
+        let pruned = S.prune parsedGraph
+        putStrLn "Trying to simplify JSON..."
+        G.display "before.dot" parsedGraph
+        G.display "simplified.dot" pruned
 
-        sol <- solve parsedGraph
+        sol <- solve pruned
         case sol of
           Left m -> do
             putStrLn "Could not prove safety:"
