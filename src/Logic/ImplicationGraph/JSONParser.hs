@@ -49,6 +49,8 @@ data EdgeHolder = EdgeHolder
 -- | A map from each vertex to its neighbors. (Defines the graph topology.)
 type VertexMap = Map Line [Var]
 
+newtype JSONVertex = JVertex Vert
+
 -- | Represents a variable renaming.
 data VarRenaming = VarRenaming Var Var
 
@@ -57,16 +59,13 @@ renameMap renames =
   M.fromList $ map tupelize renames
   where tupelize (VarRenaming a b) = (a, b)
 
-buildGraph :: [EdgeHolder] -> VertexMap -> ImplGr Line
-buildGraph edgeHolders verticesMap =
+buildGraph :: [EdgeHolder] -> Map Line JSONVertex -> ImplGr Line
+buildGraph edgeHolders vertexMap =
   let
-    vertices = map vertex $ M.toList verticesMap
-    edges = map edge edgeHolders
+    vertices = map (\(iv, JVertex v) -> (iv, v)) $ M.toList vertexMap
+    edges = map (\(EdgeHolder v1 v2 e) -> (v1, v2, e)) edgeHolders
   in
     G.fromLists vertices edges
-  where
-    vertex (idV, varsList) = (idV, InstanceV varsList (LBool False))
-    edge (EdgeHolder v1 v2 e) = (v1, v2, e)
 
 instance Ord Line where
   compare (LineNo path num) (LineNo path' num') = case compare path path' of
@@ -94,6 +93,18 @@ instance FromJSON ParsedGraph where
     edges <- o .: "edges" >>= parseJSON
     vertices <- o .: "vertices" >>= parseJSON
     return $ ParsedGraph $ buildGraph edges vertices
+  parseJSON _ = mzero
+
+instance FromJSON JSONVertex where
+  parseJSON (Object o) = do
+    kind <- o .: "type"
+    live <- o .: "live" >>= parseJSON
+    case kind of
+      (String t) | t == "instance" ->
+                   return $ JVertex $ InstanceV live (LBool False)
+      (String t) | t == "query" ->
+                   return $ JVertex $ QueryV (LBool False)
+      _ -> mzero
   parseJSON _ = mzero
 
 instance FromJSON EdgeHolder where
