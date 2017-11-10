@@ -303,6 +303,11 @@ let instr_to_expr vartable loc = function
      let (irvar, t_a) = java_to_var vartable loc None var in
      let (irexpr, t_b) = java_to_expr vartable loc expr in
      let kind = resolve_types (t_a, t_b) in
+     let irexpr = match (kind, irexpr) with
+       | (Ir.Bool, Ir.LInt 0) -> Ir.LBool false
+       | (Ir.Bool, Ir.LInt 1) -> Ir.LBool true
+       | (_, e) -> e
+     in
      let irvar' = rename_var (fun v -> QID.specify (QID.unspecify v) "1") irvar in
      let expr = (Ir.Eql kind) $:: (Ir.Var irvar') $:: irexpr in
      Some (expr, [(irvar, irvar')], Ir.Instance)
