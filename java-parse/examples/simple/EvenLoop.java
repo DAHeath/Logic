@@ -4,6 +4,6 @@ public class EvenLoop {
         while (i < n) {
             i = i + 2;
         }
-        Wunderhorn.ensure(i % 2 == 0);
+        Wunderhorn.ensure(i != 41);
     }
 }

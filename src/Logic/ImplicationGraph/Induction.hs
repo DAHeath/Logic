@@ -11,7 +11,8 @@ import qualified Data.Optic.Graph as G
 import qualified Data.Optic.Graph.Extras as G
 import           Data.Map (Map)
 import qualified Data.Map as M
-import           Data.Maybe (mapMaybe)
+import           Data.Maybe (mapMaybe, isJust, fromMaybe)
+import           Data.List (find)
 
 import           Logic.Formula
 import           Logic.Model
@@ -66,18 +67,28 @@ descendantInstanceVs g i =
     & filter (/= i)
     & mapMaybe (\i' -> g ^? ix i' . _InstanceV . _2)
 
+-- | Find the first query node of a graph
+findQuery :: Graph i e Vert -> Maybe i
+findQuery = fmap fst . find (isJust . preview _QueryV . view _2) . M.assocs . G._vertMap
+
+-- | Find the entry node (one without edges going into it)
+findEntry :: Ord i => Graph i e v -> i
+findEntry = minimum . G.idxs
+
 -- | Apply the strategy to the graph until a either a counterxample or an inductive
 -- solution is found.
 loop :: (IntoIdx i, MonadIO m)
      => Strategy e
-     -> i -> Graph i e Vert -> m (Either Model (Graph Idx e Vert))
-loop strat end g =
-  runSolve (loop' (G.mapIdxs intoIdx g)) >>= \case
+     -> Graph i e Vert -> m (Either Model (Graph Idx e Vert))
+loop strat g = do
+  let query = fromMaybe (minimum $ G.idxs g) $ findQuery g
+  solved <- runSolve $ loop' query $ G.mapIdxs intoIdx g
+  case solved of
     Left (Failed m) -> return (Left m)
     Left (Complete res) -> return (Right res)
     Right _ -> error "infinite loop terminated successfully?"
   where
-    loop' gr = loop' =<< step strat (intoIdx end) gr
+    loop' end gr = loop' end =<< step strat (intoIdx end) gr
 
 -- | Perform a step of the unwinding by
 -- 1. interpolating over the current graph
