@@ -25,12 +25,12 @@ main = do
       print . pretty . M.toList =<< collectAnswer r
 
 i, i', j, j', c, c' :: Var
-i  = Free "i"  T.Int
-i' = Free "i'" T.Int
-j  = Free "j"  T.Int
-j' = Free "j'" T.Int
-c  = Free "c"  T.Int
-c' = Free "c'" T.Int
+i  = Free ["i"] 0 T.Int
+i' = Free ["i"] 1 T.Int
+j  = Free ["j"] 0 T.Int
+j' = Free ["j"] 1 T.Int
+c  = Free ["c"] 0 T.Int
+c' = Free ["c"] 1 T.Int
 
 example :: Graph Integer Edge Vert
 example = G.fromLists
@@ -44,12 +44,12 @@ example = G.fromLists
   , (1, 2,
     Edge [form|i:Int < 1
             && j:Int = 0
-            && i':Int = i:Int+1|] (M.fromList [(i, i')]))
+            && i/1:Int = i:Int+1|] (M.fromList [(i, i')]))
   , (1, 3, Edge [form|i:Int >= 1|] M.empty)
   , (2, 2,
     Edge [form|j:Int < 1
-            && c':Int = c:Int+1
-            && j':Int = j:Int+1 |] (M.fromList [(c, c'), (j, j')]))
+            && c/1:Int = c:Int+1
+            && j/1:Int = j:Int+1 |] (M.fromList [(c, c'), (j, j')]))
   , (2, 1, Edge [form|j:Int >= 1|] M.empty)
   ]
 

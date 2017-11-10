@@ -67,32 +67,6 @@ solveChc hcs = runEnvZ3 sc
       join $ paramsSetSymbol pars <$> mkStringSymbol "engine" <*> mkStringSymbol "duality"
       fixedpointSetParams pars
 
--- | Given some formulas, determine if the conjunction of the formulas is satisfiable.
--- If it is not, find some minimal set such that removing any additional formulas from
--- the set is satisfiable.
-unsatCore :: MonadIO m => [Form] -> m (Maybe [Form])
-unsatCore = fixedM z3Core
-  where
-    fixedM :: (Eq a, Monad m) => (a -> m (Maybe a)) -> a -> m (Maybe a)
-    fixedM f x =
-      maybe
-        (return Nothing)
-        (\x' -> if x' == x then return (Just x') else fixedM f x') =<< f x
-
-    z3Core fs = runEnvZ3 $ do
-      let labels = map (\i -> "LABEL" ++ show i) [0..length fs - 1]
-      lbls <- traverse (\l -> join $ mkConst <$> mkStringSymbol l <*> mkBoolSort) labels
-      fs' <- traverse formToAst fs
-
-      let m = zip lbls fs
-
-      zipWithM_ solverAssertAndTrack fs' lbls
-      res <- solverCheck
-      case res of
-        Unsat -> do lbls' <- solverGetUnsatCore
-                    return $ Just $ mapMaybe (`lookup` m) lbls'
-        _ -> return Nothing
-
 -- | Find a satisfying model of an input formula (if one exists).
 satisfy :: MonadIO m => Form -> m (Maybe M.Model)
 satisfy f = runEnvZ3 $ do
@@ -109,7 +83,6 @@ isSat f = do
   case sol of
     Sat -> return True
     _   -> return False
-
   where sc = (assert =<< formToAst f) >> check
 
 -- | Test the validity of the input formula.
@@ -124,45 +97,6 @@ isValid f = runEnvZ3 $ do
 -- | Is `f -> g` a valid formula?
 entails :: MonadIO m => Form -> Form -> m Bool
 entails f g = isValid (F.app2 F.Impl f g)
-
--- | Construct a tree interpolant for a tree of formulas. The tree interpolant
--- is constructed such that:
---  + Each node formula conjoined with all child interpolants implies the node's
---    interpolant.
---  + The root node is contradicted.
---
---  Note that an interpolant tree is only constructed given that the original tree
---  of formulas is mutually unsatisfiable.
-interpolate :: MonadIO m => Tree Form -> m (Either M.Model (Tree Form))
-interpolate ftree = runEnvZ3 $ do
-  -- The full formula needs an interpolant wrapper (which should generate the
-  -- interpolant `false` if the input is unsatisfiable).
-  t <- mkInterpolant =<< buildInterp ftree
-  is <- computeInterpolant t =<< mkParams
-  case is of
-    Just (Right is') ->
-      Right <$> (buildTree <$> traverse astToForm is' <*> pure ftree)
-    Just (Left m) ->
-      Left <$> modelToModel m
-    _ -> undefined -- return Nothing
-  where
-    -- Z3 represents tree interpolants using the `mkInterpolant` wrapper for
-    -- subformulas. `mkInterpolant` indicates that an interpolant for the
-    -- marked subformula should be generated. To produce the correct tree,
-    -- each child of the current node is marked for generating an interpolant.
-    buildInterp (Tr.Node n cs) = do
-      f <- formToAst n
-      fs <- traverse (mkInterpolant <=< buildInterp) cs
-      mkAnd (f : fs)
-
-    -- Move the obtained interpolants into a tree which corresponds to the input.
-    buildTree fs t = evalState (populate t) fs
-
-    -- Z3 returns the interpolants as just a list. The interpolants are organized
-    -- in postorder. `populate` will crash (`fromJust`) if the result contains
-    -- fewer interpolants than the number of nodes in the input tree.
-    populate (Tr.Node _ cs) =
-      flip Tr.Node <$> traverse populate cs <*> state (fromJust . uncons)
 
 simplify :: MonadIO m => Form -> m Form
 simplify f = runEnvZ3 $ astToForm =<< Z3.Monad.simplify =<< formToAst f

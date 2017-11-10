@@ -1,0 +1,16 @@
+digraph {
+  node[fontsize=6];
+  edge[fontsize=6];
+  0 [label="0: [] False"];
+  1 [label="1: [i, c] False"];
+  2 [label="2: [i, j, c] False"];
+  3 [label="3: c = 1"];
+  0 -> 1 [label="(i = 0) && (c = 0) []"];
+  1 -> 2 [label="((i < 1) && (j = 0)) && ((i + 1) = i/1) [ ( i
+                                          , i/1 ) ]"];
+  1 -> 3 [label="i >= 1 []"];
+  2 -> 1 [label="j >= 1 []"];
+  2 -> 2 [label="((j < 1) && ((c + 1) = c/1)) && ((j + 1) = j/1) [ ( c
+                                                  , c/1 )
+                                                , (j, j/1) ]"];
+}
