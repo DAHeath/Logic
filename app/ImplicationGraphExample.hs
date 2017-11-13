@@ -20,7 +20,7 @@ import qualified Data.ByteString.Lazy.Char8 as BS
 main :: IO ()
 main = do
   G.display "before.dot" example
-  sol <- solve 2 example
+  sol <- solve example
   case sol of
     Left m -> print (pretty m)
     Right r -> do

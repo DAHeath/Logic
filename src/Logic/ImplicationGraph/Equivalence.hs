@@ -36,7 +36,7 @@ solve :: MonadIO m
       -> ImplGr Integer
       -> ImplGr Integer
       -> m (Either Model (ProdGr Idx))
-solve e1 e2 quer g1 g2 = G.display "before" wQuery >> loop equivStrat end wQuery
+solve e1 e2 quer g1 g2 = G.display "before" wQuery >> loop equivStrat wQuery
   where
     wQuery =
       equivProduct g1 g2

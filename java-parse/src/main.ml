@@ -69,6 +69,7 @@ let print_implication files methods output () =
   collect_files_methods 1 files methods
   |> List.map ~f:parse
   |> List.map ~f:(fun (p, m, v) -> (InstrGraph.build_graph p m, m, v))
+  |> List.map ~f:(fun (g, m, v) -> (g, m, InstrGraph.infer_bools v g))
   |> List.map ~f:(fun (g, m, v) -> (ImplicationGraph.to_implication g v, m))
   |> List.iter ~f:serialize
 
