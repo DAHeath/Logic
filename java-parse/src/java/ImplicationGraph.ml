@@ -18,6 +18,7 @@ module Vertex = struct
   type t = {
       loc: QualifiedIdentity.t;
       live: Ir.var list;
+      kind: Ir.vkind;
     }
   [@@deriving hash, compare]
 
@@ -36,24 +37,28 @@ let to_implication
         (graph: t) =
     let open Vertex in
     let open Edge in
-    let get_var var = InstrGraph.java_to_var vartable v.InstrGraph.Instr.loc None var |> fst in
+    let instr = v.InstrGraph.Instr.instr in
+    let loc = v.InstrGraph.Instr.loc in
+    let (expr, rename, k) = match (InstrGraph.instr_to_expr vartable loc instr, e) with
+      | (Some (expr, r, k), InstrGraph.Branch.True) -> (expr, r, k)
+      | (Some (expr, r, k), InstrGraph.Branch.Goto) -> (expr, r, k)
+      | (Some (expr, r, k), InstrGraph.Branch.False) -> (Ir.ExprCons (Ir.Not, expr), r, k)
+      | (None, _) -> (Ir.LBool true, [], Ir.Instance)
+    in
+    let get_var var = InstrGraph.java_to_var vartable v.InstrGraph.Instr.loc None var
+                      |> fst
+    in
     let live_names env = env |> Env.elements |> List.map ~f:get_var in
     let start = {
         loc = v.InstrGraph.Instr.loc;
         live = live_names v.InstrGraph.Instr.live;
+        kind = Ir.Instance;
       } in
     let finish = {
         loc = v'.InstrGraph.Instr.loc;
         live = live_names v'.InstrGraph.Instr.live;
+        kind = k;
       } in
-    let instr = v.InstrGraph.Instr.instr in
-    let loc = v.InstrGraph.Instr.loc in
-    let (expr, rename) = match (InstrGraph.instr_to_expr vartable loc instr, e) with
-      | (Some (expr, r), InstrGraph.Branch.True) -> (expr, r)
-      | (Some (expr, r), InstrGraph.Branch.Goto) -> (expr, r)
-      | (Some (expr, r), InstrGraph.Branch.False) -> (Ir.ExprCons (Ir.Not, expr), r)
-      | (None, _) -> (Ir.LBool true, [])
-    in
     let edge = {
         formula = expr;
         rename = rename;
@@ -70,7 +75,17 @@ let serialize (graph: t) =
                 |> List.map ~f:Ir.jsonsexp_var
                 |> String.concat ~sep:","
     in
-    (Printf.sprintf "\"%s\":[%s]" (QID.as_path v.loc) lives) :: l
+    (match v.kind with
+     | Ir.Instance -> Printf.sprintf "\"%s\":{\"type\":\"%s\",\"live\":[%s]}"
+                        (QID.as_path v.loc)
+                        (Ir.string_of_vkind v.kind)
+                        lives
+     | Ir.Query ex -> Printf.sprintf "\"%s\":{\"type\":\"%s\",\"query\":%s,\"live\":[%s]}"
+                        (QID.as_path v.loc)
+                        (Ir.string_of_vkind v.kind)
+                        (Ir.jsonsexp_expr ex)
+                        lives
+    ) :: l
   in
   let vertices = fold_vertex collect_vertices graph [] in
   let vlist = String.concat vertices ~sep:"," |> Printf.sprintf "{%s}" in

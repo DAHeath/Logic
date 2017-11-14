@@ -8,6 +8,7 @@ import           Data.Text.Prettyprint.Doc
 import qualified Data.ByteString.Lazy.Char8 as BS
 
 import           Logic.ImplicationGraph
+import           Logic.ImplicationGraph.Safety
 import           Logic.ImplicationGraph.Simplify as S
 import           Logic.ImplicationGraph.JSONParser (parseGraphFromJSON)
 import qualified Logic.Type as T
@@ -28,9 +29,20 @@ main = let
         print $ pretty $ _edgeForm dj
 
         parsedGraph <- parseGraphFromJSON <$> BS.readFile "test.json"
-        putStrLn "Trying to simplify JSON:"
+        let pruned = S.prune parsedGraph
+        putStrLn "Trying to simplify JSON..."
         G.display "before.dot" parsedGraph
-        G.display "simplified.dot" $ S.prune parsedGraph
+        G.display "simplified.dot" pruned
+
+        sol <- solve pruned
+        case sol of
+          Left m -> do
+            putStrLn "Could not prove safety:"
+            print (pretty m)
+          Right r -> do
+            putStrLn "Safe!"
+            G.display "solved.dot" r
+            print . pretty . M.toList =<< collectAnswer r
 
 i :: Var
 i  = Free ["i"] 0 T.Int
@@ -67,17 +79,17 @@ disjunctionExample =
 
         e1 = Edge {
             _edgeMap = M.fromList [(i, i')],
-            _edgeForm = foldl1 mkAnd $ 
-                [(Eql T.Int :@ V i :@ LInt 0)
-                , (Eql T.Int :@ V i' :@ V i)]
+            _edgeForm = foldl1 mkAnd
+                        [ Eql T.Int :@ V i :@ LInt 0
+                        , Eql T.Int :@ V i' :@ V i]
         }
 
         e2 = Edge {
             _edgeMap = M.fromList [(i, i'')],
-            _edgeForm = foldl1 mkAnd $ 
-                [(Eql T.Int :@ V i :@ LInt 0)
-                , (Eql T.Int :@ V i' :@ V i)
-                , (Eql T.Int :@ V i'' :@ V i')]
+            _edgeForm = foldl1 mkAnd
+                        [Eql T.Int :@ V i :@ LInt 0
+                        , Eql T.Int :@ V i' :@ V i
+                        , Eql T.Int :@ V i'' :@ V i']
         }
     in
         (e1, e2)

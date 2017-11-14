@@ -43,6 +43,14 @@ let cms_to_qid cms =
   let (jclass, jmethod) = JBasics.cms_split cms in
   QID.QID [JBasics.cn_name jclass; JBasics.ms_name jmethod]
 
+let var_name var =
+  JBir.var_name_debug var
+  |> Option.value ~default:(JBir.var_name var)
+
+let qid_var_name loc var prime =
+  var
+  |> QID.specify (QID.unspecify loc)
+  |> (Fn.flip QID.specify) prime
 
 let cms_to_instrs program cms =
   let open JProgram in
@@ -110,6 +118,32 @@ let squash_gotos (graph: t) =
   fold_edges_e remove_gotos graph empty
 
 
+let infer_bools
+    (vartable: (int * int * string * JBasics.value_type * int) list)
+    (graph: t)
+  =
+  let bool_assigns v m =
+    match v.Instr.instr with
+    | JBir.AffectVar (var, expr) ->
+      let vname = var_name var in
+      if List.exists vartable ~f:(fun (_, _, n, _, _) -> n = vname)
+      then m
+      else (match (expr, Map.find m vname) with
+          | (JBir.Const (`Int n), None) when n = Int32.zero || n = Int32.one ->
+            Map.add m ~key:vname ~data:true
+          | (_, None)
+          | (_, Some true) -> Map.add m ~key:vname ~data:false
+          | (_, Some false) -> m
+        )
+    | _ -> m
+  in
+  let append_vartable ~key:key ~data:data vtable =
+    (0, 0, key, JBasics.TBasic `Bool, 0) :: vtable
+  in
+  let found_bools = fold_vertex bool_assigns graph String.Map.empty in
+  Map.fold found_bools ~init:vartable ~f:append_vartable
+
+
 let build_graph
       (program: JBir.t JProgram.program)
       (method_sig: JBasics.class_method_signature)
@@ -137,15 +171,6 @@ let rec collect_vars = function
 
 
 let ( $:: ) a b = Ir.ExprCons (a, b)
-
-let var_name var =
-  JBir.var_name_debug var
-  |> Option.value ~default:(JBir.var_name var)
-
-let qid_var_name loc var prime =
-  var
-  |> QID.specify (QID.unspecify loc)
-  |> (Fn.flip QID.specify) prime
 
 
 let java_to_kind = function
@@ -181,9 +206,22 @@ let java_to_var
   (Ir.Free (name, kind), kind)
 
 
+let resolve_types = function
+  | (Ir.Bool, Ir.Int)
+  | (Ir.Int, Ir.Bool) -> Ir.Bool
+  | (a, b) when a = b -> a
+  | _ -> failwith "Mismatched types in condition."
+
+
 let rename_var f = function
   | Ir.Free (name, t) -> Ir.Free (f name, t)
   | other -> other
+
+
+let invoke cn ms v args =
+  match BuiltIn.call_built_in_method cn ms v args with
+  | Some i -> i
+  | None -> failwith "Non-builtin functions not supported yet."
 
 
 let rec java_to_expr vartable loc = function
@@ -264,25 +302,32 @@ let instr_to_expr vartable loc = function
   | JBir.AffectVar (var, expr) ->
      let (irvar, t_a) = java_to_var vartable loc None var in
      let (irexpr, t_b) = java_to_expr vartable loc expr in
-     let kind = if t_a = t_b
-       then t_a
-       else failwith "Mismatched types in condition."
+     let kind = resolve_types (t_a, t_b) in
+     let irexpr = match (kind, irexpr) with
+       | (Ir.Bool, Ir.LInt 0) -> Ir.LBool false
+       | (Ir.Bool, Ir.LInt 1) -> Ir.LBool true
+       | (_, e) -> e
      in
      let irvar' = rename_var (fun v -> QID.specify (QID.unspecify v) "1") irvar in
-     Some ((Ir.Eql kind) $:: (Ir.Var irvar') $:: irexpr, [(irvar, irvar')])
+     let expr = (Ir.Eql kind) $:: (Ir.Var irvar') $:: irexpr in
+     Some (expr, [(irvar, irvar')], Ir.Instance)
   | JBir.Ifd ((comp, a, b), i) ->
-     Some (java_to_condition vartable loc comp a b, [])
+     Some (java_to_condition vartable loc comp a b, [], Ir.Instance)
   | JBir.Nop -> None
   (* we're in a graph we can just delete this vertex *)
   | JBir.Goto i -> None
+  (* Static methods! These include `ensure` and friends *)
+  | JBir.InvokeStatic (v, cn, ms, args) ->
+    let args = List.map ~f:(java_to_expr vartable loc) args in
+    let (kind, ir) = invoke cn ms v args in
+    Some (kind, [], ir)
   (* things we haven't translated yet *)
+  | JBir.InvokeNonVirtual _
+  | JBir.InvokeVirtual _
   | JBir.Return _
   | JBir.Throw _
   | JBir.New _
   | JBir.NewArray _
-  | JBir.InvokeStatic _
-  | JBir.InvokeVirtual _
-  | JBir.InvokeNonVirtual _
   | JBir.MonitorEnter _
   | JBir.MonitorExit _
   | JBir.MayInit _
