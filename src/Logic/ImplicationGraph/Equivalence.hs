@@ -19,7 +19,7 @@ import           Logic.Model
 import           Logic.ImplicationGraph
 import           Logic.ImplicationGraph.Induction
 
-type ProdGr i = Graph i (These Edge Edge) Vert
+type ProdGr i = ImplGr i (These Edge Edge)
 
 instance (Pretty a, Pretty b) => Pretty (These a b) where
   pretty = \case
@@ -33,10 +33,15 @@ solve :: MonadIO m
       => Integer
       -> Integer
       -> Form
-      -> ImplGr Integer
-      -> ImplGr Integer
+      -> Graph Integer Edge Vert
+      -> Graph Integer Edge Vert
       -> m (Either Model (ProdGr Idx))
-solve e1 e2 quer g1 g2 = G.display "before" wQuery >> loop equivStrat wQuery
+solve e1 e2 quer g1 g2 = do
+  G.display "before" wQuery
+  let wQuery' = fromGraph wQuery
+  case wQuery' of
+    Nothing -> error "bad input graph"
+    Just gr -> loop equivStrat gr
   where
     wQuery =
       equivProduct g1 g2
@@ -64,10 +69,10 @@ equivStrat =
   let theStrat = Strategy
         { backs = concatMap allEs . G.backEdges
         , interp = \g -> do
-            sol <- interpolate (G.mapEdges edge g)
+            sol <- interpolate (g & implGr %~ G.mapEdges edge)
             return $ fmap (\g' ->
-              let vs = g' ^@.. G.iallVerts
-              in foldr (uncurry G.addVert) g vs) sol
+              let vs = g' ^@.. implGr . G.iallVerts
+              in foldr (\(i', v') g'' -> g'' & implGr %~ G.addVert i' v') g vs) sol
         , predInd = \g i -> do
             let (ls, rs) = preds g i
             lInd <- allInd (predInd theStrat) g i ls
@@ -84,4 +89,4 @@ equivStrat =
       These e1 e2 -> [((i1, i2), This e1), ((i1, i2), That e2)]
       e' -> [((i1, i2), e')]
     preds g i = mconcat $ map (\(i', e) ->
-      fromThese [] [] $ bimap (const [i']) (const [i']) e) $ g ^@.. G.iedgesTo i
+      fromThese [] [] $ bimap (const [i']) (const [i']) e) $ g ^@.. implGr . G.iedgesTo i

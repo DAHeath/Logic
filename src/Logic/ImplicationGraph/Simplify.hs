@@ -4,6 +4,7 @@ import           Control.Lens
 
 import qualified Data.Map as Map
 import           Data.Maybe
+import           Data.Optic.Graph (Graph)
 import qualified Data.Optic.Graph as G
 
 import qualified Logic.Var as V
@@ -16,7 +17,7 @@ type RenameMap = Map.Map V.Var V.Var
 
 
 -- | Finds irreducible vertices in a given `ImplGr`.
-irreducible :: (Ord i) => ImplGr i -> [i]
+irreducible :: (Ord i) => Graph i Edge Vert -> [i]
 irreducible graph = [startIndex, queryIndex] ++ loopHeaders where
   idxs = G.idxs graph
   startIndex = minimum idxs
@@ -77,7 +78,7 @@ disjunction e1 e2 =
 
 
 -- | Remove all reducible vertices and combine edges through {dis/con}junction.
-prune :: (Ord i) => ImplGr i -> ImplGr i
+prune :: (Ord i) => Graph i Edge Vert -> Graph i Edge Vert
 prune graph = foldr removeVertex graph reducible where
   andEdge (start, e) (end, e') =
     G.addEdgeWith disjunction start end $ conjunction e e'

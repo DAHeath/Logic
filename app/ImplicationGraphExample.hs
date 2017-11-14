@@ -1,4 +1,5 @@
 {-# LANGUAGE QuasiQuotes #-}
+import           Control.Lens
 import           Control.Monad.State
 import           Control.Monad.Except
 
@@ -20,12 +21,15 @@ import qualified Data.ByteString.Lazy.Char8 as BS
 main :: IO ()
 main = do
   G.display "before.dot" example
-  sol <- solve example
-  case sol of
-    Left m -> print (pretty m)
-    Right r -> do
-      G.display "test.dot" r
-      print . pretty . M.toList =<< collectAnswer r
+  case fromGraph example of
+    Nothing -> putStrLn "bad graph"
+    Just example' -> do
+      sol <- solve example'
+      case sol of
+        Left m -> print (pretty m)
+        Right r -> do
+          G.display "test.dot" (r ^. implGr)
+          print . pretty . M.toList =<< collectAnswer r
 
 i, i', n :: Var
 i  = Free ["i"] 0 T.Int

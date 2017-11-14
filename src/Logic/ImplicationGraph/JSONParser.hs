@@ -12,6 +12,7 @@ import           Data.List.Split
 import           Data.Text (Text, unpack)
 import           Data.Aeson
 import qualified Data.HashMap.Lazy as HML
+import           Data.Optic.Graph (Graph)
 import qualified Data.Optic.Graph as G
 import qualified Data.ByteString.Lazy.Char8 as BS
 import qualified Data.Vector as V
@@ -24,8 +25,8 @@ import           Logic.Type
 
 -- | Read a bytestring containing JSON into a graph where the indices are names
 -- for the program position.
-parseGraphFromJSON :: BS.ByteString -> ImplGr Line
-parseGraphFromJSON str = maybe G.empty getParsedGraph (decode str)
+parseGraphFromJSON :: BS.ByteString -> Maybe (ImplGr Line Edge)
+parseGraphFromJSON str = fromGraph =<< (getParsedGraph <$> decode str)
 
 data Line = LineNo [String] Int
   deriving (Data, Eq)
@@ -37,7 +38,7 @@ textToLine txt = LineNo path num
             path = init components
             num = read $ last components
 
-newtype ParsedGraph = ParsedGraph { getParsedGraph :: ImplGr Line }
+newtype ParsedGraph = ParsedGraph { getParsedGraph :: Graph Line Edge Vert }
 
 -- | Maps an edge (defined by a start and an end index) to its label.
 data EdgeHolder = EdgeHolder
@@ -59,7 +60,7 @@ renameMap renames =
   M.fromList $ map tupelize renames
   where tupelize (VarRenaming a b) = (a, b)
 
-buildGraph :: [EdgeHolder] -> Map Line JSONVertex -> ImplGr Line
+buildGraph :: [EdgeHolder] -> Map Line JSONVertex -> Graph Line Edge Vert
 buildGraph edgeHolders vertexMap =
   let
     vertices = map (\(iv, JVertex v) -> (iv, v)) $ M.toList vertexMap

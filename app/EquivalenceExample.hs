@@ -1,5 +1,7 @@
 {-# LANGUAGE QuasiQuotes #-}
+import           Control.Lens
 
+import           Data.Optic.Graph (Graph)
 import qualified Data.Optic.Graph as G
 import qualified Data.Optic.Graph.Extras as G
 import qualified Data.Map as M
@@ -26,7 +28,7 @@ import           Logic.ImplicationGraph.Equivalence
 --   return r;
 -- }
 
-cs0 :: ImplGr Integer
+cs0 :: Graph Integer Edge Vert
 cs0 = G.fromLists
   [ (0, emptyInst [])
   , (1, emptyInst [n, r])
@@ -60,7 +62,7 @@ cs0 = G.fromLists
 --   return x;
 -- }
 
-cs1 :: ImplGr Integer
+cs1 :: Graph Integer Edge Vert
 cs1 = G.fromLists
   [ (0, emptyInst [])
   , (1, emptyInst [m, x])
@@ -98,14 +100,14 @@ p' = Free ["p"] 1 T.Int
 i  = Free ["i"] 0 T.Int
 i' = Free ["i"] 1 T.Int
 
-ad0 :: ImplGr Integer
+ad0 :: Graph Integer Edge Vert
 ad0 = G.fromLists
   [ (0, emptyInst [])
   , (1, emptyInst [n, r])
   ]
   [ (0, 1, Edge [form|r:Int = n:Int - 9 * ((n:Int - 1) / 9)|] M.empty) ]
 
-ad1 :: ImplGr Integer
+ad1 :: Graph Integer Edge Vert
 ad1 = G.fromLists
   [ (0, emptyInst [])
   , (1, emptyInst [m, x])
@@ -130,4 +132,4 @@ main = do
   case sol of
     Left e -> print (pretty e)
     Right m ->
-      G.display "sol" m
+      G.display "sol" (m ^. implGr)

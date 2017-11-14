@@ -32,14 +32,40 @@ data Vert
   deriving (Show, Read, Eq, Ord, Data)
 makePrisms ''Vert
 
-emptyInst :: [Var] -> Vert
-emptyInst vs = InstanceV vs (LBool False)
-
 data Edge = Edge
   { _edgeForm :: Form
   , _edgeMap :: Map Var Var
   } deriving (Show, Read, Eq, Ord, Data)
 makeLenses ''Edge
+
+data ImplGr idx edge = ImplGr
+  { _implGr :: Graph idx edge Vert
+  , _entrance :: idx
+  , _exit :: idx
+  } deriving (Show, Read, Eq, Ord, Data)
+makeLenses ''ImplGr
+
+data Idx = Idx { _idxIden :: Integer, _idxInst :: Integer }
+  deriving (Show, Read, Eq, Data)
+makeLenses ''Idx
+
+fromGraph :: Ord idx => Graph idx edge Vert -> Maybe (ImplGr idx edge)
+fromGraph g = ImplGr g (findEntry g) <$> findQuery g
+  where
+    findQuery = fmap fst . find (isJust . preview _QueryV . view _2) . M.assocs . G._vertMap
+    findEntry = minimum . G.idxs
+
+idxGraph :: IntoIdx i => ImplGr i e -> ImplGr Idx e
+idxGraph (ImplGr g en ex) = ImplGr (G.mapIdxs intoIdx g) (intoIdx en) (intoIdx ex)
+
+type instance Index (ImplGr idx edge) = idx
+type instance IxValue (ImplGr idx edge) = Vert
+instance Ord idx => Ixed (ImplGr idx edge)
+instance Ord idx => At (ImplGr idx edge) where
+  at i = implGr . at i
+
+emptyInst :: [Var] -> Vert
+emptyInst vs = InstanceV vs (LBool False)
 
 instance Pretty Edge where
   pretty (Edge f m) = pretty f <+> pretty (M.toList m)
@@ -48,10 +74,6 @@ instance Pretty Vert where
   pretty = \case
     InstanceV vs f -> pretty vs <+> pretty f
     QueryV f -> pretty f
-
-data Idx = Idx { _idxIden :: Integer, _idxInst :: Integer }
-  deriving (Show, Read, Eq, Data)
-makeLenses ''Idx
 
 class (Eq a, Ord a) => IntoIdx a where
   intoIdx :: a -> Idx
@@ -80,20 +102,17 @@ written = prism' toWritten fromWritten
 instance Pretty Idx where
   pretty (Idx iden i) = pretty iden <+> pretty i
 
-type ImplGr idx = Graph idx Edge Vert
-
 -- | Convert the graph into a system of Constrained Horn Clauses.
-implGrChc :: ImplGr Idx -> [Chc]
-implGrChc g = concatMap idxRules (G.idxs g)
+implGrChc :: ImplGr Idx Edge -> [Chc]
+implGrChc g = concatMap idxRules (G.idxs (g ^. implGr))
   where
-    start = findEntry g
     idxApp i = instApp i =<< g ^? ix i . _InstanceV
     instApp _ ([], _) = Nothing
     instApp i (vs, _) = Just $ mkApp ('r' : written # i) vs
 
     idxRule i f rhs = vertRule i f rhs <$> g ^? ix i
     vertRule i f rhs = \case
-      InstanceV _ _ | i == start -> Rule [] f rhs
+      InstanceV _ _ | i == g ^. entrance -> Rule [] f rhs
       InstanceV vs _   -> Rule [mkApp ('r':written # i) vs] f rhs
       QueryV _         -> undefined
 
@@ -108,19 +127,19 @@ implGrChc g = concatMap idxRules (G.idxs g)
       mapMaybe (\(i', Edge e mvs) -> do
         lhs <- idxApp i'
         let rhs = subst mvs f
-        return (Query [lhs] e rhs)) (g ^@.. G.iedgesTo i)
+        return (Query [lhs] e rhs)) (g ^@.. implGr . G.iedgesTo i)
 
     -- We only create rules for non-back edges
-    relevantIncoming i = g ^@.. G.iedgesTo i . indices (i >)
+    relevantIncoming i = g ^@.. implGr . G.iedgesTo i . indices (i >)
 
 -- | Interpolate the facts in the graph using CHC solving to label the vertices
 -- with fresh definitions.
-interpolate :: MonadIO m => ImplGr Idx -> m (Either Model (ImplGr Idx))
+interpolate :: MonadIO m => ImplGr Idx Edge -> m (Either Model (ImplGr Idx Edge))
 interpolate g = (fmap . fmap) (`applyModel` g) (Z3.solveChc (implGrChc g))
 
 -- | Augment the fact at each vertex in the graph by the fact in the model.
-applyModel :: Model -> ImplGr Idx -> ImplGr Idx
-applyModel m = G.imapVerts applyVert
+applyModel :: Model -> ImplGr Idx Edge -> ImplGr Idx Edge
+applyModel m = implGr %~ G.imapVerts applyVert
   where
     applyVert i = _InstanceV %~ applyInst i
     applyInst i inst =
@@ -133,16 +152,8 @@ applyModel m = G.imapVerts applyVert
 
 data Result e
   = Failed Model
-  | Complete (Graph Idx e Vert)
+  | Complete (ImplGr Idx e)
   deriving (Show, Read, Eq)
-
--- | Find the first query node of a graph
-findQuery :: Graph i e Vert -> Maybe i
-findQuery = fmap fst . find (isJust . preview _QueryV . view _2) . M.assocs . G._vertMap
-
--- | Find the entry node (one without edges going into it)
-findEntry :: Ord i => Graph i e v -> i
-findEntry = minimum . G.idxs
 
 type SolveState = Map Integer Integer
 
@@ -153,8 +164,8 @@ runSolve :: Monad m => ExceptT e (StateT (Map k a) m) a1 -> m (Either e a1)
 runSolve ac = evalStateT (runExceptT ac) M.empty
 
 -- | Gather all facts known about each instance of the same index together by disjunction.
-collectAnswer :: MonadIO m => ImplGr Idx -> m (Map Integer Form)
-collectAnswer g = traverse Z3.superSimplify $ execState (G.itravVerts (\i v -> case v of
+collectAnswer :: MonadIO m => ImplGr Idx Edge -> m (Map Integer Form)
+collectAnswer (ImplGr g _ _) = traverse Z3.superSimplify $ execState (G.itravVerts (\i v -> case v of
   InstanceV _ f ->
     if f == LBool True then return ()
     else modify (M.insertWith mkOr (i ^. idxIden) f)

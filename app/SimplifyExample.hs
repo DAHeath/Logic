@@ -1,4 +1,5 @@
 {-# LANGUAGE QuasiQuotes #-}
+import           Control.Lens
 
 import           Data.Optic.Graph (Graph)
 import qualified Data.Optic.Graph as G
@@ -6,6 +7,7 @@ import qualified Data.Optic.Graph.Extras as G
 import qualified Data.Map as M
 import           Data.Text.Prettyprint.Doc
 import qualified Data.ByteString.Lazy.Char8 as BS
+import           Data.Maybe (fromJust)
 
 import           Logic.ImplicationGraph
 import           Logic.ImplicationGraph.Safety
@@ -28,11 +30,11 @@ main = let
         print $ _edgeMap dj
         print $ pretty $ _edgeForm dj
 
-        parsedGraph <- parseGraphFromJSON <$> BS.readFile "test.json"
-        let pruned = S.prune parsedGraph
+        parsedGraph <- fromJust . parseGraphFromJSON <$> BS.readFile "test.json"
+        let pruned = parsedGraph & implGr %~ S.prune
         putStrLn "Trying to simplify JSON..."
-        G.display "before.dot" parsedGraph
-        G.display "simplified.dot" pruned
+        G.display "before.dot" (parsedGraph ^. implGr)
+        G.display "simplified.dot" (pruned ^. implGr)
 
         sol <- solve pruned
         case sol of
@@ -41,7 +43,7 @@ main = let
             print (pretty m)
           Right r -> do
             putStrLn "Safe!"
-            G.display "solved.dot" r
+            G.display "solved.dot" (r ^. implGr)
             print . pretty . M.toList =<< collectAnswer r
 
 i :: Var

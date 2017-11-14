@@ -85,6 +85,7 @@ executable ImplicationGraphExample
   build-depends:       base
                      , text             >= 1.2
                      , mtl
+                     , lens
                      , prettyprinter
                      , containers
                      , Logic
@@ -113,6 +114,7 @@ executable ImperativeExample
   ghc-options:
   build-depends:       base
                      , text             >= 1.2
+                     , lens
                      , mtl
                      , prettyprinter
                      , containers
