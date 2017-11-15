@@ -21,6 +21,7 @@ library
                      , Logic.Model
                      , Logic.Chc
                      , Logic.ImplicationGraph
+                     , Logic.ImplicationGraph.Chc
                      , Logic.ImplicationGraph.Induction
                      , Logic.ImplicationGraph.Equivalence
                      , Logic.ImplicationGraph.Safety
@@ -39,7 +40,6 @@ library
   build-depends:       base             >= 4.8
                      , containers       >= 0.5
                      , tardis
-                     , graphviz
                      , turtle
                      , fixed-vector
                      , lens             >= 4.15

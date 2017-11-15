@@ -36,7 +36,7 @@ cs0 = G.fromLists
   , (3, emptyInst [n, r])
   ]
   [ (0, 1, Edge [form|r:Int = 0|] M.empty)
-  , (1, 3, Edge [form|n:Int <= 1 && r':Int = 1|] (M.fromList [(r, r')]))
+  , (1, 3, Edge [form|n:Int <= 1 && r/1:Int = 1|] (M.fromList [(r, r')]))
   , (1, 2, Edge [form|n:Int > 1 && s:Int = 2 && p:Int = 1 && i:Int = 2|] M.empty)
   , (2, 2, Edge [form|i:Int < n:Int
                    && i/1:Int = i:Int+1
@@ -70,14 +70,14 @@ cs1 = G.fromLists
   , (3, emptyInst [m, x])
   ]
   [ (0, 1, Edge [form|x:Int = 0|] M.empty)
-  , (1, 3, Edge [form|m:Int <= 1 && x':Int = 1|] (M.fromList [(x, x')]))
+  , (1, 3, Edge [form|m:Int <= 1 && x/1:Int = 1|] (M.fromList [(x, x')]))
   , (1, 2, Edge [form|m:Int > 1 && c1:Int = 1 && c2:Int = 1 && j:Int = 2|] M.empty)
   , (2, 2, Edge [form|j:Int <= m:Int
-                   && j':Int = j:Int+1
-                   && c2':Int = c2:Int + c1:Int
-                   && c1':Int = c2:Int |]
+                   && j/1:Int = j:Int+1
+                   && c2/1:Int = c2:Int + c1:Int
+                   && c1/1:Int = c2:Int |]
            (M.fromList [(j, j'), (c1, c1'), (c2, c2')]))
-  , (2, 3, Edge [form|j:Int > m:Int && x':Int = c2:Int|] (M.fromList [(x, x')]))
+  , (2, 3, Edge [form|j:Int > m:Int && x/1:Int = c2:Int|] (M.fromList [(x, x')]))
   ]
 
 x   = Free ["x"] 0 T.Int
@@ -118,18 +118,18 @@ ad1 = G.fromLists
   , (1, 2, Edge [form|x:Int <= 9|] M.empty)
   ]
 
--- main :: IO ()
--- main = do
---   sol <- solve 3 3 [form|n:Int = m:Int -> x:Int = r:Int|] cs0 cs1
---   case sol of
---     Left e -> print (pretty e)
---     Right m ->
---       G.display "sol" m
-
 main :: IO ()
 main = do
-  sol <- solve 1 2 [form|n:Int > 0 && n:Int = m:Int -> x:Int = r:Int|] ad0 ad1
+  sol <- solve 3 3 [form|n:Int = m:Int -> x:Int = r:Int|] cs0 cs1
   case sol of
     Left e -> print (pretty e)
     Right m ->
       G.display "sol" (m ^. implGr)
+
+-- main :: IO ()
+-- main = do
+--   sol <- solve 1 2 [form|n:Int > 0 && n:Int = m:Int -> x:Int = r:Int|] ad0 ad1
+--   case sol of
+--     Left e -> print (pretty e)
+--     Right m ->
+--       G.display "sol" (m ^. implGr)

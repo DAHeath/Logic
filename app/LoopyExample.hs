@@ -1,4 +1,5 @@
 {-# LANGUAGE QuasiQuotes #-}
+import           Control.Lens
 import           Control.Monad.State
 import           Control.Monad.Except
 
@@ -17,11 +18,11 @@ import           Logic.Var
 main :: IO ()
 main = do
   G.display "before" example
-  sol <- solve 3 example
+  sol <- solve example
   case sol of
     Left m -> print (pretty m)
     Right r -> do
-      G.display "after" r
+      G.display "after" (r ^. implGr)
       print . pretty . M.toList =<< collectAnswer r
 
 i, i', j, j', c, c' :: Var

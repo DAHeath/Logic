@@ -8,12 +8,16 @@ import qualified Data.Optic.Graph as G
 
 import           Logic.Model
 import           Logic.ImplicationGraph
+import           Logic.ImplicationGraph.Chc
 import           Logic.ImplicationGraph.Induction
 
 -- | Repeatedly unwind the program until a counterexample is found or inductive
 -- invariants are found.
-solve :: (IntoIdx i, MonadIO m) => ImplGr i Edge -> m (Either Model (ImplGr Idx Edge))
-solve = loop safetyStrat
+solve :: (AsInteger i, MonadIO m) => Graph i Edge Vert -> HyperEdges -> m (Either Model (ImplGr Edge))
+solve g hs =
+  case fromGraph g hs of
+    Nothing -> error "bad safety graph"
+    Just g' -> loop safetyStrat g'
 
 safetyStrat :: Strategy Edge
 safetyStrat =

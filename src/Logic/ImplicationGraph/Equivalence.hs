@@ -18,8 +18,9 @@ import           Logic.Var
 import           Logic.Model
 import           Logic.ImplicationGraph
 import           Logic.ImplicationGraph.Induction
+import           Logic.ImplicationGraph.Chc
 
-type ProdGr i = ImplGr i (These Edge Edge)
+type ProdGr = ImplGr (These Edge Edge)
 
 instance (Pretty a, Pretty b) => Pretty (These a b) where
   pretty = \case
@@ -35,10 +36,10 @@ solve :: MonadIO m
       -> Form
       -> Graph Integer Edge Vert
       -> Graph Integer Edge Vert
-      -> m (Either Model (ProdGr Idx))
+      -> m (Either Model ProdGr)
 solve e1 e2 quer g1 g2 = do
   G.display "before" wQuery
-  let wQuery' = fromGraph wQuery
+  let wQuery' = fromGraph wQuery M.empty
   case wQuery' of
     Nothing -> error "bad input graph"
     Just gr -> loop equivStrat gr

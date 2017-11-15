@@ -21,27 +21,36 @@ import qualified Data.ByteString.Lazy.Char8 as BS
 main :: IO ()
 main = do
   G.display "before.dot" example
-  sol <- solve example M.empty
+  sol <- solve example hs
   case sol of
     Left m -> print (pretty m)
     Right r -> do
       G.display "test.dot" (r ^. implGr)
       print . pretty . M.toList =<< collectAnswer r
 
-i, i', n :: Var
-i  = Free ["i"] 0 T.Int
-i' = Free ["i"] 1 T.Int
-n  = Free ["n"] 0 T.Int
-
-s :: [Var]
-s = [i, n]
+a, a', x, x' :: Var
+a  = Free ["a"] 0 T.Int
+a' = Free ["a"] 1 T.Int
+p  = Free ["p"] 0 T.Int
+x  = Free ["x"] 0 T.Int
+x' = Free ["x"] 1 T.Int
 
 example :: Graph Integer Edge Vert
 example = G.fromLists
   [ (0, emptyInst [])
-  , (1, emptyInst s)
-  , (2, QueryV [form|not (i:Int = 11)|])]
-  [ ( 0, 1, Edge [form|i:Int = 0|] M.empty)
-  , ( 1, 1, Edge [form|i/1:Int = i:Int + 2 && i:Int < n:Int|] (M.singleton i i'))
-  , ( 1, 2, Edge [form|i:Int >= n:Int|] M.empty)
+  , (1, emptyInst [a])
+
+  , (2, emptyInst [p, x])
+
+  , (3, emptyInst [p, x])
+  , (4, QueryV [form|a:Int = 1|])]
+
+  [ ( 0, 1, Edge [form|a:Int = 0|] M.empty)
+  , ( 0, 2, Edge [form|x:Int = p:Int|] M.empty)
+  , ( 2, 3, Edge [form|x/1:Int = x:Int + 1|] (M.singleton x x'))
+  , ( 1, 4, Edge [form|true|] M.empty)
+  , ( 3, 4, Edge [form|p:Int = a:Int && a/1:Int = x:Int|] (M.singleton a a'))
   ]
+
+hs :: HyperEdges
+hs = M.singleton 4 [(1, 3)]

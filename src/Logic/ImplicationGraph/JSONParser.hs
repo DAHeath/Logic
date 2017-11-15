@@ -25,8 +25,8 @@ import           Logic.Type
 
 -- | Read a bytestring containing JSON into a graph where the indices are names
 -- for the program position.
-parseGraphFromJSON :: BS.ByteString -> Maybe (ImplGr Line Edge)
-parseGraphFromJSON str = fromGraph =<< (getParsedGraph <$> decode str)
+parseGraphFromJSON :: BS.ByteString -> Maybe (Graph Line Edge Vert)
+parseGraphFromJSON str = getParsedGraph <$> decode str
 
 data Line = LineNo [String] Int
   deriving (Data, Eq)
@@ -76,8 +76,8 @@ instance Ord Line where
 instance Show Line where
   show (LineNo path num) = L.intercalate "/" $ path ++ [show num]
 
-instance IntoIdx Line where
-  intoIdx (LineNo _ n) = Idx (toInteger n) 0
+instance AsInteger Line where
+  asInteger (LineNo _ n) = toInteger n
 
 instance Pretty Line where
   pretty = pretty . show
