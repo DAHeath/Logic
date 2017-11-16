@@ -27,6 +27,7 @@ library
                      , Logic.ImplicationGraph.Safety
                      , Logic.ImplicationGraph.Simplify
                      , Logic.ImplicationGraph.JSONParser
+                     , Logic.ImplicationGraph.JavaParser
                      , Logic.Solver.Z3
                      , Data.Optic.Graph.Extras
 
@@ -62,6 +63,7 @@ library
                      , unordered-containers
                      , vector
                      , bytestring
+                     , foldl
   default-language:    Haskell2010
 
 executable DualityExample
