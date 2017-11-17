@@ -26,7 +26,7 @@ main = do
     Left m -> print (pretty m)
     Right r -> do
       G.display "test.dot" (r ^. implGr)
-      print . pretty . M.toList =<< collectAnswer r
+      -- print . pretty . M.toList =<< collectAnswer r
 
 i, i', n :: Var
 i  = Free ["i"] 0 T.Int
@@ -38,8 +38,8 @@ s = [i, n]
 
 example :: Graph Integer Edge Vert
 example = G.fromLists
-  [ (0, emptyInst [])
-  , (1, emptyInst s)
+  [ (0, emptyInst 0 [])
+  , (1, emptyInst 1 s)
   , (2, QueryV [form|not (i:Int = 11)|])]
   [ ( 0, 1, Edge [form|i:Int = 0|] M.empty)
   , ( 1, 1, Edge [form|i/1:Int = i:Int + 2 && i:Int < n:Int|] (M.singleton i i'))

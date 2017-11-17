@@ -44,7 +44,6 @@ main = let
           Right r -> do
             putStrLn "Safe!"
             G.display "solved.dot" (r ^. implGr)
-            print . pretty . M.toList =<< collectAnswer r
 
 i :: Var
 i  = Free ["i"] 0 T.Int
@@ -58,12 +57,12 @@ emptyEdge s d = (s, d, Edge [form|i:Int = 0|] M.empty)
 
 irreducibleExample :: Graph Int Edge Vert
 irreducibleExample = G.fromLists
-    [ (0, emptyInst [])
-    , (1, emptyInst [])
-    , (2, emptyInst [])
-    , (3, emptyInst [])
-    , (4, emptyInst [])
-    , (5, emptyInst [])]
+    [ (0, emptyInst 0 [])
+    , (1, emptyInst 1 [])
+    , (2, emptyInst 2 [])
+    , (3, emptyInst 3 [])
+    , (4, emptyInst 4 [])
+    , (5, emptyInst 5 [])]
     [ emptyEdge 0 1
     , emptyEdge 1 2
     , emptyEdge 2 4

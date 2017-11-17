@@ -30,10 +30,10 @@ import           Logic.ImplicationGraph.Equivalence
 
 cs0 :: Graph Integer Edge Vert
 cs0 = G.fromLists
-  [ (0, emptyInst [])
-  , (1, emptyInst [n, r])
-  , (2, emptyInst [n, r, s, p, i])
-  , (3, emptyInst [n, r])
+  [ (0, emptyInst 0 [])
+  , (1, emptyInst 1 [n, r])
+  , (2, emptyInst 2 [n, r, s, p, i])
+  , (3, emptyInst 3 [n, r])
   ]
   [ (0, 1, Edge [form|r:Int = 0|] M.empty)
   , (1, 3, Edge [form|n:Int <= 1 && r/1:Int = 1|] (M.fromList [(r, r')]))
@@ -64,10 +64,10 @@ cs0 = G.fromLists
 
 cs1 :: Graph Integer Edge Vert
 cs1 = G.fromLists
-  [ (0, emptyInst [])
-  , (1, emptyInst [m, x])
-  , (2, emptyInst [m, x, c1, c2, j])
-  , (3, emptyInst [m, x])
+  [ (0, emptyInst 0 [])
+  , (1, emptyInst 1 [m, x])
+  , (2, emptyInst 2 [m, x, c1, c2, j])
+  , (3, emptyInst 3 [m, x])
   ]
   [ (0, 1, Edge [form|x:Int = 0|] M.empty)
   , (1, 3, Edge [form|m:Int <= 1 && x/1:Int = 1|] (M.fromList [(x, x')]))
@@ -102,34 +102,34 @@ i' = Free ["i"] 1 T.Int
 
 ad0 :: Graph Integer Edge Vert
 ad0 = G.fromLists
-  [ (0, emptyInst [])
-  , (1, emptyInst [n, r])
+  [ (0, emptyInst 0 [])
+  , (1, emptyInst 1 [n, r])
   ]
   [ (0, 1, Edge [form|r:Int = n:Int - 9 * ((n:Int - 1) / 9)|] M.empty) ]
 
 ad1 :: Graph Integer Edge Vert
 ad1 = G.fromLists
-  [ (0, emptyInst [])
-  , (1, emptyInst [m, x])
-  , (2, emptyInst [m, x])
+  [ (0, emptyInst 0 [])
+  , (1, emptyInst 1 [m, x])
+  , (2, emptyInst 2 [m, x])
   ]
   [ (0, 1, Edge [form|x:Int = m:Int|] M.empty)
   , (1, 1, Edge [form|x:Int > 9 && x/1:Int = x:Int / 10 + x:Int % 10|] (M.fromList [(x, x')]))
   , (1, 2, Edge [form|x:Int <= 9|] M.empty)
   ]
 
-main :: IO ()
-main = do
-  sol <- solve 3 3 [form|n:Int = m:Int -> x:Int = r:Int|] cs0 cs1
-  case sol of
-    Left e -> print (pretty e)
-    Right m ->
-      G.display "sol" (m ^. implGr)
-
 -- main :: IO ()
 -- main = do
---   sol <- solve 1 2 [form|n:Int > 0 && n:Int = m:Int -> x:Int = r:Int|] ad0 ad1
+--   sol <- solve 3 3 [form|n:Int = m:Int -> x:Int = r:Int|] cs0 cs1
 --   case sol of
 --     Left e -> print (pretty e)
 --     Right m ->
 --       G.display "sol" (m ^. implGr)
+
+main :: IO ()
+main = do
+  sol <- solve 1 2 [form|n:Int > 0 && n:Int = m:Int -> x:Int = r:Int|] ad0 ad1
+  case sol of
+    Left e -> print (pretty e)
+    Right m ->
+      G.display "sol" (m ^. implGr)

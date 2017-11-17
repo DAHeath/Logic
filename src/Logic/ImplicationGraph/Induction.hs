@@ -19,7 +19,6 @@ import           Logic.Model
 import qualified Logic.Solver.Z3 as Z3
 import           Logic.ImplicationGraph
 
-
 type PredInd e m = ImplGr e -> Idx -> m [Bool]
 
 data Strategy e = Strategy
@@ -40,7 +39,7 @@ ind pc g i = maybe (computeInd pc g i) return . M.lookup i =<< get
 
 indPred :: (MonadIO m, MonadState (Map Idx Bool) m)
         => PredInd e m -> ImplGr e -> Idx -> Idx -> m Bool
-indPred pc g i i' = if i <= i' then return False else ind pc g i'
+indPred pc g i i' = if i >= i' then return False else ind pc g i'
 
 computeInd :: (MonadIO m, MonadState (Map Idx Bool) m)
            => PredInd e m -> ImplGr e -> Idx -> m Bool
@@ -49,21 +48,22 @@ computeInd pc g i =
     psInd <- pc g i
     case v of
       QueryV _ -> return (or psInd)
-      InstanceV _ f ->
+      InstanceV loc _ f ->
         or <$> sequence ([ return $ f == LBool True
-                         , anyM (`Z3.entails` f) (descendantInstanceVs g i)
+                         , anyM (`Z3.entails` f) (descendantInstanceVs g loc i)
                          ] ++ map return psInd)) (g ^. at i)
 
 allInd :: (MonadIO m, MonadState (Map Idx Bool) m)
        => PredInd e m -> ImplGr e -> Idx -> [Idx] -> m Bool
 allInd pc g i is = and <$> mapM (indPred pc g i) is
 
-descendantInstanceVs :: ImplGr e -> Idx -> [Form]
-descendantInstanceVs g i =
+descendantInstanceVs :: ImplGr e -> Loc -> Idx -> [Form]
+descendantInstanceVs g loc i =
   G.descendants i (g ^. implGr)
-    & filter (match i)
-    & filter (/= i)
-    & mapMaybe (\i' -> g ^? ix i' . _InstanceV . _2)
+    & filter (\i' -> case g ^? implGr . ix i' . _InstanceV . _1 of
+      Nothing -> False
+      Just loc' -> i /= i' && loc == loc')
+    & mapMaybe (\i' -> g ^? ix i' . _InstanceV . _3)
 
 -- | Apply the strategy to the graph until a either a counterxample or an inductive
 -- solution is found.
@@ -84,11 +84,12 @@ loop strat g = do
 -- 2. checking if the solution is inductive (and terminating if it is)
 -- 3. unwinding the graph over all backedges
 step :: (Pretty e, Solve e m) => Strategy e -> ImplGr e -> m (ImplGr e)
-step strat g = interp strat g >>= either (throwError . Failed) (\interp -> do
-  G.display "step" (interp ^. implGr)
-  liftIO getLine
-  let end = g ^. exit
-  indM <- inductive (predInd strat) interp
-  let isInd = M.keys $ M.filter id indM
-  when (M.lookup end indM == Just True) $ throwError $ Complete interp
-  interp & implGr %%~ unwindAll (backs strat (g ^. implGr)) isInd end)
+step strat g = do
+  G.display "step" (g ^. implGr)
+  interp strat g >>= either (throwError . Failed) (\interp -> do
+    liftIO getLine
+    let end = g ^. exit
+    indM <- inductive (predInd strat) interp
+    let isInd = M.keys $ M.filter id indM
+    when (M.lookup end indM == Just True) $ throwError $ Complete interp
+    return $ unwindAll (backs strat (g ^. implGr)) isInd end interp)

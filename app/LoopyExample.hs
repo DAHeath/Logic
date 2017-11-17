@@ -18,7 +18,7 @@ import           Logic.Var
 main :: IO ()
 main = do
   G.display "before" example
-  sol <- solve example
+  sol <- solve example M.empty
   case sol of
     Left m -> print (pretty m)
     Right r -> do

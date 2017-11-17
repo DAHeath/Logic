@@ -18,24 +18,6 @@ import qualified Turtle
 
 import           System.Info
 
-unwind :: (Applicative f, Ord i, Show i)
-       => (i -> f i)
-       -> (i -> i -> e -> f e)
-       -> (i -> v -> f v)
-       -> i -> i -> e
-       -> Graph i e v -> f (i, Graph i e v)
-unwind fi fe fv i1 i2 e g =
-  let g' = reaches i2 (delEdge i1 i2 g) `mappend` between i2 i1 g
-      am = M.fromList <$> traverse (\i -> fmap (\i' -> (i, i')) (Backwards $ fi i)) (idxs g')
-      ae = fe i1 i2 e
-      ag = idfs fe fv g'
-  in complete <$> forwards am <*> ae <*> ag
-
-  where
-    complete m e' g' = ( M.findWithDefault i2 i2 m, connect m e' (unwind' m g'))
-    unwind' m = mapIdxs (\i -> M.findWithDefault i i m)
-    connect m e' g' = addEdge (M.findWithDefault i1 i1 m) i2 e' $ union g g'
-
 display :: (MonadIO m, Eq i, Pretty i, Pretty e, Pretty v)
         => FilePath -> Graph i e v -> m ()
 display fn g = do

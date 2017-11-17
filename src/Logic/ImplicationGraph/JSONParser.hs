@@ -28,7 +28,7 @@ import           Logic.Type
 parseGraphFromJSON :: BS.ByteString -> Maybe (Graph Line Edge Vert)
 parseGraphFromJSON str = getParsedGraph <$> decode str
 
-data Line = LineNo [String] Int
+data Line = LineNo { qualifer :: [String], lineNo :: Integer }
   deriving (Data, Eq)
 
 -- TODO: parse into int safely
@@ -50,7 +50,10 @@ data EdgeHolder = EdgeHolder
 -- | A map from each vertex to its neighbors. (Defines the graph topology.)
 type VertexMap = Map Line [Var]
 
-newtype JSONVertex = JVertex Vert
+data JSONVertex
+  = JInst [Var]
+  | JQuery Form
+  deriving (Show, Read, Eq, Ord, Data)
 
 -- | Represents a variable renaming.
 data VarRenaming = VarRenaming Var Var
@@ -63,7 +66,9 @@ renameMap renames =
 buildGraph :: [EdgeHolder] -> Map Line JSONVertex -> Graph Line Edge Vert
 buildGraph edgeHolders vertexMap =
   let
-    vertices = map (\(iv, JVertex v) -> (iv, v)) $ M.toList vertexMap
+    vertices = map (\(iv, v) -> (iv, case v of
+      JInst vs -> InstanceV (lineNo iv) vs (LBool False)
+      JQuery q -> QueryV q)) $ M.toList vertexMap
     edges = map (\(EdgeHolder v1 v2 e) -> (v1, v2, e)) edgeHolders
   in
     G.fromLists vertices edges
@@ -77,7 +82,7 @@ instance Show Line where
   show (LineNo path num) = L.intercalate "/" $ path ++ [show num]
 
 instance AsInteger Line where
-  asInteger (LineNo _ n) = toInteger n
+    asInteger (LineNo _ n) = toInteger n
 
 instance Pretty Line where
   pretty = pretty . show
@@ -104,10 +109,10 @@ instance FromJSON JSONVertex where
     kind <- o .: "type"
     live <- o .: "live" >>= parseJSON
     case kind of
-      (String t) | t == "instance" ->
-                   return $ JVertex $ InstanceV live (LBool False)
-      (String t) | t == "query" ->
-                   (JVertex . QueryV) <$> (o .: "query" >>= parseJSON)
+      String t | t == "instance" ->
+        return $ JInst live
+      String t | t == "query" ->
+        JQuery <$> (o .: "query" >>= parseJSON)
       _ -> mzero
   parseJSON _ = mzero
 
