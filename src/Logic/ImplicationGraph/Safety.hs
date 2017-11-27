@@ -3,8 +3,9 @@ module Logic.ImplicationGraph.Safety where
 import           Control.Lens
 import           Control.Monad.State
 
-import           Data.Optic.Graph (Graph)
-import qualified Data.Optic.Graph as G
+import           Data.Optic.Directed.Graph (Graph)
+import qualified Data.Optic.Directed.Graph as G
+import qualified Data.Set as S
 
 import           Logic.Model
 import           Logic.ImplicationGraph
@@ -24,6 +25,7 @@ safetyStrat =
   let theStrat = Strategy
         { backs = revBackEdges
         , interp = interpolate
-        , predInd = \g i -> (: []) <$> allInd (predInd theStrat) g i (G.predecessors i (g ^. implGr))
+        , predInd = \g i -> (: []) <$> allInd (predInd theStrat) g i
+                              (S.toList $ G.predecessors (g ^. implGr) i)
         }
   in theStrat

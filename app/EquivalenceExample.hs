@@ -1,8 +1,8 @@
 {-# LANGUAGE QuasiQuotes #-}
 import           Control.Lens
 
-import           Data.Optic.Graph (Graph)
-import qualified Data.Optic.Graph as G
+import           Data.Optic.Directed.Graph (Graph)
+import qualified Data.Optic.Directed.Graph as G
 import qualified Data.Optic.Graph.Extras as G
 import qualified Data.Map as M
 import           Data.Text.Prettyprint.Doc
@@ -35,14 +35,14 @@ cs0 = G.fromLists
   , (2, emptyInst 2 [n, r, s, p, i])
   , (3, emptyInst 3 [n, r])
   ]
-  [ (0, 1, Edge [form|r:Int = 0|] M.empty)
-  , (1, 3, Edge [form|n:Int <= 1 && r/1:Int = 1|] (M.fromList [(r, r')]))
-  , (1, 2, Edge [form|n:Int > 1 && s:Int = 2 && p:Int = 1 && i:Int = 2|] M.empty)
-  , (2, 2, Edge [form|i:Int < n:Int
+  [ (G.Pair 0 1, Edge [form|r:Int = 0|] M.empty)
+  , (G.Pair 1 3, Edge [form|n:Int <= 1 && r/1:Int = 1|] (M.fromList [(r, r')]))
+  , (G.Pair 1 2, Edge [form|n:Int > 1 && s:Int = 2 && p:Int = 1 && i:Int = 2|] M.empty)
+  , (G.Pair 2 2, Edge [form|i:Int < n:Int
                    && i/1:Int = i:Int+1
                    && s/1:Int = s:Int + p:Int
                    && p/1:Int = s:Int |] (M.fromList [(i, i'), (s, s'), (p, p')]))
-  , (2, 3 , Edge [form|i:Int >= n:Int && r/1:Int = s:Int|] (M.fromList [(r, r')]))
+  , (G.Pair 2 3 , Edge [form|i:Int >= n:Int && r/1:Int = s:Int|] (M.fromList [(r, r')]))
   ]
 
 
@@ -69,15 +69,15 @@ cs1 = G.fromLists
   , (2, emptyInst 2 [m, x, c1, c2, j])
   , (3, emptyInst 3 [m, x])
   ]
-  [ (0, 1, Edge [form|x:Int = 0|] M.empty)
-  , (1, 3, Edge [form|m:Int <= 1 && x/1:Int = 1|] (M.fromList [(x, x')]))
-  , (1, 2, Edge [form|m:Int > 1 && c1:Int = 1 && c2:Int = 1 && j:Int = 2|] M.empty)
-  , (2, 2, Edge [form|j:Int <= m:Int
+  [ (G.Pair 0 1, Edge [form|x:Int = 0|] M.empty)
+  , (G.Pair 1 3, Edge [form|m:Int <= 1 && x/1:Int = 1|] (M.fromList [(x, x')]))
+  , (G.Pair 1 2, Edge [form|m:Int > 1 && c1:Int = 1 && c2:Int = 1 && j:Int = 2|] M.empty)
+  , (G.Pair 2 2, Edge [form|j:Int <= m:Int
                    && j/1:Int = j:Int+1
                    && c2/1:Int = c2:Int + c1:Int
                    && c1/1:Int = c2:Int |]
            (M.fromList [(j, j'), (c1, c1'), (c2, c2')]))
-  , (2, 3, Edge [form|j:Int > m:Int && x/1:Int = c2:Int|] (M.fromList [(x, x')]))
+  , (G.Pair 2 3, Edge [form|j:Int > m:Int && x/1:Int = c2:Int|] (M.fromList [(x, x')]))
   ]
 
 x   = Free ["x"] 0 T.Int
@@ -105,7 +105,7 @@ ad0 = G.fromLists
   [ (0, emptyInst 0 [])
   , (1, emptyInst 1 [n, r])
   ]
-  [ (0, 1, Edge [form|r:Int = n:Int - 9 * ((n:Int - 1) / 9)|] M.empty) ]
+  [ (G.Pair 0 1, Edge [form|r:Int = n:Int - 9 * ((n:Int - 1) / 9)|] M.empty) ]
 
 ad1 :: Graph Integer Edge Vert
 ad1 = G.fromLists
@@ -113,9 +113,9 @@ ad1 = G.fromLists
   , (1, emptyInst 1 [m, x])
   , (2, emptyInst 2 [m, x])
   ]
-  [ (0, 1, Edge [form|x:Int = m:Int|] M.empty)
-  , (1, 1, Edge [form|x:Int > 9 && x/1:Int = x:Int / 10 + x:Int % 10|] (M.fromList [(x, x')]))
-  , (1, 2, Edge [form|x:Int <= 9|] M.empty)
+  [ (G.Pair 0 1, Edge [form|x:Int = m:Int|] M.empty)
+  , (G.Pair 1 1, Edge [form|x:Int > 9 && x/1:Int = x:Int / 10 + x:Int % 10|] (M.fromList [(x, x')]))
+  , (G.Pair 1 2, Edge [form|x:Int <= 9|] M.empty)
   ]
 
 -- main :: IO ()

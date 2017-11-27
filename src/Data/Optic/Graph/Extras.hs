@@ -5,7 +5,7 @@ import           Control.Lens
 import           Control.Applicative.Backwards
 import           Control.Monad.State
 
-import           Data.Optic.Graph
+import           Data.Optic.Directed.Graph
 import           Data.Maybe (fromJust)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -48,5 +48,5 @@ dot seper fi fe fv g =
 
     showVert (i, v) =
       lbl i ++ " [label=\"" ++ fi i ++ seper ++ fv v ++ "\"];"
-    showEdge ((i1, i2), e) =
+    showEdge (Pair i1 i2, e) =
       lbl i1 ++ " -> " ++ lbl i2 ++ " [label=\"" ++ fe e ++ "\"];"

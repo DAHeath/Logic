@@ -5,8 +5,8 @@ import           Control.Monad.State
 
 import           Data.Map (Map)
 import qualified Data.Map as M
-import           Data.Optic.Graph (Graph)
-import qualified Data.Optic.Graph as G
+import           Data.Optic.Directed.Graph (Graph)
+import qualified Data.Optic.Directed.Graph as G
 import           Data.Maybe (mapMaybe)
 import           Data.Text.Prettyprint.Doc
 
@@ -28,13 +28,15 @@ implGrChc g =
 
     idxRule i f rhs = vertRule i f rhs <$> g ^? ix i
     vertRule i f rhs = \case
-      InstanceV{} | i == g ^. entrance -> Rule [] f rhs
-      InstanceV _ vs _   -> Rule [mkApp ('r':_Show # i) vs] f rhs
+      InstanceV _ vs _ ->
+        if null vs
+        then Rule [] f rhs
+        else Rule [mkApp ('r':_Show # i) vs] f rhs
       QueryV _         -> undefined
 
     idxRules i = maybe [] (\case
       InstanceV {} ->
-        mapMaybe (\(i', Edge f mvs) -> do
+        mapMaybe (\(G.Pair i' _, Edge f mvs) -> do
           rhs <- subst mvs <$> idxApp i
           idxRule i' f rhs) (relevantIncoming i)
           -- idxRule i' f rhs) (singleIncoming i)
@@ -48,7 +50,7 @@ implGrChc g =
       QueryV f -> queries i f) (g ^? ix i)
 
     queries i f =
-      mapMaybe (\(i', Edge e mvs) -> do
+      mapMaybe (\(G.Pair i' _, Edge e mvs) -> do
         lhs <- idxApp i'
         let rhs = subst mvs f
         return (Query [lhs] e rhs)) (relevantIncoming i)
@@ -61,7 +63,7 @@ implGrChc g =
         -- return $ Query [r1, r2] e rhs) (hyperIncoming i)
 
     -- We only create rules for non-back edges
-    relevantIncoming i = g ^@.. implGr . G.iedgesTo i . indices (i <)
+    relevantIncoming i = g ^@.. implGr . G.iedgesTo i . indices (\(G.Pair s _) -> i < s)
 
     -- singleIncoming :: Idx -> [(Idx, Edge)]
     -- singleIncoming i =

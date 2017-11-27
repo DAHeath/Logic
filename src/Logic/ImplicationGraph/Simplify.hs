@@ -4,8 +4,8 @@ import           Control.Lens
 
 import qualified Data.Map as Map
 import           Data.Maybe
-import           Data.Optic.Graph (Graph)
-import qualified Data.Optic.Graph as G
+import           Data.Optic.Directed.Graph (Graph)
+import qualified Data.Optic.Directed.Graph as G
 
 import qualified Logic.Var as V
 import qualified Logic.Type as T
@@ -24,7 +24,7 @@ irreducible graph = [startIndex, queryIndex] ++ loopHeaders where
   queryIndex = maximum idxs
 
   -- Find the loop headers, i.e. the destination vertices of back edges.
-  loopHeaders = map (\((_, s), _) -> s) $ G.backEdges graph
+  loopHeaders = map (\(G.Pair _ s, _) -> s) $ G.backEdges graph
 
 
 -- | Takes the Cartesian product of two lists and with the product function.
@@ -80,8 +80,8 @@ disjunction e1 e2 =
 -- | Remove all reducible vertices and combine edges through {dis/con}junction.
 prune :: (Ord i) => Graph i Edge Vert -> Graph i Edge Vert
 prune graph = foldr removeVertex graph reducible where
-  andEdge (start, e) (end, e') =
-    G.addEdgeWith disjunction start end $ conjunction e e'
+  andEdge (G.Pair start _, e) (G.Pair _ end, e') =
+    G.addEdgeWith disjunction (G.Pair start end) $ conjunction e e'
 
   newEdges i g = cartesianProduct andEdge
                  ((toListOf $ G.iedgesTo i . withIndex) g)

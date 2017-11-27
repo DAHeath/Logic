@@ -12,8 +12,8 @@ import           Data.List.Split
 import           Data.Text (Text, unpack)
 import           Data.Aeson
 import qualified Data.HashMap.Lazy as HML
-import           Data.Optic.Graph (Graph)
-import qualified Data.Optic.Graph as G
+import           Data.Optic.Directed.Graph (Graph)
+import qualified Data.Optic.Directed.Graph as G
 import qualified Data.ByteString.Lazy.Char8 as BS
 import qualified Data.Vector as V
 import           Data.Text.Prettyprint.Doc
@@ -69,7 +69,7 @@ buildGraph edgeHolders vertexMap =
     vertices = map (\(iv, v) -> (iv, case v of
       JInst vs -> InstanceV (lineNo iv) vs (LBool False)
       JQuery q -> QueryV q)) $ M.toList vertexMap
-    edges = map (\(EdgeHolder v1 v2 e) -> (v1, v2, e)) edgeHolders
+    edges = map (\(EdgeHolder v1 v2 e) -> (G.Pair v1 v2, e)) edgeHolders
   in
     G.fromLists vertices edges
 

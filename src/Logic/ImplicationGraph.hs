@@ -8,8 +8,8 @@ import           Control.Monad.Except
 import           Control.Monad.Loops (anyM)
 
 import           Data.Data
-import           Data.Optic.Graph (Graph)
-import qualified Data.Optic.Graph as G
+import           Data.Optic.Directed.Graph (Graph)
+import qualified Data.Optic.Directed.Graph as G
 import qualified Data.Optic.Graph.Extras as G
 import           Data.Map (Map)
 import qualified Data.Map as M
@@ -68,7 +68,7 @@ fromGraph hes g =
       return (m M.! end, G.mapIdx (m M.!) g)
       where
         buildMapping =
-          let noBacks = G.ifilterEdges (\i1 i2 _ -> (i1, i2) `notElem` map fst (G.backEdges g)) g
+          let noBacks = G.ifilterEdges (\i _ -> i `notElem` map fst (G.backEdges g)) g
               revSubGr = G.reached end $ G.reverse noBacks
           in
           execStateT (fromJust (G.itopVert_ update revSubGr)) M.empty
@@ -130,7 +130,7 @@ relabel end g = do
   return (m M.! end, G.mapIdx (\i -> M.findWithDefault i i m) g)
   where
     buildMapping =
-      let noBacks = G.ifilterEdges (\i1 i2 _ -> (i1, i2) `notElem` map fst (revBackEdges g)) g
+      let noBacks = G.ifilterEdges (\i _ -> i `notElem` map fst (revBackEdges g)) g
           revSubGr = G.reached end $ G.reverse noBacks
       in
       execStateT (fromJust (G.itopVert_ update revSubGr)) M.empty
@@ -140,20 +140,20 @@ relabel end g = do
 
 -- | Unwind all backedges which do not reach an inductive vertex, then compress
 -- the graph to only those vertices which reach the end.
-unwindAll :: [((Idx, Idx), e)] -> [Idx] -> Idx -> ImplGr e -> ImplGr e
+unwindAll :: [(G.Pair Idx, e)] -> [Idx] -> Idx -> ImplGr e -> ImplGr e
 unwindAll bes ind end ig =
-  let relevantBes = filter (\((i1, _), _) ->
+  let relevantBes = filter (\(G.Pair i1 _, _) ->
         all (`notElem` ind) (ig ^. implGr & withoutRevBackEdges & G.reached i1 & G.idxs)) bes
       (is, ig') =
-        foldr (\((i1, i2), e) (is, ig) ->
+        foldr (\(G.Pair i1 i2, e) (is, ig) ->
           let (i, ig') = unwind i1 i2 e ig
           in (i:is, ig')) ([], ig) relevantBes
-  in ig' & implGr %~ G.ifilterEdges (\i1 i2 _ -> (i1, i2) `notElem` map fst bes)
+  in ig' & implGr %~ G.ifilterEdges (\i _ -> i `notElem` map fst bes)
          & implGr %~ reachEndWithoutBackedge
   where
     reachEndWithoutBackedge g' =
       let compressed = g'
-            & G.ifilterEdges (\i1 i2 _ -> (i1, i2) `notElem` map fst (revBackEdges g'))
+            & G.ifilterEdges (\i _ -> i `notElem` map fst (revBackEdges g'))
             & G.reaches end
       in G.filterIdxs (`elem` G.idxs compressed) g'
 
@@ -161,19 +161,19 @@ unwindAll bes ind end ig =
 unwind :: Idx -> Idx -> e -> ImplGr e -> (Idx, ImplGr e)
 unwind i1 i2 e ig =
   let g = ig ^. implGr
-      g' = (G.reaches i2 (G.delEdge i1 i2 g) `mappend` G.between i2 i1 g)
+      g' = (G.reaches i2 (G.delEdge (G.Pair i1 i2) g) `mappend` G.between i2 i1 g)
          & G.mapVert (_InstanceV . _3 .~ LBool False)
       ((i1', g''), lbl') = runState (relabel i1 g') (ig ^. currIdx)
   in
-  (i1', ig & currIdx .~ lbl' & implGr %~ (G.addEdge i1' i2 e . mappend g''))
+  (i1', ig & currIdx .~ lbl' & implGr %~ (G.addEdge (G.Pair i1' i2) e . mappend g''))
 
 newtype ReverseOrder a = ReverseOrder { getReverseOrder :: a }
   deriving (Show, Read, Eq, Data)
 instance Ord a => Ord (ReverseOrder a) where
   ReverseOrder a <= ReverseOrder b = b <= a
 
-revBackEdges :: Ord i => Graph i e v -> [((i, i), e)]
-revBackEdges = map (\((i1, i2), e) -> ((getReverseOrder i1, getReverseOrder i2), e))
+revBackEdges :: Ord i => Graph i e v -> [(G.Pair i, e)]
+revBackEdges = map (\(G.Pair i1 i2, e) -> (G.Pair (getReverseOrder i1) (getReverseOrder i2), e))
              . G.backEdges
              . G.mapIdx ReverseOrder
 

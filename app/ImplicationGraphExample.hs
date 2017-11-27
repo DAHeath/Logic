@@ -3,8 +3,8 @@ import           Control.Lens
 import           Control.Monad.State
 import           Control.Monad.Except
 
-import           Data.Optic.Graph (Graph)
-import qualified Data.Optic.Graph as G
+import           Data.Optic.Directed.Graph (Graph)
+import qualified Data.Optic.Directed.Graph as G
 import qualified Data.Optic.Graph.Extras as G
 import qualified Data.Map as M
 import           Data.Text.Prettyprint.Doc
@@ -40,8 +40,8 @@ example :: Graph Integer Edge Vert
 example = G.fromLists
   [ (0, emptyInst 0 [])
   , (1, emptyInst 1 s)
-  , (2, QueryV [form|not (i:Int = 11)|])]
-  [ ( 0, 1, Edge [form|i:Int = 0|] M.empty)
-  , ( 1, 1, Edge [form|i/1:Int = i:Int + 2 && i:Int < n:Int|] (M.singleton i i'))
-  , ( 1, 2, Edge [form|i:Int >= n:Int|] M.empty)
+  , (2, QueryV [form|not (i:Int = 3)|])]
+  [ ( G.Pair 0 1, Edge [form|i:Int = 0|] M.empty)
+  , ( G.Pair 1 1, Edge [form|i/1:Int = i:Int + 2 && i:Int < n:Int|] (M.singleton i i'))
+  , ( G.Pair 1 2, Edge [form|i:Int >= n:Int|] M.empty)
   ]
