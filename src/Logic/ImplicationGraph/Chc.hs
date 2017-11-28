@@ -5,9 +5,11 @@ import           Control.Monad.State
 
 import           Data.Map (Map)
 import qualified Data.Map as M
-import           Data.Optic.Directed.Graph (Graph)
-import qualified Data.Optic.Directed.Graph as G
-import           Data.Maybe (mapMaybe)
+import           Data.Set (Set)
+import qualified Data.Set as S
+import           Data.Optic.Directed.HyperGraph (Graph)
+import qualified Data.Optic.Directed.HyperGraph as G
+import           Data.Maybe (mapMaybe, fromJust)
 import           Data.Text.Prettyprint.Doc
 
 import           Logic.Model
@@ -19,65 +21,20 @@ import qualified Logic.Solver.Z3 as Z3
 
 -- | Convert the graph into a system of Constrained Horn Clauses.
 implGrChc :: ImplGr Edge -> [Chc]
-implGrChc g =
-  concatMap idxRules (G.idxs (g ^. implGr))
+implGrChc g = map rule (G.connections (withoutRevBackEdges $ g ^. implGr))
   where
-    idxApp i = instApp i =<< g ^? ix i . _InstanceV
-    instApp _ (_, [], _) = Nothing
-    instApp i (_, vs, _) = Just $ mkApp ('r' : _Show # i) vs
+    rule :: (G.HEdge (Idx, Vert), Edge) -> Chc
+    rule (G.HEdge lhs (i, v), Edge f mvs) =
+      let lhs' = mapMaybe (uncurry buildRel) (S.toList lhs)
+      in case v of
+        InstanceV{} -> Rule lhs' f (subst mvs (fromJust $ buildRel i v))
+        QueryV f'   -> Query lhs' f (subst mvs f')
 
-    idxRule i f rhs = vertRule i f rhs <$> g ^? ix i
-    vertRule i f rhs = \case
-      InstanceV _ vs _ ->
-        if null vs
-        then Rule [] f rhs
-        else Rule [mkApp ('r':_Show # i) vs] f rhs
-      QueryV _         -> undefined
-
-    idxRules i = maybe [] (\case
-      InstanceV {} ->
-        mapMaybe (\(G.Pair i' _, Edge f mvs) -> do
-          rhs <- subst mvs <$> idxApp i
-          idxRule i' f rhs) (relevantIncoming i)
-          -- idxRule i' f rhs) (singleIncoming i)
-        -- ++
-        -- mapMaybe (\(i1, i2, Edge f mvs) -> do
-        --   rhs <- subst mvs <$> idxApp i
-        --   r1 <- idxApp i1
-        --   r2 <- idxApp i2
-        --   return $ Rule [r1, r2] f rhs) (hyperIncoming i)
-
-      QueryV f -> queries i f) (g ^? ix i)
-
-    queries i f =
-      mapMaybe (\(G.Pair i' _, Edge e mvs) -> do
-        lhs <- idxApp i'
-        let rhs = subst mvs f
-        return (Query [lhs] e rhs)) (relevantIncoming i)
-        -- return (Query [lhs] e rhs)) (singleIncoming i)
-        -- ++
-      -- mapMaybe (\(i1, i2, Edge e mvs) -> do
-        -- let rhs = subst mvs f
-        -- r1 <- idxApp i1
-        -- r2 <- idxApp i2
-        -- return $ Query [r1, r2] e rhs) (hyperIncoming i)
-
-    -- We only create rules for non-back edges
-    relevantIncoming i = g ^@.. implGr . G.iedgesTo i . indices (\(G.Pair s _) -> i < s)
-
-    -- singleIncoming :: Idx -> [(Idx, Edge)]
-    -- singleIncoming i =
-    --   filter (\(i', _) -> notElemOf (traverse.both) (i' ^. idxIden) (hyperIdxs i))
-    --          (relevantIncoming i)
-
-    -- hyperIncoming :: Idx -> [(Idx, Idx, Edge)]
-    -- hyperIncoming i = map (\(i1, i2) ->
-    --   let (ix1, e1) = head $ filter (\(ix, _) -> ix ^. idxIden == i1) (relevantIncoming i)
-    --       (ix2, e2) = head $ filter (\(ix, _) -> ix ^. idxIden == i2) (relevantIncoming i)
-    --   in (ix1, ix2, conjunction e1 e2)) (hyperIdxs i)
-
-    -- hyperIdxs :: Idx -> [(Integer, Integer)]
-    -- hyperIdxs i = M.findWithDefault [] (i ^. idxIden) (g ^. hyperEdges)
+    buildRel :: Idx -> Vert -> Maybe App
+    buildRel i v = case v of
+      InstanceV _ [] _ -> Nothing
+      InstanceV _ vs _ -> Just $ mkApp ('r' : _Show #i) vs
+      QueryV _ -> undefined
 
 -- | Interpolate the facts in the graph using CHC solving to label the vertices
 -- with fresh definitions.

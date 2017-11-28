@@ -6,8 +6,9 @@ import           Control.Monad.Except
 
 import           Data.Map (Map)
 import qualified Data.Map as M
-import           Data.Optic.Directed.Graph (Graph)
-import qualified Data.Optic.Directed.Graph as G
+import qualified Data.Set as S
+import           Data.Optic.Directed.HyperGraph (Graph)
+import qualified Data.Optic.Directed.HyperGraph as G
 import qualified Data.Optic.Graph.Extras as G
 import           Data.Text.Prettyprint.Doc
 import           Data.These
@@ -47,7 +48,7 @@ solve e1 e2 quer g1 g2 = do
     wQuery =
       equivProduct g1 g2
       & G.addVert end (QueryV quer)
-      & G.addEdge (G.Pair (end-1) end) (This $ Edge (LBool True) M.empty)
+      & G.addEdge (G.HEdge (S.singleton $ end-1) end) (This $ Edge (LBool True) M.empty)
 
     locMerge i j = j + i * (maxJ + 1)
     maxJ = maximum (G.idxs g2)
@@ -86,8 +87,9 @@ equivStrat =
       This e -> e
       That e -> e
       These _ _ -> undefined
-    allEs (G.Pair i1 i2, e) = case e of
-      These e1 e2 -> [(G.Pair i1 i2, This e1), (G.Pair i1 i2, That e2)]
-      e' -> [(G.Pair i1 i2, e')]
-    preds g i = mconcat $ map (\(G.Pair i' _, e) ->
-      fromThese [] [] $ bimap (const [i']) (const [i']) e) $ g ^@.. implGr . G.iedgesTo i
+    allEs (i, e) = case e of
+      These e1 e2 -> [(i, This e1), (i, That e2)]
+      e' -> [(i, e')]
+    preds g i = mconcat $ map (\(G.HEdge i' _, e) ->
+      fromThese [] [] $ bimap (const (S.toList i')) (const (S.toList i')) e)
+      $ g ^@.. implGr . G.iedgesTo i

@@ -3,10 +3,11 @@ import           Control.Lens
 import           Control.Monad.State
 import           Control.Monad.Except
 
-import           Data.Optic.Directed.Graph (Graph)
-import qualified Data.Optic.Directed.Graph as G
+import           Data.Optic.Directed.HyperGraph (Graph)
+import qualified Data.Optic.Directed.HyperGraph as G
 import qualified Data.Optic.Graph.Extras as G
 import qualified Data.Map as M
+import qualified Data.Set as S
 import           Data.Text.Prettyprint.Doc
 
 import           Logic.ImplicationGraph
@@ -21,10 +22,11 @@ import qualified Data.ByteString.Lazy.Char8 as BS
 main :: IO ()
 main = do
   G.display "before.dot" example
+  print example
   sol <- solve example M.empty
   case sol of
     Left m -> print (pretty m)
-    Right r -> do
+    Right r ->
       G.display "test.dot" (r ^. implGr)
       -- print . pretty . M.toList =<< collectAnswer r
 
@@ -38,10 +40,9 @@ s = [i, n]
 
 example :: Graph Integer Edge Vert
 example = G.fromLists
-  [ (0, emptyInst 0 [])
-  , (1, emptyInst 1 s)
-  , (2, QueryV [form|not (i:Int = 3)|])]
-  [ ( G.Pair 0 1, Edge [form|i:Int = 0|] M.empty)
-  , ( G.Pair 1 1, Edge [form|i/1:Int = i:Int + 2 && i:Int < n:Int|] (M.singleton i i'))
-  , ( G.Pair 1 2, Edge [form|i:Int >= n:Int|] M.empty)
+  [ (0, emptyInst 1 s)
+  , (1, QueryV [form|not (i:Int = 3)|])]
+  [ ( G.HEdge S.empty 0, Edge [form|i:Int = 0|] M.empty)
+  , ( G.HEdge (S.singleton 0) 0, Edge [form|i/1:Int = i:Int + 2 && i:Int < n:Int|] (M.singleton i i'))
+  , ( G.HEdge (S.singleton 0) 1, Edge [form|i:Int >= n:Int|] M.empty)
   ]

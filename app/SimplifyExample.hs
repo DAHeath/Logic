@@ -1,10 +1,11 @@
 {-# LANGUAGE QuasiQuotes #-}
 import           Control.Lens
 
-import           Data.Optic.Directed.Graph (Graph)
-import qualified Data.Optic.Directed.Graph as G
+import           Data.Optic.Directed.HyperGraph (Graph)
+import qualified Data.Optic.Directed.HyperGraph as G
 import qualified Data.Optic.Graph.Extras as G
 import qualified Data.Map as M
+import qualified Data.Set as S
 import           Data.Text.Prettyprint.Doc
 import qualified Data.ByteString.Lazy.Char8 as BS
 import           Data.Maybe (fromJust)
@@ -52,8 +53,8 @@ bump :: Var -> Int -> Var
 bump (Free p c t) b = Free p (c + b) t
 bump o _ = o
 
-emptyEdge :: (Ord i) => i -> i -> (G.Pair i, Edge)
-emptyEdge s d = (G.Pair s d, Edge [form|i:Int = 0|] M.empty)
+emptyEdge :: (Ord i) => i -> i -> (G.HEdge i, Edge)
+emptyEdge s d = (G.HEdge (S.singleton s) d, Edge [form|i:Int = 0|] M.empty)
 
 irreducibleExample :: Graph Int Edge Vert
 irreducibleExample = G.fromLists

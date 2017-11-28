@@ -1,10 +1,11 @@
 {-# LANGUAGE QuasiQuotes #-}
 import           Control.Lens
 
-import           Data.Optic.Directed.Graph (Graph)
-import qualified Data.Optic.Directed.Graph as G
+import           Data.Optic.Directed.HyperGraph (Graph)
+import qualified Data.Optic.Directed.HyperGraph as G
 import qualified Data.Optic.Graph.Extras as G
 import qualified Data.Map as M
+import qualified Data.Set as S
 import           Data.Text.Prettyprint.Doc
 
 import           Logic.Var
@@ -30,19 +31,18 @@ import           Logic.ImplicationGraph.Equivalence
 
 cs0 :: Graph Integer Edge Vert
 cs0 = G.fromLists
-  [ (0, emptyInst 0 [])
-  , (1, emptyInst 1 [n, r])
-  , (2, emptyInst 2 [n, r, s, p, i])
-  , (3, emptyInst 3 [n, r])
+  [ (0, emptyInst 0 [n, r])
+  , (1, emptyInst 1 [n, r, s, p, i])
+  , (2, emptyInst 2 [n, r])
   ]
-  [ (G.Pair 0 1, Edge [form|r:Int = 0|] M.empty)
-  , (G.Pair 1 3, Edge [form|n:Int <= 1 && r/1:Int = 1|] (M.fromList [(r, r')]))
-  , (G.Pair 1 2, Edge [form|n:Int > 1 && s:Int = 2 && p:Int = 1 && i:Int = 2|] M.empty)
-  , (G.Pair 2 2, Edge [form|i:Int < n:Int
+  [ (G.HEdge S.empty 0, Edge [form|r:Int = 0|] M.empty)
+  , (G.HEdge (S.singleton 0) 2, Edge [form|n:Int <= 1 && r/1:Int = 1|] (M.fromList [(r, r')]))
+  , (G.HEdge (S.singleton 0) 1, Edge [form|n:Int > 1 && s:Int = 2 && p:Int = 1 && i:Int = 2|] M.empty)
+  , (G.HEdge (S.singleton 1) 1, Edge [form|i:Int < n:Int
                    && i/1:Int = i:Int+1
                    && s/1:Int = s:Int + p:Int
                    && p/1:Int = s:Int |] (M.fromList [(i, i'), (s, s'), (p, p')]))
-  , (G.Pair 2 3 , Edge [form|i:Int >= n:Int && r/1:Int = s:Int|] (M.fromList [(r, r')]))
+  , (G.HEdge (S.singleton 1) 2 , Edge [form|i:Int >= n:Int && r/1:Int = s:Int|] (M.fromList [(r, r')]))
   ]
 
 
@@ -64,20 +64,19 @@ cs0 = G.fromLists
 
 cs1 :: Graph Integer Edge Vert
 cs1 = G.fromLists
-  [ (0, emptyInst 0 [])
-  , (1, emptyInst 1 [m, x])
-  , (2, emptyInst 2 [m, x, c1, c2, j])
-  , (3, emptyInst 3 [m, x])
+  [ (0, emptyInst 0 [m, x])
+  , (1, emptyInst 1 [m, x, c1, c2, j])
+  , (2, emptyInst 2 [m, x])
   ]
-  [ (G.Pair 0 1, Edge [form|x:Int = 0|] M.empty)
-  , (G.Pair 1 3, Edge [form|m:Int <= 1 && x/1:Int = 1|] (M.fromList [(x, x')]))
-  , (G.Pair 1 2, Edge [form|m:Int > 1 && c1:Int = 1 && c2:Int = 1 && j:Int = 2|] M.empty)
-  , (G.Pair 2 2, Edge [form|j:Int <= m:Int
+  [ (G.HEdge S.empty 0, Edge [form|x:Int = 0|] M.empty)
+  , (G.HEdge (S.singleton 0) 2, Edge [form|m:Int <= 1 && x/1:Int = 1|] (M.fromList [(x, x')]))
+  , (G.HEdge (S.singleton 0) 1, Edge [form|m:Int > 1 && c1:Int = 1 && c2:Int = 1 && j:Int = 2|] M.empty)
+  , (G.HEdge (S.singleton 1) 1, Edge [form|j:Int <= m:Int
                    && j/1:Int = j:Int+1
                    && c2/1:Int = c2:Int + c1:Int
                    && c1/1:Int = c2:Int |]
            (M.fromList [(j, j'), (c1, c1'), (c2, c2')]))
-  , (G.Pair 2 3, Edge [form|j:Int > m:Int && x/1:Int = c2:Int|] (M.fromList [(x, x')]))
+  , (G.HEdge (S.singleton 1) 2, Edge [form|j:Int > m:Int && x/1:Int = c2:Int|] (M.fromList [(x, x')]))
   ]
 
 x   = Free ["x"] 0 T.Int
@@ -103,9 +102,8 @@ i' = Free ["i"] 1 T.Int
 ad0 :: Graph Integer Edge Vert
 ad0 = G.fromLists
   [ (0, emptyInst 0 [])
-  , (1, emptyInst 1 [n, r])
-  ]
-  [ (G.Pair 0 1, Edge [form|r:Int = n:Int - 9 * ((n:Int - 1) / 9)|] M.empty) ]
+  , (1, emptyInst 1 [n, r]) ]
+  [ (G.HEdge (S.singleton 0) 1, Edge [form|r:Int = n:Int - 9 * ((n:Int - 1) / 9)|] M.empty) ]
 
 ad1 :: Graph Integer Edge Vert
 ad1 = G.fromLists
@@ -113,9 +111,9 @@ ad1 = G.fromLists
   , (1, emptyInst 1 [m, x])
   , (2, emptyInst 2 [m, x])
   ]
-  [ (G.Pair 0 1, Edge [form|x:Int = m:Int|] M.empty)
-  , (G.Pair 1 1, Edge [form|x:Int > 9 && x/1:Int = x:Int / 10 + x:Int % 10|] (M.fromList [(x, x')]))
-  , (G.Pair 1 2, Edge [form|x:Int <= 9|] M.empty)
+  [ (G.HEdge (S.singleton 0) 1, Edge [form|x:Int = m:Int|] M.empty)
+  , (G.HEdge (S.singleton 1) 1, Edge [form|x:Int > 9 && x/1:Int = x:Int / 10 + x:Int % 10|] (M.fromList [(x, x')]))
+  , (G.HEdge (S.singleton 1) 2, Edge [form|x:Int <= 9|] M.empty)
   ]
 
 -- main :: IO ()

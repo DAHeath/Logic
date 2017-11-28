@@ -6,8 +6,8 @@ import           Control.Monad.State
 import           Control.Monad.Except
 import           Control.Monad.Loops (anyM)
 
-import           Data.Optic.Directed.Graph (Graph)
-import qualified Data.Optic.Directed.Graph as G
+import           Data.Optic.Directed.HyperGraph (Graph)
+import qualified Data.Optic.Directed.HyperGraph as G
 import qualified Data.Optic.Graph.Extras as G
 import           Data.Map (Map)
 import qualified Data.Map as M
@@ -24,7 +24,7 @@ type PredInd e m = ImplGr e -> Idx -> m [Bool]
 
 data Strategy e = Strategy
     -- What constitutes a back edge for the strategy?
-  { backs :: Graph Idx e Vert -> [(G.Pair Idx, e)]
+  { backs :: Graph Idx e Vert -> [(G.HEdge Idx, e)]
     -- How is interpolation performed over the graph?
   , interp :: forall m. MonadIO m => ImplGr e -> m (Either Model (ImplGr e))
     -- How do we know if the predecessors indicate the current vertex is inductive?
@@ -69,7 +69,7 @@ descendantInstanceVs g loc i =
 
 -- | Apply the strategy to the graph until a either a counterxample or an inductive
 -- solution is found.
-loop :: (MonadIO m, Pretty e)
+loop :: (MonadIO m, Pretty e, Show e)
      => Strategy e
      -> ImplGr e -> m (Either Model (ImplGr e))
 loop strat g = do
@@ -85,10 +85,12 @@ loop strat g = do
 -- 1. interpolating over the current graph
 -- 2. checking if the solution is inductive (and terminating if it is)
 -- 3. unwinding the graph over all backedges
-step :: (Pretty e, Solve e m) => Strategy e -> ImplGr e -> m (ImplGr e)
+step :: (Show e, Pretty e, Solve e m) => Strategy e -> ImplGr e -> m (ImplGr e)
 step strat g = do
-  G.display "step" (g ^. implGr)
+  liftIO (putStrLn "here")
+  liftIO $ print g
   interp strat g >>= either (throwError . Failed) (\interp -> do
+    G.display "step" (interp ^. implGr)
     liftIO getLine
     let end = g ^. exit
     indM <- inductive (predInd strat) interp
