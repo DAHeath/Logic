@@ -40,14 +40,12 @@ solve :: MonadIO m
       -> m (Either Model ProdGr)
 solve e1 e2 quer g1 g2 = do
   G.display "before" wQuery
-  let wQuery' = fromGraph M.empty wQuery
-  case wQuery' of
-    Nothing -> error "bad input graph"
-    Just gr -> loop equivStrat gr
+  let gr = fromGraph wQuery
+  loop equivStrat gr
   where
     wQuery =
       equivProduct g1 g2
-      & G.addVert end (QueryV quer)
+      & G.addVert end (Vert (locMerge e1 e2 + 1) [] quer)
       & G.addEdge (G.HEdge (S.singleton $ end-1) end) (This $ Edge (LBool True) M.empty)
 
     locMerge i j = j + i * (maxJ + 1)
@@ -56,25 +54,29 @@ solve e1 e2 quer g1 g2 = do
     equate (v1, v2) = mkEql (T.typeOf v1) (V v1) (V v2)
 
     equivProduct g1 g2 =
-      G.cartesianProductWith edgeMerge const locMerge vertMerge
-        (G.mapEdge This g1) (G.mapEdge That g2)
+      cleanIntros (G.cartesianProductWith edgeMerge const locMerge vertMerge
+                    (G.mapEdge This g1) (G.mapEdge That g2))
+
+    cleanIntros g =
+      let es = g ^@.. G.iallEdges
+      in G.delIdx 0 $ foldr (\(G.HEdge i1 i2, e) g ->
+        G.addEdge (G.HEdge (S.filter (/= 0) i1) i2) e (G.delEdge (G.HEdge i1 i2) g)) g es
 
     edgeMerge (This e1) (That e2) = These e1 e2
     edgeMerge e1 _ = e1
 
     vertMerge v1 v2 = case (v1, v2) of
-      (InstanceV i vs1 _, InstanceV j vs2 _) -> emptyInst (locMerge i j) (vs1 ++ vs2)
-      _ -> error "query in middle of equivalence graph"
+      (Vert i vs1 _, Vert j vs2 _) -> emptyInst (locMerge i j) (vs1 ++ vs2)
 
 equivStrat :: Strategy (These Edge Edge)
 equivStrat =
   let theStrat = Strategy
         { backs = concatMap allEs . revBackEdges
         , interp = \g -> do
-            sol <- interpolate (g & implGr %~ G.mapEdge edge)
+            sol <- interpolate (G.mapEdge edge g)
             return $ fmap (\g' ->
-              let vs = g' ^@.. implGr . G.iallVerts
-              in foldr (\(i', v') g'' -> g'' & implGr %~ G.addVert i' v') g vs) sol
+              let vs = g' ^@.. G.iallVerts
+              in foldr (\(i', v') g'' -> G.addVert i' v' g'') g vs) sol
         , predInd = \g i -> do
             let (ls, rs) = preds g i
             lInd <- allInd (predInd theStrat) g i ls
@@ -92,4 +94,4 @@ equivStrat =
       e' -> [(i, e')]
     preds g i = mconcat $ map (\(G.HEdge i' _, e) ->
       fromThese [] [] $ bimap (const (S.toList i')) (const (S.toList i')) e)
-      $ g ^@.. implGr . G.iedgesTo i
+      $ g ^@.. G.iedgesTo i

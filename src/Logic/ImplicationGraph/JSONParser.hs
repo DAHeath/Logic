@@ -67,8 +67,8 @@ buildGraph :: [EdgeHolder] -> Map Line JSONVertex -> Graph Line Edge Vert
 buildGraph edgeHolders vertexMap =
   let
     vertices = map (\(iv, v) -> (iv, case v of
-      JInst vs -> InstanceV (lineNo iv) vs (LBool False)
-      JQuery q -> QueryV q)) $ M.toList vertexMap
+      JInst vs -> Vert (lineNo iv) vs (LBool False)
+      JQuery q -> Vert (lineNo iv) [] q)) $ M.toList vertexMap
     edges = map (\(EdgeHolder v1 v2 e) -> (G.Pair v1 v2, e)) edgeHolders
   in
     G.fromLists vertices edges

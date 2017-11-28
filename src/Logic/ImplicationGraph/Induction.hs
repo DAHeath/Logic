@@ -32,8 +32,8 @@ data Strategy e = Strategy
   }
 
 -- | Check whether the vertex labels in the graph form an inductive relationship.
-inductive :: MonadIO m => PredInd e (StateT (Map Idx Bool) m) -> ImplGr e -> m (Map Idx Bool)
-inductive pc g = execStateT (ind pc g (g ^. exit)) M.empty
+inductive :: MonadIO m => Idx -> PredInd e (StateT (Map Idx Bool) m) -> ImplGr e -> m (Map Idx Bool)
+inductive end pc g = execStateT (ind pc g end) M.empty
 
 ind :: (MonadIO m, MonadState (Map Idx Bool) m) => PredInd e m -> ImplGr e -> Idx -> m Bool
 ind pc g i = maybe (computeInd pc g i) return . M.lookup i =<< get
@@ -48,8 +48,7 @@ computeInd pc g i =
   (at i <?=) =<< maybe (return False) (\v -> do
     psInd <- pc g i
     case v of
-      QueryV _ -> return (or psInd)
-      InstanceV loc _ f ->
+      Vert loc _ f ->
         or <$> sequence ([ return $ f == LBool True
                          , anyM (`Z3.entails` f) (descendantInstanceVs g loc i)
                          ] ++ map return psInd)) (g ^. at i)
@@ -60,12 +59,12 @@ allInd pc g i is = and <$> mapM (indPred pc g i) is
 
 descendantInstanceVs :: ImplGr e -> Loc -> Idx -> [Form]
 descendantInstanceVs g loc i =
-  G.descendants i (g ^. implGr)
+  G.descendants i g
     & S.toList
-    & filter (\i' -> case g ^? implGr . ix i' . _InstanceV . _1 of
+    & filter (\i' -> case g ^? ix i' . vertLoc of
       Nothing -> False
       Just loc' -> i /= i' && loc == loc')
-    & mapMaybe (\i' -> g ^? ix i' . _InstanceV . _3)
+    & mapMaybe (\i' -> g ^? ix i' . vertForm)
 
 -- | Apply the strategy to the graph until a either a counterxample or an inductive
 -- solution is found.
@@ -79,21 +78,21 @@ loop strat g = do
     Left (Complete res) -> return (Right res)
     Right _ -> error "infinite loop terminated successfully?"
   where
-    loop' gr = loop' =<< step strat gr
+    loop' gr = loop' =<< step end strat gr
+    end = head $ filter (\i -> lengthOf (G.edgesFrom i) g == 0) (G.idxs g)
 
 -- | Perform a step of the unwinding by
 -- 1. interpolating over the current graph
 -- 2. checking if the solution is inductive (and terminating if it is)
 -- 3. unwinding the graph over all backedges
-step :: (Show e, Pretty e, Solve e m) => Strategy e -> ImplGr e -> m (ImplGr e)
-step strat g = do
+step :: (Show e, Pretty e, Solve e m) => Idx -> Strategy e -> ImplGr e -> m (ImplGr e)
+step end strat g = do
   liftIO (putStrLn "here")
   liftIO $ print g
   interp strat g >>= either (throwError . Failed) (\interp -> do
-    G.display "step" (interp ^. implGr)
+    G.display "step" interp
     liftIO getLine
-    let end = g ^. exit
-    indM <- inductive (predInd strat) interp
+    indM <- inductive end (predInd strat) interp
     let isInd = M.keys $ M.filter id indM
     when (M.lookup end indM == Just True) $ throwError $ Complete interp
-    return $ unwindAll (backs strat (g ^. implGr)) isInd end interp)
+    return $ unwindAll (backs strat g) isInd end interp)

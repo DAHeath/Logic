@@ -130,4 +130,4 @@ main = do
   case sol of
     Left e -> print (pretty e)
     Right m ->
-      G.display "sol" (m ^. implGr)
+      G.display "sol" m

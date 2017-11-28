@@ -34,11 +34,12 @@ import Debug.Trace
 type Idx = Integer
 type Loc = Integer
 
-data Vert
-  = InstanceV Loc [Var] Form
-  | QueryV Form
-  deriving (Show, Read, Eq, Ord, Data)
-makePrisms ''Vert
+data Vert = Vert
+  { _vertLoc :: Loc
+  , _vertVars :: [Var]
+  , _vertForm :: Form
+  } deriving (Show, Read, Eq, Ord, Data)
+makeLenses ''Vert
 
 data Edge = Edge
   { _edgeForm :: Form
@@ -48,65 +49,40 @@ makeLenses ''Edge
 
 type HyperEdges = Map Loc [(Loc, Loc)]
 
-data ImplGr edge = ImplGr
-  { _implGr :: Graph Idx edge Vert
-  , _hyperEdges :: HyperEdges
-  , _entrance :: Loc
-  , _exit :: Idx
-  , _currIdx :: Idx
-  } deriving (Show, Read, Eq, Ord, Data)
-makeLenses ''ImplGr
+type ImplGr e = Graph Idx e Vert
 
-fromGraph :: (Show e, AsInteger i) => HyperEdges -> Graph i e Vert -> Maybe (ImplGr e)
-fromGraph hes g =
-  case theQuery of
-    Nothing -> Nothing
-    Just q ->
-      let ((q', g'), lbl) = runState (setIdxs q g) 0
-          theEntry = minimum $ G.idxs g'
-      in Just (ImplGr g' hes theEntry q' lbl)
+fromGraph :: (Show e, AsInteger i) => Graph i e Vert -> ImplGr e
+fromGraph g = evalState (setIdxs g) 0
   where
-    theQuery = fst <$> (g ^@? G.iallVerts . _QueryV)
-
-    setIdxs end g = do
+    setIdxs g = do
       m <- buildMapping
-      return (m M.! end, G.mapIdx (m M.!) g)
+      return (G.mapIdx (m M.!) g)
       where
         buildMapping =
           let noBacks = G.ifilterEdges (\i _ -> i `notElem` map fst (G.backEdges g)) g
-              revSubGr = G.reaches end noBacks
           in
           execStateT (
-            forwards $ fromJust (G.itopVert_ (\i -> Backwards . update i) revSubGr)) M.empty
+            forwards $ fromJust (G.itopVert_ (\i -> Backwards . update i) noBacks)) M.empty
         update i _ = modify . M.insert i =<< lift freshIdx
         freshIdx = state (\ins -> (ins, ins+1))
 
 class (Show a, Ord a) => AsInteger a where asInteger :: a -> Integer
 instance AsInteger Integer where asInteger = id
 
-type instance Index (ImplGr e) = Idx
-type instance IxValue (ImplGr e) = Vert
-instance Ixed (ImplGr e)
-instance At (ImplGr e) where at i = implGr . at i
-
 emptyInst :: Loc -> [Var] -> Vert
-emptyInst l vs = InstanceV l vs (LBool False)
+emptyInst l vs = Vert l vs (LBool False)
 
 instance Pretty Edge where
   pretty (Edge f m) = pretty f <+> pretty (M.toList m)
 
 instance Pretty Vert where
-  pretty = \case
-    InstanceV l vs f -> pretty l <+> pretty vs <+> pretty f
-    QueryV f -> pretty f
+  pretty (Vert l vs f) = pretty l <+> pretty vs <+> pretty f
 
 -- | Augment the fact at each vertex in the graph by the fact in the model.
 applyModel :: Model -> ImplGr Edge -> ImplGr Edge
-applyModel m = implGr %~ G.imapVert applyVert
+applyModel m = G.imapVert applyVert
   where
-    applyVert i = _InstanceV %~ applyInst i
-    applyInst i inst =
-      inst & _3 .~ instantiate (inst ^. _2) (M.findWithDefault (LBool False) i m')
+    applyVert i v = v & vertForm %~ (\f -> M.findWithDefault f i m')
 
     m' = M.toList (getModel m)
       & map (traverseOf _1 %%~ interpretName . varName)
@@ -154,13 +130,13 @@ unwindAll :: [(G.HEdge Idx, e)] -> [Idx] -> Idx -> ImplGr e -> ImplGr e
 unwindAll bes ind end ig =
   traceShow (map fst bes) $
   let relevantBes = filter (\(G.HEdge i _, _) ->
-        any (\i' -> all (`notElem` ind) (ig ^. implGr & withoutRevBackEdges & G.reached i' & G.idxs)) i) bes
+        any (\i' -> all (`notElem` ind) (ig & withoutRevBackEdges & G.reached i' & G.idxs)) i) bes
       (is, ig') =
         foldr (\(G.HEdge i1 i2, e) (is, ig) ->
           let (i, ig') = unwind i1 i2 e ig
           in (i:is, ig')) ([], ig) relevantBes
-  in ig' & implGr %~ G.ifilterEdges (\i _ -> i `notElem` map fst bes)
-         & implGr %~ reachEndWithoutBackedge
+  in ig' & G.ifilterEdges (\i _ -> i `notElem` map fst bes)
+         & reachEndWithoutBackedge
   where
     reachEndWithoutBackedge g' =
       let compressed = g'
@@ -170,19 +146,16 @@ unwindAll bes ind end ig =
 
 -- | Unwind the graph on the given backedge and update all instances in the unwinding.
 unwind :: Set Idx -> Idx -> e -> ImplGr e -> ([Idx], ImplGr e)
-unwind i1 i2 e ig =
-  let g = ig ^. implGr
-      g' = (G.reaches i2 (G.delEdge (G.HEdge i1 i2) g)
+unwind i1 i2 e g =
+  let g' = (G.reaches i2 (G.delEdge (G.HEdge i1 i2) g)
               `mappend` foldMap (\i -> G.between i2 i g) i1)
-         & G.mapVert (_InstanceV . _3 .~ LBool False)
+         & G.mapVert (vertForm .~ LBool False)
       ((i1', g''), lbl') =
-        traceShow "unwind" $
-        traceShow (G.mapEdge (const ()) g') $
         runState (foldrM (\i (is, g) -> do
           (i', g') <- relabel i g
-          return (i' : is, g')) ([], g') i1) (ig ^. currIdx)
+          return (i' : is, g')) ([], g') i1) (G.order g)
   in
-  (i1', ig & currIdx .~ lbl' & implGr %~ (G.addEdge (G.HEdge (S.fromList i1') i2) e . mappend g''))
+  (i1', g & (G.addEdge (G.HEdge (S.fromList i1') i2) e . mappend g''))
 
 newtype ReverseOrder a = ReverseOrder { getReverseOrder :: a }
   deriving (Show, Read, Eq, Data)
