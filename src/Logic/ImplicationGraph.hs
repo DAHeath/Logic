@@ -47,8 +47,6 @@ data Edge = Edge
   } deriving (Show, Read, Eq, Ord, Data)
 makeLenses ''Edge
 
-type HyperEdges = Map Loc [(Loc, Loc)]
-
 type ImplGr e = Graph Idx e Vert
 
 fromGraph :: (Show e, AsInteger i) => Graph i e Vert -> ImplGr e
