@@ -25,7 +25,7 @@ import           Logic.Type
 
 -- | Read a bytestring containing JSON into a graph where the indices are names
 -- for the program position.
-parseGraphFromJSON :: BS.ByteString -> Maybe (Graph Line Edge Vert)
+parseGraphFromJSON :: BS.ByteString -> Maybe (Graph Line Edge Inst)
 parseGraphFromJSON str = getParsedGraph <$> decode str
 
 data Line = LineNo { qualifer :: [String], lineNo :: Integer }
@@ -38,7 +38,7 @@ textToLine txt = LineNo path num
             path = init components
             num = read $ last components
 
-newtype ParsedGraph = ParsedGraph { getParsedGraph :: Graph Line Edge Vert }
+newtype ParsedGraph = ParsedGraph { getParsedGraph :: Graph Line Edge Inst }
 
 -- | Maps an edge (defined by a start and an end index) to its label.
 data EdgeHolder = EdgeHolder
@@ -63,12 +63,12 @@ renameMap renames =
   M.fromList $ map tupelize renames
   where tupelize (VarRenaming a b) = (a, b)
 
-buildGraph :: [EdgeHolder] -> Map Line JSONVertex -> Graph Line Edge Vert
+buildGraph :: [EdgeHolder] -> Map Line JSONVertex -> Graph Line Edge Inst
 buildGraph edgeHolders vertexMap =
   let
     vertices = map (\(iv, v) -> (iv, case v of
-      JInst vs -> Vert (lineNo iv) vs (LBool False)
-      JQuery q -> Vert (lineNo iv) [] q)) $ M.toList vertexMap
+      JInst vs -> Inst (lineNo iv) vs (LBool False)
+      JQuery q -> Inst (lineNo iv) [] q)) $ M.toList vertexMap
     edges = map (\(EdgeHolder v1 v2 e) -> (G.Pair v1 v2, e)) edgeHolders
   in
     G.fromLists vertices edges

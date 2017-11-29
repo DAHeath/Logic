@@ -56,7 +56,7 @@ bump o _ = o
 emptyEdge :: (Ord i) => i -> i -> (G.HEdge i, Edge)
 emptyEdge s d = (G.HEdge (S.singleton s) d, Edge [form|i:Int = 0|] M.empty)
 
-irreducibleExample :: Graph Int Edge Vert
+irreducibleExample :: Graph Int Edge Inst
 irreducibleExample = G.fromLists
     [ (0, emptyInst 0 [])
     , (1, emptyInst 1 [])

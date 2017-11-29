@@ -2,24 +2,17 @@
 module Logic.ImplicationGraph where
 
 import           Control.Lens
-import           Control.Arrow ((***), first)
+import           Control.Arrow (first)
 import           Control.Applicative.Backwards
 import           Control.Monad.State
-import           Control.Monad.Except
-import           Control.Monad.Loops (anyM)
 
 import           Data.Data
 import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Directed.HyperGraph as G
-import qualified Data.Optic.Graph.Extras as G
 import           Data.Map (Map)
 import qualified Data.Map as M
-import           Data.Set (Set)
 import qualified Data.Set as S
-import           Data.Maybe (catMaybes, fromJust)
-import           Data.List.Split (splitOn)
-import           Data.List (find)
-import           Data.Foldable (foldrM, fold)
+import           Data.Maybe (fromJust)
 import           Data.Text.Prettyprint.Doc
 
 import           Logic.Formula
@@ -27,9 +20,7 @@ import           Logic.Model
 import           Logic.Var
 import qualified Logic.Solver.Z3 as Z3
 
-import           Text.Read (readMaybe)
-
--- | Instance indexes are arranged backwards -- newer instances which occur
+-- | Inst indexes are arranged backwards -- newer instances which occur
 -- closer to the beginning of the graph have higher value.
 newtype Idx = Idx { getIdx :: Integer }
   deriving (Eq, Data, Num, Pretty)
@@ -39,12 +30,12 @@ instance Read Idx where readsPrec i = map (first Idx) . readsPrec i
 
 type Loc = Integer
 
-data Vert = Vert
-  { _vertLoc :: Loc
-  , _vertVars :: [Var]
-  , _vertForm :: Form
+data Inst = Inst
+  { _instLoc :: Loc
+  , _instVars :: [Var]
+  , _instForm :: Form
   } deriving (Show, Read, Eq, Ord, Data)
-makeLenses ''Vert
+makeLenses ''Inst
 
 data Edge = Edge
   { _edgeForm :: Form
@@ -55,46 +46,28 @@ makeLenses ''Edge
 instance Pretty Edge where
   pretty (Edge f m) = pretty f <+> pretty (M.toList m)
 
-instance Pretty Vert where
-  pretty (Vert l vs f) = pretty l <+> pretty vs <+> pretty f
+instance Pretty Inst where
+  pretty (Inst l vs f) = pretty l <+> pretty vs <+> pretty f
 
-type ImplGr e = Graph Idx e Vert
+type ImplGr e = Graph Idx e Inst
 
 -- | Construct an implication graph by swapping the labels for proper instance labels.
-fromGraph :: Ord i => Graph i e Vert -> ImplGr e
+fromGraph :: Ord i => Graph i e Inst -> ImplGr e
 fromGraph g = snd $ relabel (Idx 0) g
 
-emptyInst :: Loc -> [Var] -> Vert
-emptyInst l vs = Vert l vs (LBool False)
-
--- | Augment the fact at each vertex in the graph by the fact in the model.
-applyModel :: Model -> ImplGr Edge -> ImplGr Edge
-applyModel m = G.imapVert applyVert
-  where
-    applyVert i v = v & vertForm %~ (\f -> M.findWithDefault f i m')
-
-    m' = M.toList (getModel m)
-      & map (traverseOf _1 %%~ interpretName . varName)
-      & catMaybes & M.fromList
-      where interpretName n = n ^? to uncons . _Just . _2 . _Show
+-- | An instance which contains no formula.
+emptyInst :: Loc -> [Var] -> Inst
+emptyInst l vs = Inst l vs (LBool False)
 
 data Result e
   = Failed Model
   | Complete (ImplGr e)
   deriving (Show, Read, Eq)
 
-type Solve e m = (MonadError (Result e) m, MonadIO m)
-
-runSolve :: Monad m => ExceptT e (StateT Integer m) a1 -> m (Either e a1)
-runSolve ac = evalStateT (runExceptT ac) 0
-
 -- | Gather all facts known about each instance of the same index together by disjunction.
--- collectAnswer :: MonadIO m => ImplGr Edge -> m (Map Integer Form)
--- collectAnswer g = traverse Z3.superSimplify $ execState (G.itravVerts (\i v -> case v of
---   InstanceV _ f ->
---     if f == LBool True then return ()
---     else modify (M.insertWith mkOr (i ^. idxIden) f)
---   _ -> return ()) (g ^. implGr)) M.empty
+collectAnswer :: MonadIO m => ImplGr Edge -> m (Map Integer Form)
+collectAnswer g = traverse Z3.superSimplify $ execState (G.itravVert (\_ (Inst loc _ f) ->
+  when (f /= LBool True) $ modify (M.insertWith mkOr loc f)) g) M.empty
 
 -- | Unwind all backedges which do not reach an inductive vertex, then compress
 -- the graph to only those vertices which reach the end.
@@ -136,7 +109,14 @@ relabel idx g = evalState (do
   m <- execStateT (buildMapping g) M.empty
   return (m, G.mapIdx (m M.!) g)) idx
   where
-    buildMapping = forwards . fromJust . G.itopVert_ update . G.withoutBackEdges
-    update i _ = Backwards (modify . M.insert i =<< lift freshIdx)
-    freshIdx = state (\ins -> (ins, ins+1))
+    buildMapping g =         -- To construct the relabelling map
+      g & G.withoutBackEdges -- consider the graph without backedges
+        & G.itopVert_ update -- update the map in topological order
+        & fromJust           -- we know there are no backedges since we removed them
+        & forwards           -- run the updates forwards
 
+    -- add an entry to the relabelling map (in backwards order)
+    update i _ = Backwards (modify . M.insert i =<< lift freshIdx)
+
+    -- use the state to create a fresh index
+    freshIdx = state (\ins -> (ins, ins+1))

@@ -2,12 +2,10 @@
 module Data.Optic.Graph.Extras where
 
 import           Control.Lens
-import           Control.Applicative.Backwards
 import           Control.Monad.State
 
 import           Data.Optic.Directed.HyperGraph
 import           Data.Maybe (fromJust)
-import qualified Data.Map as M
 import qualified Data.Set as S
 import           Data.Monoid ((<>))
 import           Data.Text.Prettyprint.Doc hiding ((<>), dot)
@@ -56,7 +54,7 @@ dot seper fi fe fv g =
 
       case length i1 of
         1 -> map (\i -> lbl i ++ " -> " ++ lbl i2 ++ annot) (S.toList i1)
-        n ->
+        _ ->
           let mid = "m" ++ concatMap lbl (S.toList i1) ++ "_" ++ lbl i2
           in
           [ mid ++ " [shape=point, width=0.00001,height=0.00001" ++ back ++ "];" ]

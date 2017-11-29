@@ -25,7 +25,9 @@ main = do
   sol <- solve example
   case sol of
     Left m -> print (pretty m)
-    Right r -> G.display "test.dot" r
+    Right r -> do
+      G.display "test.dot" r
+      print . pretty . M.toList =<< collectAnswer r
 
 a, a', x, x' :: Var
 a  = Free ["a"] 0 T.Int
@@ -34,12 +36,12 @@ p  = Free ["p"] 0 T.Int
 x  = Free ["x"] 0 T.Int
 x' = Free ["x"] 1 T.Int
 
-example :: Graph Integer Edge Vert
+example :: Graph Integer Edge Inst
 example = G.fromLists
   [ (0, emptyInst 0 [a])
   , (1, emptyInst 1 [p, x])
   , (2, emptyInst 2 [p, x])
-  , (3, Vert 3 [] [form|a:Int = 1|])]
+  , (3, Inst 3 [] [form|a:Int = 1|])]
 
   [ ( G.HEdge S.empty 0, Edge [form|a:Int = 0|] M.empty)
   , ( G.HEdge S.empty 1, Edge [form|x:Int = p:Int|] M.empty)

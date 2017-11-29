@@ -17,7 +17,7 @@ type RenameMap = Map.Map V.Var V.Var
 
 
 -- | Finds irreducible vertices in a given `ImplGr`.
-irreducible :: (Ord i) => Graph i Edge Vert -> [i]
+irreducible :: (Ord i) => Graph i Edge Inst -> [i]
 irreducible graph = [startIndex, queryIndex] ++ loopHeaders where
   idxs = G.idxs graph
   startIndex = minimum idxs
@@ -78,7 +78,7 @@ disjunction e1 e2 =
 
 
 -- | Remove all reducible vertices and combine edges through {dis/con}junction.
-prune :: (Ord i) => Graph i Edge Vert -> Graph i Edge Vert
+prune :: (Ord i) => Graph i Edge Inst -> Graph i Edge Inst
 prune graph = foldr removeVertex graph reducible where
   andEdge (G.Pair start _, e) (G.Pair _ end, e') =
     G.addEdgeWith disjunction (G.Pair start end) $ conjunction e e'

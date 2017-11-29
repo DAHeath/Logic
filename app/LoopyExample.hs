@@ -32,11 +32,11 @@ j' = Free ["j"] 1 T.Int
 c  = Free ["c"] 0 T.Int
 c' = Free ["c"] 1 T.Int
 
-example :: Graph Integer Edge Vert
+example :: Graph Integer Edge Inst
 example = G.fromLists
   [ (0, emptyInst 0 [i, c])
   , (1, emptyInst 1 [i, j, c])
-  , (2, Vert 2 [] [form|c:Int = 1|])
+  , (2, Inst 2 [] [form|c:Int = 1|])
   ]
 
   [ (G.HEdge S.empty 0, Edge [form|i:Int = 0 && c:Int = 0|] M.empty)

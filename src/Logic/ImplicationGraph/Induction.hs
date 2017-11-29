@@ -12,7 +12,7 @@ import qualified Data.Optic.Graph.Extras as G
 import           Data.Map (Map)
 import qualified Data.Map as M
 import qualified Data.Set as S
-import           Data.Maybe (mapMaybe, fromMaybe)
+import           Data.Maybe (mapMaybe)
 import           Data.Text.Prettyprint.Doc
 
 import           Logic.Formula
@@ -24,7 +24,7 @@ type PredInd e m = ImplGr e -> Idx -> m [Bool]
 
 data Strategy e = Strategy
     -- What constitutes a back edge for the strategy?
-  { backs :: Graph Idx e Vert -> [(G.HEdge Idx, e)]
+  { backs :: Graph Idx e Inst -> [(G.HEdge Idx, e)]
     -- How is interpolation performed over the graph?
   , interp :: forall m. MonadIO m => ImplGr e -> m (Either Model (ImplGr e))
     -- How do we know if the predecessors indicate the current vertex is inductive?
@@ -48,7 +48,7 @@ computeInd pc g i =
   (at i <?=) =<< maybe (return False) (\v -> do
     psInd <- pc g i
     case v of
-      Vert loc _ f ->
+      Inst loc _ f ->
         or <$> sequence ([ return $ f == LBool True
                          , anyM (`Z3.entails` f) (descendantInstanceVs g loc i)
                          ] ++ map return psInd)) (g ^. at i)
@@ -61,10 +61,10 @@ descendantInstanceVs :: ImplGr e -> Loc -> Idx -> [Form]
 descendantInstanceVs g loc i =
   G.descendants i g
     & S.toList
-    & filter (\i' -> case g ^? ix i' . vertLoc of
+    & filter (\i' -> case g ^? ix i' . instLoc of
       Nothing -> False
       Just loc' -> i /= i' && loc == loc')
-    & mapMaybe (\i' -> g ^? ix i' . vertForm)
+    & mapMaybe (\i' -> g ^? ix i' . instForm)
 
 -- | Apply the strategy to the graph until a either a counterxample or an inductive
 -- solution is found.
@@ -72,7 +72,7 @@ loop :: (MonadIO m, Pretty e, Show e)
      => Strategy e
      -> ImplGr e -> m (Either Model (ImplGr e))
 loop strat g = do
-  solved <- runSolve $ loop' g
+  solved <- runExceptT $ loop' g
   case solved of
     Left (Failed m) -> return (Left m)
     Left (Complete res) -> return (Right res)
@@ -85,12 +85,13 @@ loop strat g = do
 -- 1. interpolating over the current graph
 -- 2. checking if the solution is inductive (and terminating if it is)
 -- 3. unwinding the graph over all backedges
-step :: (Show e, Pretty e, Solve e m) => Idx -> Strategy e -> ImplGr e -> m (ImplGr e)
+step :: (Pretty e, MonadError (Result e) m, MonadIO m)
+     => Idx -> Strategy e -> ImplGr e -> m (ImplGr e)
 step end strat g = do
   G.display "step" g
-  interp strat g >>= either (throwError . Failed) (\interp -> do
-    liftIO getLine
-    indM <- inductive end (predInd strat) interp
+  interp strat g >>= either (throwError . Failed) (\itp -> do
+    _ <- liftIO getLine
+    indM <- inductive end (predInd strat) itp
     let isInd = M.keys $ M.filter id indM
-    when (M.lookup end indM == Just True) $ throwError $ Complete interp
-    return $ unwindAll (backs strat g) isInd end interp)
+    when (M.lookup end indM == Just True) $ throwError $ Complete itp
+    return $ unwindAll (backs strat g) isInd end itp)

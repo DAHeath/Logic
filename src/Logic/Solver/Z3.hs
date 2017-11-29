@@ -4,15 +4,12 @@ module Logic.Solver.Z3 where
 
 import           Control.Lens
 import           Control.Monad.State
-import           Control.Monad.Reader
 
 import           Data.List (partition)
 import           Data.List.Split (splitOn)
 import           Data.Maybe
 import qualified Data.Map as M
 import           Data.Map (Map)
-import qualified Data.Tree as Tr
-import           Data.Tree (Tree)
 
 import           Logic.Chc (Chc)
 import qualified Logic.Chc as C
@@ -115,7 +112,7 @@ superSimplify f = runEnvZ3 $ astToForm =<< superSimp =<< formToAst f
       rs <- getApplyResultSubgoals =<< applyTactic tac' g
       asts <- concat <$> mapM getGoalFormulas rs
       case asts of
-        (f : _) -> return f
+        (f' : _) -> return f'
         _ -> return ast
 
 -- | A monadic context for Z3 actions which caches the variables and functions

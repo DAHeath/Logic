@@ -22,13 +22,12 @@ import qualified Data.ByteString.Lazy.Char8 as BS
 main :: IO ()
 main = do
   G.display "before.dot" example
-  print example
   sol <- solve example
   case sol of
     Left m -> print (pretty m)
-    Right r ->
+    Right r -> do
       G.display "test.dot" r
-      -- print . pretty . M.toList =<< collectAnswer r
+      print . pretty . M.toList =<< collectAnswer r
 
 i, i', n :: Var
 i  = Free ["i"] 0 T.Int
@@ -38,10 +37,10 @@ n  = Free ["n"] 0 T.Int
 s :: [Var]
 s = [i, n]
 
-example :: Graph Integer Edge Vert
+example :: Graph Integer Edge Inst
 example = G.fromLists
   [ (0, emptyInst 0 s)
-  , (1, Vert 1 [] [form|not (i:Int = 3)|])]
+  , (1, Inst 1 [] [form|not (i:Int = 3)|])]
   [ ( G.HEdge S.empty 0, Edge [form|i:Int = 0|] M.empty)
   , ( G.HEdge (S.singleton 0) 0, Edge [form|i/1:Int = i:Int + 2 && i:Int < n:Int|] (M.singleton i i'))
   , ( G.HEdge (S.singleton 0) 1, Edge [form|i:Int >= n:Int|] M.empty)

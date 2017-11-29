@@ -29,7 +29,7 @@ import           Logic.ImplicationGraph.Equivalence
 --   return r;
 -- }
 
-cs0 :: Graph Integer Edge Vert
+cs0 :: Graph Integer Edge Inst
 cs0 = G.fromLists
   [ (0, emptyInst 0 [n, r])
   , (1, emptyInst 1 [n, r, s, p, i])
@@ -62,7 +62,7 @@ cs0 = G.fromLists
 --   return x;
 -- }
 
-cs1 :: Graph Integer Edge Vert
+cs1 :: Graph Integer Edge Inst
 cs1 = G.fromLists
   [ (0, emptyInst 0 [m, x])
   , (1, emptyInst 1 [m, x, c1, c2, j])
@@ -99,13 +99,13 @@ p' = Free ["p"] 1 T.Int
 i  = Free ["i"] 0 T.Int
 i' = Free ["i"] 1 T.Int
 
-ad0 :: Graph Integer Edge Vert
+ad0 :: Graph Integer Edge Inst
 ad0 = G.fromLists
   [ (0, emptyInst 0 [])
   , (1, emptyInst 1 [n, r]) ]
   [ (G.HEdge (S.singleton 0) 1, Edge [form|r:Int = n:Int - 9 * ((n:Int - 1) / 9)|] M.empty) ]
 
-ad1 :: Graph Integer Edge Vert
+ad1 :: Graph Integer Edge Inst
 ad1 = G.fromLists
   [ (0, emptyInst 0 [])
   , (1, emptyInst 1 [m, x])

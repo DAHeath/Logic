@@ -1,51 +1,57 @@
 module Logic.ImplicationGraph.Chc where
 
 import           Control.Lens
-import           Control.Arrow (first)
 import           Control.Monad.State
 
-import           Data.Map (Map)
 import qualified Data.Map as M
-import           Data.Set (Set)
-import           Data.List (sortBy)
 import qualified Data.Set as S
-import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Directed.HyperGraph as G
-import           Data.Maybe (mapMaybe, fromJust)
-import           Data.Text.Prettyprint.Doc
+import           Data.Maybe (fromJust)
 
 import           Logic.Model
 import           Logic.Var
 import           Logic.Chc
 import           Logic.ImplicationGraph
-import           Logic.ImplicationGraph.Simplify (conjunction)
 import qualified Logic.Solver.Z3 as Z3
-
--- | Convert the graph into a system of Constrained Horn Clauses.
-implGrChc :: ImplGr Edge -> [Chc]
-implGrChc g = map rule topConns
-  where
-    -- | Find the connections in topological order.
-    topConns =
-      runIdentity (fromJust $ G.itopEdge
-        (\is e -> Identity (G.omap (\i -> (i, g ^?! ix i)) is, e)) (G.withoutBackEdges g))
-        ^.. G.allEdges
-
-    -- | A single connection converts to a Horn Clause.
-    rule (G.HEdge lhs (i, v), Edge f mvs) =
-      let lhs' = mapMaybe (uncurry buildRel) (S.toList lhs)
-      in case lengthOf (G.iedgesFrom i) g of
-            -- If the target vertex has no successors, then it's a query>
-            0 -> Query lhs' f (subst mvs (v ^. vertForm))
-            -- Otherwise, the vertex is part of a rule.
-            _ -> Rule lhs' f (subst mvs (fromJust $ buildRel i v))
-
-    buildRel i v = case v of
-      Vert _ vs _ -> Just $ mkApp ('r' : _Show #i) vs
 
 -- | Interpolate the facts in the graph using CHC solving to label the vertices
 -- with fresh definitions.
 interpolate :: MonadIO m => ImplGr Edge -> m (Either Model (ImplGr Edge))
-interpolate g = do
-  liftIO $ print $ pretty (implGrChc g)
-  (fmap . fmap) (`applyModel` g) (Z3.solveChc (implGrChc g))
+interpolate g = (fmap . fmap) (`applyModel` g) (Z3.solveChc $ implGrChc g)
+
+-- | Convert the forward edges of the graph into a system of Constrained Horn Clauses.
+implGrChc :: ImplGr Edge -> [Chc]
+implGrChc g = map rule topConns
+  where
+    topConns = -- to find the graph connections in topological order...
+      (g & G.withoutBackEdges                          -- remove backedges
+         & G.itopEdge                                  -- for each edge...
+            (\is e -> Identity (G.omap inspect is, e)) -- lookup the edge indexes
+         & fromJust                                    -- we know the graph has no backedges
+         & runIdentity) ^.. G.iallEdges                -- collect all the connections
+      where
+        inspect i = (i, g ^?! ix i)
+
+    -- each hypergraph connection converts to a Horn Clause.
+    rule (G.HEdge lhs (i, v), Edge f mvs) =
+      let lhs' = map buildRel (S.toList lhs)
+      in case lengthOf (G.iedgesFrom i) g of
+        0 -> Query lhs' f (subst mvs (v ^. instForm))   -- If the target vertex has no successors, then it's a query
+        _ -> Rule  lhs' f (subst mvs (buildRel (i, v))) -- Otherwise, the vertex is part of a rule.
+
+    -- construct an applied predicate from the instance
+    buildRel (i, v) = mkApp ('r' : _Show #i) (v ^. instVars)
+
+-- | Augment the fact at each vertex in the graph by the fact in the model.
+applyModel :: Model -> ImplGr Edge -> ImplGr Edge
+applyModel model = G.imapVert applyInst
+  where
+    applyInst i v =
+      v & instForm %~ (\f ->
+          M.findWithDefault f i instMap -- replace the formula by the value in the map
+        & instantiate (v ^. instVars))  -- replace the bound variables by the instance variables
+
+    instMap = getModel model
+      & M.filterWithKey (\k _ -> head (varName k) == 'r') -- only consider the instance predicates
+      & M.mapKeys (read . tail . varName)                 -- convert the keys of the map to indexes
+

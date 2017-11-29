@@ -2,9 +2,7 @@ module Logic.ImplicationGraph.Equivalence where
 
 import           Control.Lens
 import           Control.Monad.State
-import           Control.Monad.Except
 
-import           Data.Map (Map)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import           Data.Optic.Directed.HyperGraph (Graph)
@@ -13,9 +11,7 @@ import qualified Data.Optic.Graph.Extras as G
 import           Data.Text.Prettyprint.Doc
 import           Data.These
 
-import qualified Logic.Type as T
 import           Logic.Formula
-import           Logic.Var
 import           Logic.Model
 import           Logic.ImplicationGraph
 import           Logic.ImplicationGraph.Induction
@@ -35,8 +31,8 @@ solve :: MonadIO m
       => Integer
       -> Integer
       -> Form
-      -> Graph Integer Edge Vert
-      -> Graph Integer Edge Vert
+      -> Graph Integer Edge Inst
+      -> Graph Integer Edge Inst
       -> m (Either Model ProdGr)
 solve e1 e2 quer g1 g2 = do
   G.display "before" wQuery
@@ -45,13 +41,12 @@ solve e1 e2 quer g1 g2 = do
   where
     wQuery =
       equivProduct g1 g2
-      & G.addVert end (Vert (locMerge e1 e2 + 1) [] quer)
+      & G.addVert end (Inst (locMerge e1 e2 + 1) [] quer)
       & G.addEdge (G.HEdge (S.singleton $ end-1) end) (This $ Edge (LBool True) M.empty)
 
     locMerge i j = j + i * (maxJ + 1)
     maxJ = maximum (G.idxs g2)
     end = locMerge e1 e2 + 1
-    equate (v1, v2) = mkEql (T.typeOf v1) (V v1) (V v2)
 
     equivProduct g1 g2 =
       cleanIntros (G.cartesianProductWith edgeMerge const locMerge vertMerge
@@ -66,7 +61,7 @@ solve e1 e2 quer g1 g2 = do
     edgeMerge e1 _ = e1
 
     vertMerge v1 v2 = case (v1, v2) of
-      (Vert i vs1 _, Vert j vs2 _) -> emptyInst (locMerge i j) (vs1 ++ vs2)
+      (Inst i vs1 _, Inst j vs2 _) -> emptyInst (locMerge i j) (vs1 ++ vs2)
 
 equivStrat :: Strategy (These Edge Edge)
 equivStrat =
