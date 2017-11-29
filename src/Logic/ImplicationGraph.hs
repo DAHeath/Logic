@@ -11,6 +11,7 @@ import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Directed.HyperGraph as G
 import           Data.Map (Map)
 import qualified Data.Map as M
+import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Maybe (fromJust)
 import           Data.Text.Prettyprint.Doc
@@ -59,11 +60,6 @@ fromGraph g = snd $ relabel (Idx 0) g
 emptyInst :: Loc -> [Var] -> Inst
 emptyInst l vs = Inst l vs (LBool False)
 
-data Result e
-  = Failed Model
-  | Complete (ImplGr e)
-  deriving (Show, Read, Eq)
-
 -- | Gather all facts known about each instance of the same index together by disjunction.
 collectAnswer :: MonadIO m => ImplGr Edge -> m (Map Integer Form)
 collectAnswer g = traverse Z3.superSimplify $ execState (G.itravVert (\_ (Inst loc _ f) ->
@@ -71,7 +67,7 @@ collectAnswer g = traverse Z3.superSimplify $ execState (G.itravVert (\_ (Inst l
 
 -- | Unwind all backedges which do not reach an inductive vertex, then compress
 -- the graph to only those vertices which reach the end.
-unwindAll :: [(G.HEdge Idx, e)] -> [Idx] -> Idx -> ImplGr e -> ImplGr e
+unwindAll :: [(G.HEdge Idx, e)] -> Set Idx -> Idx -> ImplGr e -> ImplGr e
 unwindAll bes ind end g =
   let relevantBes = bes & filter (\be ->        -- a backedge is relevant if...
         be & fst & G.start                      -- we consider the start of the backedge and...

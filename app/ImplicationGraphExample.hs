@@ -1,8 +1,4 @@
 {-# LANGUAGE QuasiQuotes #-}
-import           Control.Lens
-import           Control.Monad.State
-import           Control.Monad.Except
-
 import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Directed.HyperGraph as G
 import qualified Data.Optic.Graph.Extras as G
@@ -15,9 +11,6 @@ import           Logic.ImplicationGraph.Safety
 import qualified Logic.Type as T
 import           Logic.Formula.Parser
 import           Logic.Var
-
-import           Logic.ImplicationGraph.JSONParser (parseGraphFromJSON)
-import qualified Data.ByteString.Lazy.Char8 as BS
 
 main :: IO ()
 main = do

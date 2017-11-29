@@ -2,6 +2,7 @@ module Logic.ImplicationGraph.Chc where
 
 import           Control.Lens
 import           Control.Monad.State
+import           Control.Monad.Except
 
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -16,8 +17,9 @@ import qualified Logic.Solver.Z3 as Z3
 
 -- | Interpolate the facts in the graph using CHC solving to label the vertices
 -- with fresh definitions.
-interpolate :: MonadIO m => ImplGr Edge -> m (Either Model (ImplGr Edge))
-interpolate g = (fmap . fmap) (`applyModel` g) (Z3.solveChc $ implGrChc g)
+interpolate :: (MonadError Model m, MonadIO m)
+            => ImplGr Edge -> m (ImplGr Edge)
+interpolate g = (`applyModel` g) <$> Z3.solveChc (implGrChc g)
 
 -- | Convert the forward edges of the graph into a system of Constrained Horn Clauses.
 implGrChc :: ImplGr Edge -> [Chc]

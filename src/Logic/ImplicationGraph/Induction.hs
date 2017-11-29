@@ -11,6 +11,7 @@ import qualified Data.Optic.Directed.HyperGraph as G
 import qualified Data.Optic.Graph.Extras as G
 import           Data.Map (Map)
 import qualified Data.Map as M
+import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Maybe (mapMaybe)
 import           Data.Text.Prettyprint.Doc
@@ -20,78 +21,84 @@ import           Logic.Model
 import qualified Logic.Solver.Z3 as Z3
 import           Logic.ImplicationGraph
 
+import           Prelude hiding (pi)
+
 type PredInd e m = ImplGr e -> Idx -> m [Bool]
 
 data Strategy e = Strategy
     -- What constitutes a back edge for the strategy?
   { backs :: Graph Idx e Inst -> [(G.HEdge Idx, e)]
     -- How is interpolation performed over the graph?
-  , interp :: forall m. MonadIO m => ImplGr e -> m (Either Model (ImplGr e))
+  , interp :: forall m. (MonadIO m, MonadError Model m) => ImplGr e -> m (ImplGr e)
     -- How do we know if the predecessors indicate the current vertex is inductive?
   , predInd :: forall m. (MonadIO m, MonadState (Map Idx Bool) m) => PredInd e m
   }
 
--- | Check whether the vertex labels in the graph form an inductive relationship.
-inductive :: MonadIO m => Idx -> PredInd e (StateT (Map Idx Bool) m) -> ImplGr e -> m (Map Idx Bool)
-inductive end pc g = execStateT (ind pc g end) M.empty
+-- | Find the vertex labels in the graph which are inductive.
+inductive :: MonadIO m => PredInd e (StateT (Map Idx Bool) m) -> ImplGr e -> m (Set Idx)
+inductive pi g = M.keysSet . M.filter id <$> execStateT (ind pi g (end g)) M.empty
 
+-- | Decide if the given index
 ind :: (MonadIO m, MonadState (Map Idx Bool) m) => PredInd e m -> ImplGr e -> Idx -> m Bool
-ind pc g i = maybe (computeInd pc g i) return . M.lookup i =<< get
+ind pi g i =
+  maybe
+    (computeInd pi g i)  -- compute inductiveness when we don't know the answer
+    return               -- if we memoized the answer, we're done
+    . M.lookup i =<< get -- lookup the answer from the state
 
 indPred :: (MonadIO m, MonadState (Map Idx Bool) m)
         => PredInd e m -> ImplGr e -> Idx -> Idx -> m Bool
-indPred pc g i i' = if i <= i' then return False else ind pc g i'
+indPred pi g i i' =
+  if i <= i'        -- if we check the 'predecessor' and it occurs after the current index (back edge)
+  then return False -- then it is automatically not inductive
+  else ind pi g i'  -- otherwise, we recurse
 
 computeInd :: (MonadIO m, MonadState (Map Idx Bool) m)
            => PredInd e m -> ImplGr e -> Idx -> m Bool
-computeInd pc g i =
-  (at i <?=) =<< maybe (return False) (\v -> do
-    psInd <- pc g i
-    case v of
-      Inst loc _ f ->
-        or <$> sequence ([ return $ f == LBool True
-                         , anyM (`Z3.entails` f) (descendantInstanceVs g loc i)
-                         ] ++ map return psInd)) (g ^. at i)
+computeInd pi g i =
+  (at i <?=) =<< -- find the answer and update the memoization table
+    maybe
+      (return False)    -- if there is no vertex, it is not inductive
+      (\(Inst loc _ f) -> do
+        psInd <- pi g i -- check inductiveness via predecessors
+        or <$> sequence (                                   -- this index is inductive if...
+          [ return $ f == LBool True                        -- it is trivially inductive
+          , anyM (`Z3.entails` f) (descendantForms g loc i) -- a descendant at the same location entails it
+          ] ++ map return psInd)) (g ^. at i)               -- it's inductive via its predecessors
 
+-- | Are all predecessors inductive?
 allInd :: (MonadIO m, MonadState (Map Idx Bool) m)
        => PredInd e m -> ImplGr e -> Idx -> [Idx] -> m Bool
-allInd pc g i is = and <$> mapM (indPred pc g i) is
+allInd pi g i is = and <$> mapM (indPred pi g i) is
 
-descendantInstanceVs :: ImplGr e -> Loc -> Idx -> [Form]
-descendantInstanceVs g loc i =
-  G.descendants i g
-    & S.toList
-    & filter (\i' -> case g ^? ix i' . instLoc of
-      Nothing -> False
-      Just loc' -> i /= i' && loc == loc')
-    & mapMaybe (\i' -> g ^? ix i' . instForm)
+-- | Find the formulas of descendants at the same location.
+descendantForms :: ImplGr e -> Loc -> Idx -> [Form]
+descendantForms g loc i =
+  G.descendants i g                      -- look at all descendants
+    & S.delete i                         -- an instance cannot entail itself
+    & S.toList                           -- convert to a list
+    & mapMaybe (\i' -> g ^? ix i')       -- lookup the vertex at each index
+    & filter (\v -> v ^. instLoc == loc) -- only consider those at the location in question
+    & map _instForm                      -- fetch the formula
+
+-- | Find the end (query) of the graph
+end :: ImplGr e -> Idx
+end g = head $ filter (\i -> lengthOf (G.edgesFrom i) g == 0) (G.idxs g) -- the query has no outgoing edges
 
 -- | Apply the strategy to the graph until a either a counterxample or an inductive
--- solution is found.
-loop :: (MonadIO m, Pretty e, Show e)
-     => Strategy e
-     -> ImplGr e -> m (Either Model (ImplGr e))
-loop strat g = do
-  solved <- runExceptT $ loop' g
-  case solved of
-    Left (Failed m) -> return (Left m)
-    Left (Complete res) -> return (Right res)
-    Right _ -> error "infinite loop terminated successfully?"
-  where
-    loop' gr = loop' =<< step end strat gr
-    end = head $ filter (\i -> lengthOf (G.edgesFrom i) g == 0) (G.idxs g)
-
--- | Perform a step of the unwinding by
+-- solution is found.  Perform a step of the unwinding by
 -- 1. interpolating over the current graph
 -- 2. checking if the solution is inductive (and terminating if it is)
 -- 3. unwinding the graph over all backedges
-step :: (Pretty e, MonadError (Result e) m, MonadIO m)
-     => Idx -> Strategy e -> ImplGr e -> m (ImplGr e)
-step end strat g = do
-  G.display "step" g
-  interp strat g >>= either (throwError . Failed) (\itp -> do
-    _ <- liftIO getLine
-    indM <- inductive end (predInd strat) itp
-    let isInd = M.keys $ M.filter id indM
-    when (M.lookup end indM == Just True) $ throwError $ Complete itp
-    return $ unwindAll (backs strat g) isInd end itp)
+loop :: (MonadIO m, Pretty e, Show e)
+     => Strategy e -> ImplGr e -> m (Either Model (ImplGr e))
+loop strat = runExceptT . loop'
+  where
+    loop' g = do
+      G.display "step" g
+      _ <- liftIO getLine
+      itp <- interp strat g                                   -- interpolate
+      indS <- inductive (predInd strat) itp                   -- check inductiveness
+      if end g `elem` indS                                    -- if the query is inductive...
+      then return itp                                         -- we're done
+      else loop' (unwindAll (backs strat g) indS (end g) itp) -- otherwise unwind and repeat

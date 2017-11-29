@@ -4,6 +4,7 @@ module Logic.Solver.Z3 where
 
 import           Control.Lens
 import           Control.Monad.State
+import           Control.Monad.Except
 
 import           Data.List (partition)
 import           Data.List.Split (splitOn)
@@ -33,8 +34,12 @@ makeLenses ''Env
 type SMT m = (MonadState Env m, MonadZ3 m)
 
 -- | Invoke `duality` to solve the relational post fixed-point problem.
-solveChc :: MonadIO m => [Chc] -> m (Either M.Model M.Model)
-solveChc hcs = runEnvZ3 sc
+solveChc :: (MonadError M.Model m, MonadIO m) => [Chc] -> m M.Model
+solveChc hcs = do
+  res <- runEnvZ3 sc
+  case res of
+    Left e -> throwError e
+    Right m -> return m
   where
     sc =
       let (queries, rules) = partition C.isQuery hcs
