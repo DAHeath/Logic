@@ -2,7 +2,7 @@
 module Logic.ImplicationGraph where
 
 import           Control.Lens
-import           Control.Arrow ((***))
+import           Control.Arrow ((***), first)
 import           Control.Applicative.Backwards
 import           Control.Monad.State
 import           Control.Monad.Except
@@ -29,9 +29,14 @@ import qualified Logic.Solver.Z3 as Z3
 
 import           Text.Read (readMaybe)
 
-import Debug.Trace
+-- | Instance indexes are arranged backwards -- newer instances which occur
+-- closer to the beginning of the graph have higher value.
+newtype Idx = Idx { getIdx :: Integer }
+  deriving (Eq, Data, Num, Pretty)
+instance Ord Idx where Idx a <= Idx b = b <= a
+instance Show Idx where show (Idx a) = show a
+instance Read Idx where readsPrec i = map (first Idx) . readsPrec i
 
-type Idx = Integer
 type Loc = Integer
 
 data Vert = Vert
@@ -47,34 +52,20 @@ data Edge = Edge
   } deriving (Show, Read, Eq, Ord, Data)
 makeLenses ''Edge
 
-type ImplGr e = Graph Idx e Vert
-
-fromGraph :: (Show e, AsInteger i) => Graph i e Vert -> ImplGr e
-fromGraph g = evalState (setIdxs g) 0
-  where
-    setIdxs g = do
-      m <- buildMapping
-      return (G.mapIdx (m M.!) g)
-      where
-        buildMapping =
-          let noBacks = G.ifilterEdges (\i _ -> i `notElem` map fst (G.backEdges g)) g
-          in
-          execStateT (
-            forwards $ fromJust (G.itopVert_ (\i -> Backwards . update i) noBacks)) M.empty
-        update i _ = modify . M.insert i =<< lift freshIdx
-        freshIdx = state (\ins -> (ins, ins+1))
-
-class (Show a, Ord a) => AsInteger a where asInteger :: a -> Integer
-instance AsInteger Integer where asInteger = id
-
-emptyInst :: Loc -> [Var] -> Vert
-emptyInst l vs = Vert l vs (LBool False)
-
 instance Pretty Edge where
   pretty (Edge f m) = pretty f <+> pretty (M.toList m)
 
 instance Pretty Vert where
   pretty (Vert l vs f) = pretty l <+> pretty vs <+> pretty f
+
+type ImplGr e = Graph Idx e Vert
+
+-- | Construct an implication graph by swapping the labels for proper instance labels.
+fromGraph :: Ord i => Graph i e Vert -> ImplGr e
+fromGraph g = snd $ relabel (Idx 0) g
+
+emptyInst :: Loc -> [Var] -> Vert
+emptyInst l vs = Vert l vs (LBool False)
 
 -- | Augment the fact at each vertex in the graph by the fact in the model.
 applyModel :: Model -> ImplGr Edge -> ImplGr Edge
@@ -105,65 +96,47 @@ runSolve ac = evalStateT (runExceptT ac) 0
 --     else modify (M.insertWith mkOr (i ^. idxIden) f)
 --   _ -> return ()) (g ^. implGr)) M.empty
 
-relabel :: (MonadState Integer m) => Idx -> Graph Idx e v -> m (Idx, Graph Idx e v)
-relabel end g = do
-  m <- buildMapping
-  return (M.findWithDefault end end m, G.mapIdx (\i -> M.findWithDefault i i m) g)
-  where
-    buildMapping =
-      let noBacks = G.ifilterEdges (\i _ -> i `notElem` map fst (revBackEdges g)) g
-          revSubGr = G.reaches end noBacks
-      in
-      execStateT (
-        forwards $ fromJust (G.itopVert_ (\i -> Backwards . update i) revSubGr)) M.empty
-
-    update i _ = do
-      f <- lift freshIdx
-      modify $ M.insert i f
-    freshIdx = state (\ins -> (ins, ins+1))
-
 -- | Unwind all backedges which do not reach an inductive vertex, then compress
 -- the graph to only those vertices which reach the end.
 unwindAll :: [(G.HEdge Idx, e)] -> [Idx] -> Idx -> ImplGr e -> ImplGr e
-unwindAll bes ind end ig =
-  traceShow (map fst bes) $
-  let relevantBes = filter (\(G.HEdge i _, _) ->
-        any (\i' -> all (`notElem` ind) (ig & withoutRevBackEdges & G.reached i' & G.idxs)) i) bes
-      (is, ig') =
-        foldr (\(G.HEdge i1 i2, e) (is, ig) ->
-          let (i, ig') = unwind i1 i2 e ig
-          in (i:is, ig')) ([], ig) relevantBes
-  in ig' & G.ifilterEdges (\i _ -> i `notElem` map fst bes)
-         & reachEndWithoutBackedge
+unwindAll bes ind end g =
+  let relevantBes = bes & filter (\be ->        -- a backedge is relevant if...
+        be & fst & G.start                      -- we consider the start of the backedge and...
+           & any (\i' -> g & G.withoutBackEdges -- when there are no backedges...
+                           & G.reached i'       -- the subgraph reached by the start of the backedge...
+                           & G.idxs             -- contains no inductive indices
+                           & none (`elem` ind)))
+  in g & flip (foldr unwind) relevantBes                  -- unwind all the relevant backedges
+       & G.ifilterEdges (\i _ -> i `notElem` map fst bes) -- filter out the old backedges
+       & reachEndWithoutBackedge                          -- select the portion which reaches the query
+       & relabel (Idx 0) & snd                            -- relabel to account for discarded indices
   where
     reachEndWithoutBackedge g' =
-      let compressed = g'
-            & G.ifilterEdges (\i _ -> i `notElem` map fst (revBackEdges g'))
-            & G.reaches end
+      let compressed = g'        -- find the subgraph which...
+            & G.withoutBackEdges -- has no backedges...
+            & G.reaches end      -- and reaches the query
       in G.filterIdxs (`elem` G.idxs compressed) g'
 
 -- | Unwind the graph on the given backedge and update all instances in the unwinding.
-unwind :: Set Idx -> Idx -> e -> ImplGr e -> ([Idx], ImplGr e)
-unwind i1 i2 e g =
-  let g' = (G.reaches i2 (G.delEdge (G.HEdge i1 i2) g)
-              `mappend` foldMap (\i -> G.between i2 i g) i1)
-         & G.mapVert (vertForm .~ LBool False)
-      ((i1', g''), lbl') =
-        runState (foldrM (\i (is, g) -> do
-          (i', g') <- relabel i g
-          return (i' : is, g')) ([], g') i1) (G.order g)
+unwind :: (G.HEdge Idx, e) -> ImplGr e -> ImplGr e
+unwind (G.HEdge i1 i2, e) g =
+  let (m, g') = g                                       -- in order to calculate the unwound subgraph:
+        & G.reaches i2                                  -- find the subgraph which reaches the end of backedge
+        & G.union (foldMap (\i -> G.between i2 i g) i1) -- attach the subgraph between the ends of the backedge
+        & relabel (Idx $ G.order g)                     -- relabel all the instances
   in
-  (i1', g & (G.addEdge (G.HEdge (S.fromList i1') i2) e . mappend g''))
+  g & G.union g'                                  -- attach the unwound subgraph
+    & G.delEdge (G.HEdge i1 i2)                   -- delete the old backedge
+    & G.addEdge (G.HEdge (S.map (m M.!) i1) i2) e -- re-add the backedge as a forward edge from the unwound subgraph
 
-newtype ReverseOrder a = ReverseOrder { getReverseOrder :: a }
-  deriving (Show, Read, Eq, Data)
-instance Ord a => Ord (ReverseOrder a) where
-  ReverseOrder a <= ReverseOrder b = b <= a
+-- | Relabel the vertices in the graph in reverse topological order. The new index
+-- values are obtained from the state. The map used to relabel is also returned.
+relabel :: Ord i => Idx -> Graph i e v -> (Map i Idx, Graph Idx e v)
+relabel idx g = evalState (do
+  m <- execStateT (buildMapping g) M.empty
+  return (m, G.mapIdx (m M.!) g)) idx
+  where
+    buildMapping = forwards . fromJust . G.itopVert_ update . G.withoutBackEdges
+    update i _ = Backwards (modify . M.insert i =<< lift freshIdx)
+    freshIdx = state (\ins -> (ins, ins+1))
 
-revBackEdges :: Ord i => Graph i e v -> [(G.HEdge i, e)]
-revBackEdges = map (\(G.HEdge i1 i2, e) -> (G.HEdge (G.omap getReverseOrder i1) (getReverseOrder i2), e))
-             . G.backEdges
-             . G.mapIdx ReverseOrder
-
-withoutRevBackEdges :: Ord i => Graph i e v -> Graph i e v
-withoutRevBackEdges = G.mapIdx getReverseOrder . G.withoutBackEdges . G.mapIdx ReverseOrder

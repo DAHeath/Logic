@@ -14,13 +14,13 @@ import           Logic.ImplicationGraph.Induction
 
 -- | Repeatedly unwind the program until a counterexample is found or inductive
 -- invariants are found.
-solve :: (AsInteger i, MonadIO m) => Graph i Edge Vert -> m (Either Model (ImplGr Edge))
+solve :: (Ord i, MonadIO m) => Graph i Edge Vert -> m (Either Model (ImplGr Edge))
 solve g = loop safetyStrat (fromGraph g)
 
 safetyStrat :: Strategy Edge
 safetyStrat =
   let theStrat = Strategy
-        { backs = revBackEdges
+        { backs = G.backEdges
         , interp = interpolate
         , predInd = \g i -> (: []) <$> allInd (predInd theStrat) g i
                               (S.toList $ G.predecessors g i)

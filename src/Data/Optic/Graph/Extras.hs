@@ -50,7 +50,7 @@ dot seper fi fe fv g =
     showVert (i, v) =
       lbl i ++ " [label=\"" ++ fi i ++ seper ++ fv v ++ "\"];"
     showEdge (HEdge i1 i2, e) =
-      let back = if any (<= i2) i1 then ", style=dashed" else ""
+      let back = if any (>= i2) i1 then ", style=dashed" else ""
           annot = " [label=\"" ++ fe e ++ "\"" ++ back ++"];"
       in
 

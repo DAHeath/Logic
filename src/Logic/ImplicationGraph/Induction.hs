@@ -40,7 +40,7 @@ ind pc g i = maybe (computeInd pc g i) return . M.lookup i =<< get
 
 indPred :: (MonadIO m, MonadState (Map Idx Bool) m)
         => PredInd e m -> ImplGr e -> Idx -> Idx -> m Bool
-indPred pc g i i' = if i >= i' then return False else ind pc g i'
+indPred pc g i i' = if i <= i' then return False else ind pc g i'
 
 computeInd :: (MonadIO m, MonadState (Map Idx Bool) m)
            => PredInd e m -> ImplGr e -> Idx -> m Bool
@@ -87,10 +87,8 @@ loop strat g = do
 -- 3. unwinding the graph over all backedges
 step :: (Show e, Pretty e, Solve e m) => Idx -> Strategy e -> ImplGr e -> m (ImplGr e)
 step end strat g = do
-  liftIO (putStrLn "here")
-  liftIO $ print g
+  G.display "step" g
   interp strat g >>= either (throwError . Failed) (\interp -> do
-    G.display "step" interp
     liftIO getLine
     indM <- inductive end (predInd strat) interp
     let isInd = M.keys $ M.filter id indM

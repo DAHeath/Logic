@@ -1,6 +1,7 @@
 module Logic.ImplicationGraph.Chc where
 
 import           Control.Lens
+import           Control.Arrow (first)
 import           Control.Monad.State
 
 import           Data.Map (Map)
@@ -22,27 +23,23 @@ import qualified Logic.Solver.Z3 as Z3
 
 -- | Convert the graph into a system of Constrained Horn Clauses.
 implGrChc :: ImplGr Edge -> [Chc]
-implGrChc g = organize $ map rule (G.connections (withoutRevBackEdges g))
+implGrChc g = map rule topConns
   where
-    organize :: [Chc] -> [Chc]
-    organize = sortBy (\c1 c2 -> case (c1, c2) of
-      (Query{}, Query{}) -> LT
-      (Query{}, Rule{}) -> GT
-      (Rule{}, Query{}) -> LT
-      (Rule _ _ a1, Rule _ _ a2) ->
-        compare (appNum a2) (appNum a1))
+    -- | Find the connections in topological order.
+    topConns =
+      runIdentity (fromJust $ G.itopEdge
+        (\is e -> Identity (G.omap (\i -> (i, g ^?! ix i)) is, e)) (G.withoutBackEdges g))
+        ^.. G.allEdges
 
-    appNum :: App -> Integer
-    appNum = read . tail . varName . appOperator
-
-    rule :: (G.HEdge (Idx, Vert), Edge) -> Chc
+    -- | A single connection converts to a Horn Clause.
     rule (G.HEdge lhs (i, v), Edge f mvs) =
       let lhs' = mapMaybe (uncurry buildRel) (S.toList lhs)
       in case lengthOf (G.iedgesFrom i) g of
+            -- If the target vertex has no successors, then it's a query>
             0 -> Query lhs' f (subst mvs (v ^. vertForm))
+            -- Otherwise, the vertex is part of a rule.
             _ -> Rule lhs' f (subst mvs (fromJust $ buildRel i v))
 
-    buildRel :: Idx -> Vert -> Maybe App
     buildRel i v = case v of
       Vert _ vs _ -> Just $ mkApp ('r' : _Show #i) vs
 

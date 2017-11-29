@@ -71,7 +71,7 @@ solve e1 e2 quer g1 g2 = do
 equivStrat :: Strategy (These Edge Edge)
 equivStrat =
   let theStrat = Strategy
-        { backs = concatMap allEs . revBackEdges
+        { backs = concatMap allEs . G.backEdges
         , interp = \g -> do
             sol <- interpolate (G.mapEdge edge g)
             return $ fmap (\g' ->
