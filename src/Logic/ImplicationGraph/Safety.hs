@@ -4,24 +4,13 @@ import           Control.Monad.State
 
 import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Directed.HyperGraph as G
-import qualified Data.Set as S
 
 import           Logic.Model
 import           Logic.ImplicationGraph
-import           Logic.ImplicationGraph.Chc
 import           Logic.ImplicationGraph.Induction
+import           Logic.ImplicationGraph.LTree
 
 -- | Repeatedly unwind the program until a counterexample is found or inductive
 -- invariants are found.
-solve :: (Ord i, MonadIO m) => Graph i Edge Inst -> m (Either Model (ImplGr Edge))
-solve = loop safetyStrat . fromGraph
-
-safetyStrat :: Strategy Edge
-safetyStrat =
-  let theStrat = Strategy
-        { backs = G.backEdges
-        , interp = interpolate
-        , predInd = \g i -> (: []) <$> allInd (predInd theStrat) g i
-                              (S.toList $ G.predecessors g i)
-        }
-  in theStrat
+solve :: (Ord i, MonadIO m) => Graph i Edge Inst -> m (Either Model ImplGr)
+solve = loop . G.mapEdge Leaf . fromGraph

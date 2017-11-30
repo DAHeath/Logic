@@ -30,11 +30,11 @@ n  = Free ["n"] 0 T.Int
 s :: [Var]
 s = [i, n]
 
-example :: Graph Integer Edge Inst
+example :: Graph Loc Edge Inst
 example = G.fromLists
-  [ (0, emptyInst 0 s)
-  , (1, Inst 1 [] [form|not (i:Int = 3)|])]
-  [ ( G.HEdge S.empty 0, Edge [form|i:Int = 0|] M.empty)
-  , ( G.HEdge (S.singleton 0) 0, Edge [form|i/1:Int = i:Int + 2 && i:Int < n:Int|] (M.singleton i i'))
-  , ( G.HEdge (S.singleton 0) 1, Edge [form|i:Int >= n:Int|] M.empty)
+  [ (Loc 0, emptyInst (Loc 0) s)
+  , (Loc 1, Inst (Loc 1) [] [form|not (i:Int = 3)|])]
+  [ ( G.HEdge S.empty (Loc 0), Edge [form|i:Int = 0|] M.empty)
+  , ( G.HEdge (S.singleton (Loc 0)) (Loc 0), Edge [form|i/1:Int = i:Int + 2 && i:Int < n:Int|] (M.singleton i i'))
+  , ( G.HEdge (S.singleton (Loc 0)) (Loc 1), Edge [form|i:Int >= n:Int|] M.empty)
   ]

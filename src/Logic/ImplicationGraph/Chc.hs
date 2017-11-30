@@ -6,6 +6,7 @@ import           Control.Monad.Except
 
 import qualified Data.Map as M
 import qualified Data.Set as S
+import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Directed.HyperGraph as G
 import           Data.Maybe (fromJust)
 
@@ -13,21 +14,26 @@ import           Logic.Model
 import           Logic.Var
 import           Logic.Chc
 import           Logic.ImplicationGraph
+import           Logic.ImplicationGraph.LTree
 import qualified Logic.Solver.Z3 as Z3
 
 -- | Interpolate the facts in the graph using CHC solving to label the vertices
 -- with fresh definitions.
 interpolate :: (MonadError Model m, MonadIO m)
-            => ImplGr Edge -> m (ImplGr Edge)
-interpolate g = (`applyModel` g) <$> Z3.solveChc (implGrChc g)
+            => ImplGr -> m ImplGr
+interpolate g = do
+  sol <- interp (G.mapEdge point (G.withoutBackEdges g))
+  let vs = sol ^@.. G.iallVerts
+  return $ foldr (\(i', v') g' -> G.addVert i' v' g') g vs
+  where
+    interp g' = (`applyModel` g') <$> Z3.solveChc (implGrChc g')
 
 -- | Convert the forward edges of the graph into a system of Constrained Horn Clauses.
-implGrChc :: ImplGr Edge -> [Chc]
+implGrChc :: Graph Idx Edge Inst -> [Chc]
 implGrChc g = map rule topConns
   where
     topConns = -- to find the graph connections in topological order...
-      (g & G.withoutBackEdges                          -- remove backedges
-         & G.itopEdge                                  -- for each edge...
+      (g & G.itopEdge                                  -- for each edge...
             (\is e -> Identity (G.omap inspect is, e)) -- lookup the edge indexes
          & fromJust                                    -- we know the graph has no backedges
          & runIdentity) ^.. G.iallEdges                -- collect all the connections
@@ -45,7 +51,7 @@ implGrChc g = map rule topConns
     buildRel (i, v) = mkApp ('r' : _Show #i) (v ^. instVars)
 
 -- | Augment the fact at each vertex in the graph by the fact in the model.
-applyModel :: Model -> ImplGr Edge -> ImplGr Edge
+applyModel :: Model -> Graph Idx Edge Inst -> Graph Idx Edge Inst
 applyModel model = G.imapVert applyInst
   where
     applyInst i v =
