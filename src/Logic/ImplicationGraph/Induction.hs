@@ -62,7 +62,6 @@ inductiveByPred g i = do
         let ts = taggings e in
         foldr (\t -> M.insertWith (++) t (S.toList $ G.start i)) m ts) M.empty ies
   let cats = M.elems m
-  liftIO $ print m
   or <$> traverse (fmap and . traverse (indPred g i)) cats
 
 -- | Are all predecessors inductive?

@@ -30,3 +30,17 @@ point (Leaf a) = a
 point (LOnly t) = point t
 point (ROnly t) = point t
 point t = error "point of ltree with branch"
+
+unionWith :: (a -> a -> a) -> LTree a -> LTree a -> LTree a
+unionWith f (Leaf a) (Leaf b) = Leaf (f a b)
+unionWith f (Leaf a) _ = Leaf a
+unionWith f _ (Leaf b) = Leaf b
+unionWith f (LOnly a) (LOnly b) = LOnly (unionWith f a b)
+unionWith f (ROnly a) (ROnly b) = ROnly (unionWith f a b)
+unionWith f (LOnly a) (ROnly b) = Br a b
+unionWith f (ROnly a) (LOnly b) = Br b a
+unionWith f (Br a b) (LOnly c) = Br (unionWith f a c) b
+unionWith f (Br a b) (ROnly c) = Br a (unionWith f b c)
+unionWith f (LOnly a) (Br b c) = Br (unionWith f a b) c
+unionWith f (ROnly a) (Br b c) = Br b (unionWith f a c)
+unionWith f (Br a b) (Br c d) = Br (unionWith f a b) (unionWith f c d)

@@ -17,6 +17,7 @@ import           Logic.ImplicationGraph
 import           Logic.ImplicationGraph.Induction
 import           Logic.ImplicationGraph.Chc
 import           Logic.ImplicationGraph.LTree
+import           Logic.ImplicationGraph.Simplify
 
 -- | Repeatedly unwind the program until a counterexample is found or inductive
 -- invariants are found.
@@ -32,10 +33,7 @@ solve e1 e2 quer g1 g2 = do
   let gr = fromGraph wQuery
   loop gr
   where
-    wQuery =
-      equivProduct g1 g2
-      & G.addVert Terminus (Inst (LocPair e1 e2) [] quer)
-      & G.addEdge (G.HEdge (S.singleton (LocPair e1 e2)) Terminus) (LOnly $ Leaf $ Edge (LBool True) M.empty)
+    wQuery = prune $ equivProduct g1 g2 & ix (LocPair e1 e2) . instForm .~ quer
 
     equivProduct g1 g2 =
       cleanIntros (G.cartesianProductWith edgeMerge const LocPair vertMerge

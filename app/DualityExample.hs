@@ -1,6 +1,6 @@
 {-# LANGUAGE QuasiQuotes #-}
 
-import Logic.Formula
+import Control.Monad.Except
 import Logic.Chc
 import Logic.Solver.Z3
 import Logic.Formula.Parser
@@ -8,7 +8,7 @@ import Data.Text.Prettyprint.Doc
 
 test :: [Chc] -> IO ()
 test t = do
-  sol <- solveChc t
+  sol <- liftIO (runExceptT (solveChc t))
   case sol of
     Left f -> do putStrLn "counterexample"
                  print (pretty f)
@@ -16,7 +16,7 @@ test t = do
                   print (pretty m)
 
 main :: IO ()
-main = test test2
+main = test test1
 
 test1, test2 :: [Chc]
 test1 = [chc| i:Int = 0 => {r i:Int}

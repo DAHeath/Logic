@@ -4,27 +4,29 @@ import           Control.Lens
 
 import qualified Data.Map as Map
 import           Data.Maybe
-import           Data.Optic.Directed.Graph (Graph)
-import qualified Data.Optic.Directed.Graph as G
+import           Data.Optic.Directed.HyperGraph (Graph)
+import qualified Data.Optic.Directed.HyperGraph as G
+import           Data.Foldable (toList)
 
 import qualified Logic.Var as V
 import qualified Logic.Type as T
 import           Logic.Formula
 import           Logic.ImplicationGraph
+import           Logic.ImplicationGraph.LTree as L
 
 
 type RenameMap = Map.Map V.Var V.Var
 
 
 -- | Finds irreducible vertices in a given `ImplGr`.
-irreducible :: (Ord i) => Graph i Edge Inst -> [i]
+irreducible :: (Ord i) => Graph i e v -> [i]
 irreducible graph = [startIndex, queryIndex] ++ loopHeaders where
   idxs = G.idxs graph
   startIndex = minimum idxs
   queryIndex = maximum idxs
 
   -- Find the loop headers, i.e. the destination vertices of back edges.
-  loopHeaders = map (\(G.Pair _ s, _) -> s) $ G.backEdges graph
+  loopHeaders = map (\(G.HEdge _ s, _) -> s) $ G.backEdges graph
 
 
 -- | Takes the Cartesian product of two lists and with the product function.
@@ -76,12 +78,20 @@ disjunction e1 e2 =
       folder (k, v) f = let v' = maxTemporality k rm in
         if v' > v then mkAnd (eqlForm v' v) f else f
 
+lconjunction :: LEdge -> LEdge -> LEdge
+lconjunction e1 e2 =
+  let inc = foldl1 disjunction (toList e1)
+  in fmap (conjunction inc) e2
+
+ldisjunction :: LEdge -> LEdge -> LEdge
+ldisjunction = L.unionWith disjunction
 
 -- | Remove all reducible vertices and combine edges through {dis/con}junction.
-prune :: (Ord i) => Graph i Edge Inst -> Graph i Edge Inst
+prune :: (Ord i) => Graph i LEdge Inst -> Graph i LEdge Inst
 prune graph = foldr removeVertex graph reducible where
-  andEdge (G.Pair start _, e) (G.Pair _ end, e') =
-    G.addEdgeWith disjunction (G.Pair start end) $ conjunction e e'
+  andEdge (G.HEdge start _, e) (G.HEdge s' end, e')
+    | length s' == 1 = G.addEdgeWith ldisjunction (G.HEdge start end) $ lconjunction e e'
+    | otherwise      = error "hyperedge reduction"
 
   newEdges i g = cartesianProduct andEdge
                  ((toListOf $ G.iedgesTo i . withIndex) g)
