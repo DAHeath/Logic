@@ -2,8 +2,14 @@
 module Logic.Type where
 
 import           Control.Lens hiding (List)
+
 import           Data.Data (Data)
 import           Data.Text.Prettyprint.Doc
+
+import           Logic.Formula.Tokens
+
+import           Text.Parsec
+import           Text.Parsable
 
 data Type
   = Unit
@@ -28,6 +34,21 @@ instance Pretty Type where
     t :=> t'    -> pretty t <+> pretty "->" <+> pretty t'
     List t      -> pretty "List<" <> pretty t <> pretty ">"
     Array t1 t2 -> pretty "Array<" <> pretty t1 <> pretty "," <> pretty t2
+
+instance Parsable Type where
+  parsable =
+    (do res "Arr"
+        _ <- symbol "{"
+        t1 <- parsable
+        _ <- symbol ","
+        t2 <- parsable
+        _ <- symbol "}"
+        return (Array t1 t2))
+    <|> (res "Bool" >> return Bool)
+    <|> (res "Int"  >> return Int)
+    <|> (res "Real" >> return Real)
+    <|> (res "Unit" >> return Unit)
+
 
 class Typed a where
   typeOf :: a -> Type

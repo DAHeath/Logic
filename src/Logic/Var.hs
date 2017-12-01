@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Logic.Var where
 
-import           Control.Lens
+import           Control.Lens hiding (op)
 
 import           Data.Data (Data)
 import           Data.Data.Lens (biplate)
@@ -14,8 +14,14 @@ import           Data.List (intercalate)
 
 import           Logic.Type (Type, Typed)
 import qualified Logic.Type as T
+import           Logic.Formula.Tokens
+
+import           Text.Parsable
 
 type Name = String
+
+class Named a where
+  nameOf :: a -> Name
 
 data Var
   = Bound Int Type
@@ -28,16 +34,23 @@ instance Typed Var
         typeOf (Free _ _ t) = t
 
 instance Pretty Var
-  where pretty = pretty . varName
+  where pretty = pretty . nameOf
+
+instance Parsable Var where
+  parsable = do
+    i <- ident
+    op ":"
+    t <- parsable
+    return $ Free [i] 0 t
 
 -- | A name for the variable. If the variable is bound, it is a textual
 -- representation of the index. Otherwise, it is just the variable name.
-varName :: Var -> Name
-varName (Bound i _) = "!" ++ show i
-varName (Free ns i _) = case i of
-  0 -> path ns
-  _ -> path ns ++ "/" ++ show i
-  where path = intercalate "/"
+instance Named Var where
+  nameOf (Bound i _) = "!" ++ show i
+  nameOf (Free ns i _) = case i of
+    0 -> path ns
+    _ -> path ns ++ "/" ++ show i
+    where path = intercalate "/"
 
 -- | A traversal which targets all of the variables in a given expression.
 vars :: Data a => Traversal' a Var

@@ -70,7 +70,7 @@ disjunction e1 e2 =
     maxTemporality :: V.Var -> RenameMap -> V.Var
     maxTemporality v rm = fromMaybe v $ max v <$> Map.lookup v rm
 
-    fitEdge :: Edge -> RenameMap -> Form
+    fitEdge :: Edge -> RenameMap -> Form V.Var
     fitEdge e rm = foldr folder (_edgeForm e) (Map.toList $ _edgeMap e)
       where
       eqlForm v' v = Eql (T.typeOf v) :@ V v' :@ V v

@@ -16,6 +16,7 @@ library
   ghc-options: -Wall
   exposed-modules:     Logic.Formula
                      , Logic.Formula.Parser
+                     , Logic.Formula.Tokens
                      , Logic.Var
                      , Logic.Type
                      , Logic.Model
@@ -30,6 +31,7 @@ library
                      , Logic.ImplicationGraph.LTree
                      , Logic.Solver.Z3
                      , Data.Optic.Graph.Extras
+                     , Text.Parsable
 
   default-extensions:  LambdaCase
                      , DeriveDataTypeable

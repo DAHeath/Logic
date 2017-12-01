@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
 
 module Logic.ImplicationGraph.JSONParser where
 
@@ -52,7 +52,7 @@ type VertexMap = Map Line [Var]
 
 data JSONVertex
   = JInst [Var]
-  | JQuery Form
+  | JQuery (Form Var)
   deriving (Show, Read, Eq, Ord, Data)
 
 -- | Represents a variable renaming.
@@ -132,7 +132,7 @@ instance FromJSON VarRenaming where
       _ -> mzero
   parseJSON _ = mzero
 
-instance FromJSON Form where
+instance FromJSON (Form Var) where
   parseJSON (Object o) = case Prelude.head (HML.toList o) of
     (str, val) ->
       let withArg f = do

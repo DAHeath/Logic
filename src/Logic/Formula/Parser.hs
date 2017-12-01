@@ -9,6 +9,7 @@ import           Text.Parsec
 import           Text.ParserCombinators.Parsec.Char
 import qualified Text.Parsec.Token as T
 import           Text.Parsec.Language (emptyDef)
+import           Text.Parsable
 
 import qualified Language.Haskell.TH as TH
 import           Language.Haskell.TH.Quote
@@ -16,40 +17,41 @@ import           Language.Haskell.TH.Quote
 import           Logic.Type (Type)
 import qualified Logic.Type as T
 import           Logic.Formula
+import           Logic.Formula.Tokens
 import           Logic.Var
 import           Logic.Chc
 
 lexeme :: Stream s m Char => ParsecT s u m b -> ParsecT s u m b
 lexeme p = do { x <- p; spaces; return x  }
 
-parseForm :: CharParser st Form
+parseForm :: (Parsable v, Eq v) => CharParser st (Form v)
 parseForm = ex1
 
-ex1 :: CharParser st Form
+ex1 :: (Parsable v, Eq v) => CharParser st (Form v)
 ex1 = ex2 `chainl1` impop
 
-ex2 :: CharParser st Form
+ex2 :: (Parsable v, Eq v) => CharParser st (Form v)
 ex2 = ex3 `chainl1` (op "||" >> return (\x y -> manyOr [x, y]))
 
-ex3 :: CharParser st Form
+ex3 :: (Parsable v, Eq v) => CharParser st (Form v)
 ex3 = ex4 `chainl1` (op "&&" >> return (\x y -> manyAnd [x, y]))
 
-ex4 :: CharParser st Form
+ex4 :: (Parsable v, Eq v) => CharParser st (Form v)
 ex4 = ex6 `chainl1` compareop
 
-ex6 :: CharParser st Form
+ex6 :: (Parsable v, Eq v) => CharParser st (Form v)
 ex6 = ex7 `chainl1` addop
 
-ex7 :: CharParser st Form
+ex7 :: (Parsable v, Eq v) => CharParser st (Form v)
 ex7 = exInf `chainl1` mulop
 
-exInf :: CharParser st Form
+exInf :: (Parsable v, Eq v) => CharParser st (Form v)
 exInf = atom
 
-atom :: CharParser st Form
+atom :: (Parsable v, Eq v) => CharParser st (Form v)
 atom = try app <|> nonapp
   where
-    nonapp = parens parseForm <|> (V <$> try var) <|> bool <|> integer
+    nonapp = parens parseForm <|> (V <$> try parsable) <|> bool <|> integer
     app = (res "not"      >> (:@) Not                    <$> nonapp)
       <|> (res "if"       >> appMany (If T.Int)          <$> sequence [nonapp, nonapp, nonapp])
       <|> (res "store"    >> appMany (Store T.Int T.Int) <$> sequence [nonapp, nonapp, nonapp])
@@ -59,38 +61,17 @@ atom = try app <|> nonapp
       <|> (res "or"       >> manyOr                      <$> many1 nonapp)
       <|> (res "add"      >> appMany (Add T.Int)         <$> many1 nonapp)
       <|> (res "mul"      >> appMany (Mul T.Int)         <$> many1 nonapp)
-      <|> (do n <- ident
-              op ":"
-              t <- typ
+      <|> (do n <- parsable
               args <- many1 nonapp
-              let ts = map T.typeOf args
-              return $ appMany (V $ Free [n] 0 (T.curryType ts t)) args)
+              return $ appMany (V n) args)
 
-bool :: CharParser st Form
+bool :: CharParser st (Form v)
 bool = const (LBool True)  <$> res "true"
    <|> const (LBool False) <$> res "false"
 
-typ :: CharParser st Type
-typ = (do res "Arr"
-          _ <- symbol "{"
-          t1 <- typ
-          _ <- symbol ","
-          t2 <- typ
-          _ <- symbol "}"
-          return (T.Array t1 t2))
-  <|> (res "Bool" >> return T.Bool)
-  <|> (res "Int"  >> return T.Int)
-  <|> (res "Real" >> return T.Real)
-  <|> (res "Unit" >> return T.Unit)
-
-var :: CharParser st Var
-var = do
-  i <- ident
-  op ":"
-  t <- typ
-  return $ Free [i] 0 t
-
-impop, compareop, mulop, addop :: CharParser st (Form -> Form -> Form)
+impop, compareop, mulop, addop
+  :: Eq v
+  => CharParser st (Form v -> Form v -> Form v)
 
 impop = (op "<->" >> return (app2 Iff))
     <|> (op "->"  >> return (app2 Impl))
@@ -109,13 +90,13 @@ mulop = (op "*" >> return (app2 $ Mul T.Int))
 addop = (op "+" >> return (app2 $ Add T.Int))
     <|> (op "-" >> return (app2 $ Sub T.Int))
 
-integer :: CharParser st Form
+integer :: CharParser st (Form v)
 integer = lexeme $ do { ds <- many1 digit ; return $ LInt (read ds) }
 
-parseChc :: CharParser st [Chc]
+parseChc :: (Eq v, Parsable v) => CharParser st [Chc v]
 parseChc = many parseChc'
   where
-    parseChc' :: CharParser st Chc
+    parseChc' :: (Eq v, Parsable v) => CharParser st (Chc v)
     parseChc' = do
       (as, f) <- lhs
       op "=>"
@@ -124,17 +105,14 @@ parseChc = many parseChc'
         Left a  -> return $ Rule as f a
         Right q -> return $ Query as f q
 
-    lhs :: CharParser st ([App], Form)
+    lhs :: (Eq v, Parsable v) => CharParser st ([App v], Form v)
     lhs = (,) <$> many app <*> (try parseForm <|> return (LBool True))
 
-    rhs :: CharParser st (Either App Form)
+    rhs :: (Eq v, Parsable v) => CharParser st (Either (App v) (Form v))
     rhs = (Left <$> app) <|> (Right <$> parseForm)
 
-    app :: CharParser st App
-    app = braces $ do n <- ident
-                      args <- many var
-                      let ts = map T.typeOf args
-                      return $ App (Free [n] 0 (T.curryType ts T.Bool)) args
+    app :: (Eq v, Parsable v) => CharParser st (App v)
+    app = braces $ App <$> parsable <*> many parsable
 
 promote :: Monad m => CharParser () a -> (String, Int, Int) -> String -> m a
 promote par (file, line, col) s =
@@ -153,15 +131,15 @@ promote par (file, line, col) s =
            return x
 
 form :: QuasiQuoter
-form = QuasiQuoter { quoteExp = quoteFormExp parseForm
-                   , quotePat = quoteFormPat parseForm
+form = QuasiQuoter { quoteExp = quoteFormExp (parseForm :: CharParser st (Form Var))
+                   , quotePat = quoteFormPat (parseForm :: CharParser st (Form Var))
                    , quoteType = undefined
                    , quoteDec = undefined
                    }
 
 chc :: QuasiQuoter
-chc = QuasiQuoter { quoteExp = quoteFormExp parseChc
-                  , quotePat = quoteFormPat parseChc
+chc = QuasiQuoter { quoteExp = quoteFormExp (parseChc :: CharParser st [Chc Var])
+                  , quotePat = quoteFormPat (parseChc :: CharParser st [Chc Var])
                   , quoteType = undefined
                   , quoteDec = undefined
                   }
@@ -174,74 +152,18 @@ thPos = do loc <- TH.location
                   )
 
 
-quoteFormExp :: Data a => CharParser () a -> String -> TH.ExpQ
+quoteFormExp :: (Data f) => CharParser () f -> String -> TH.ExpQ
 quoteFormExp par s = do pos <- thPos
                         ex <- promote par pos s
                         dataToExpQ (const Nothing `extQ` metaExp) ex
 
-metaExp :: Form -> Maybe TH.ExpQ
-metaExp (V (Free (x:_) _ _))
-  | head x == '$' = Just [| $(TH.varE (TH.mkName (tail x))) |]
-  | head x == '@' = Just [| V $ $(TH.varE (TH.mkName (tail x))) |]
+metaExp :: Form Var -> Maybe TH.ExpQ
+metaExp (V v)
+  | head (nameOf v) == '$' = Just [| $(TH.varE (TH.mkName (tail (nameOf v)))) |]
+  | head (nameOf v) == '@' = Just [| V $ $(TH.varE (TH.mkName (tail (nameOf v)))) |]
 metaExp _ = Nothing
 
 quoteFormPat :: Data a => CharParser () a -> String -> TH.PatQ
 quoteFormPat par s = do pos <- thPos
                         ex <- promote par pos s
                         dataToPatQ (const Nothing) ex
-
-lexer :: T.GenTokenParser String u Identity
-lexer = T.makeTokenParser (emptyDef { T.identStart = letter <|> char '_' <|> char '$'
-                                    , T.identLetter = alphaNum
-                                                  <|> char '_' <|> char '/' <|> char '$' <|> char '\''
-                                    , T.reservedOpNames = [ "->" , "<-" , "<->" , "=>"
-                                                          , "||"
-                                                          , "&&"
-                                                          , "=" , "<" , "<=" , ">" , ">="
-                                                          , "+" , "-"
-                                                          , "*" , "/", "%"
-                                                          , "(", ")"
-                                                          , ":"
-                                                          , ":="
-                                                          , ";"
-                                                          ]
-                                    , T.reservedNames = [ "not", "distinct"
-                                                        , "and", "or"
-                                                        , "add", "mul"
-                                                        , "def"
-                                                        , "true", "false"
-                                                        , "call"
-                                                        , "anything"
-                                                        , "cond"
-                                                        , "return"
-                                                        , "assert"
-                                                        , "Int", "Bool", "Real", "Arr"
-                                                        ]
-                                    })
-
-res :: String -> CharParser st ()
-res    = T.reserved lexer
-
-ident :: CharParser st String
-ident  = (do s <- symbol "$"
-             i <- T.identifier lexer
-             return (s ++ i))
-     <|> (do s <- symbol "@"
-             i <- T.identifier lexer
-             return (s ++ i))
-     <|> T.identifier lexer
-
-op :: String -> CharParser st ()
-op = T.reservedOp lexer
-
-symbol :: String -> CharParser st String
-symbol = T.symbol lexer
-
-commaSep :: CharParser st a -> CharParser st [a]
-commaSep = T.commaSep lexer
-
-parens :: CharParser st a -> CharParser st a
-parens = T.parens lexer
-
-braces :: CharParser st a -> CharParser st a
-braces = T.braces lexer

@@ -51,12 +51,12 @@ instance Pretty Loc where
 data Inst = Inst
   { _instLoc :: Loc
   , _instVars :: [Var]
-  , _instForm :: Form
+  , _instForm :: Form Var
   } deriving (Show, Read, Eq, Ord, Data)
 makeLenses ''Inst
 
 data Edge = Edge
-  { _edgeForm :: Form
+  { _edgeForm :: Form Var
   , _edgeMap :: Map Var Var
   } deriving (Show, Read, Eq, Ord, Data)
 makeLenses ''Edge
@@ -87,7 +87,7 @@ emptyInst :: Loc -> [Var] -> Inst
 emptyInst l vs = Inst l vs (LBool False)
 
 -- | Gather all facts known about each instance of the same index together by disjunction.
-collectAnswer :: MonadIO m => ImplGr -> m (Map Loc Form)
+collectAnswer :: MonadIO m => ImplGr -> m (Map Loc (Form Var))
 collectAnswer g = traverse Z3.superSimplify $ execState (G.itravVert (\_ (Inst loc _ f) ->
   when (f /= LBool True) $ modify (M.insertWith mkOr loc f)) g) M.empty
 

@@ -12,6 +12,7 @@ import           Data.Maybe (fromJust)
 import           Data.Text.Prettyprint.Doc
 
 import           Logic.Model
+import qualified Logic.Type as T
 import           Logic.Var
 import           Logic.Chc
 import           Logic.ImplicationGraph
@@ -20,7 +21,7 @@ import qualified Logic.Solver.Z3 as Z3
 
 -- | Interpolate the facts in the graph using CHC solving to label the vertices
 -- with fresh definitions.
-interpolate :: (MonadError Model m, MonadIO m)
+interpolate :: (MonadError (Model Var) m, MonadIO m)
             => ImplGr -> m ImplGr
 interpolate g = do
   let g' = G.withoutBackEdges (G.mapEdge point g)
@@ -33,7 +34,7 @@ interpolate g = do
       (`applyModel` g') <$> Z3.solveChc (implGrChc g')
 
 -- | Convert the forward edges of the graph into a system of Constrained Horn Clauses.
-implGrChc :: Graph Idx Edge Inst -> [Chc]
+implGrChc :: Graph Idx Edge Inst -> [Chc Var]
 implGrChc g = map rule topConns
   where
     topConns = -- to find the graph connections in topological order...
@@ -55,7 +56,7 @@ implGrChc g = map rule topConns
     buildRel (i, v) = mkApp ('r' : _Show #i) (v ^. instVars)
 
 -- | Augment the fact at each vertex in the graph by the fact in the model.
-applyModel :: Model -> Graph Idx Edge Inst -> Graph Idx Edge Inst
+applyModel :: Model Var -> Graph Idx Edge Inst -> Graph Idx Edge Inst
 applyModel model = G.imapVert applyInst
   where
     applyInst i v =
@@ -64,6 +65,8 @@ applyModel model = G.imapVert applyInst
         & instantiate (v ^. instVars))  -- replace the bound variables by the instance variables
 
     instMap = getModel model
-      & M.filterWithKey (\k _ -> head (varName k) == 'r') -- only consider the instance predicates
-      & M.mapKeys (read . tail . varName)                 -- convert the keys of the map to indexes
+      & M.filterWithKey (\k _ -> head (nameOf k) == 'r') -- only consider the instance predicates
+      & M.mapKeys (read . tail . nameOf)                 -- convert the keys of the map to indexes
 
+mkApp :: Name -> [Var] -> App Var
+mkApp n vs = App (Free [n] 0 (T.curryType (map T.typeOf vs) T.Bool)) vs

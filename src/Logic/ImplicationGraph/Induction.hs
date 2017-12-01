@@ -14,6 +14,7 @@ import           Data.Maybe (mapMaybe)
 
 import           Logic.Formula
 import           Logic.Model
+import           Logic.Var
 import qualified Logic.Solver.Z3 as Z3
 import           Logic.ImplicationGraph
 import           Logic.ImplicationGraph.Chc
@@ -64,7 +65,7 @@ allInd :: (MonadIO m, MonadState (Map Idx Bool) m) => ImplGr -> Idx -> [Idx] -> 
 allInd g i is = and <$> mapM (indPred g i) is
 
 -- | Find the formulas of descendants at the same location.
-descendantForms :: ImplGr -> Loc -> Idx -> [Form]
+descendantForms :: ImplGr -> Loc -> Idx -> [Form Var]
 descendantForms g loc i =
   G.descendants i g                      -- look at all descendants
     & S.delete i                         -- an instance cannot entail itself
@@ -78,7 +79,7 @@ descendantForms g loc i =
 -- 1. interpolating over the current graph
 -- 2. checking if the solution is inductive (and terminating if it is)
 -- 3. unwinding the graph over all backedges
-loop :: MonadIO m => ImplGr -> m (Either Model ImplGr)
+loop :: MonadIO m => ImplGr -> m (Either (Model Var) ImplGr)
 loop = runExceptT . loop'
   where
     loop' g = do
