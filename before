@@ -1,0 +1,21 @@
+digraph {
+  node[fontsize=6];
+  edge[fontsize=6, arrowsize=0.6];
+  0 [label="{0,1}: {0,1} [m, x] False"];
+  1 [label="{1,1}: {1,1} [n, r, m, x] False"];
+  2 [label="{1,2}: {1,2} [ n
+      , r
+      , m
+      , x ] ((n > 0) && (m = n)) -> (r = x)"];
+  m_0 [shape=point, width=0.00001,height=0.00001];
+  m_0 -> 0 [label="R:m = x []"];
+  m_1 [shape=point, width=0.00001,height=0.00001];
+  m_1 -> 1 [label="R:((n - (9 * ((n - 1) / 9))) = r) && (m = x) [  ]"];
+  0 -> 0 [label="R:(x > 9) && (((x / 10) + (x % 10)) = x/1) [ ( x
+                                             , x/1 ) ]", style=dashed];
+  0 -> 1 [label="L:(n - (9 * ((n - 1) / 9))) = r [  ]"];
+  0 -> 2 [label="L:(x <= 9) && ((n - (9 * ((n - 1) / 9))) = r) [  ]"];
+  1 -> 1 [label="R:(x > 9) && (((x / 10) + (x % 10)) = x/1) [ ( x
+                                             , x/1 ) ]", style=dashed];
+  1 -> 2 [label="R:x <= 9 []"];
+}

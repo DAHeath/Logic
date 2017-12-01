@@ -6,6 +6,7 @@ import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Directed.HyperGraph as G
+import qualified Data.Set as S
 import           Data.Foldable (toList)
 
 import qualified Logic.Var as V
@@ -20,9 +21,8 @@ type RenameMap = Map.Map V.Var V.Var
 
 -- | Finds irreducible vertices in a given `ImplGr`.
 irreducible :: (Ord i) => Graph i e v -> [i]
-irreducible graph = [startIndex, queryIndex] ++ loopHeaders where
+irreducible graph = queryIndex : loopHeaders where
   idxs = G.idxs graph
-  startIndex = minimum idxs
   queryIndex = maximum idxs
 
   -- Find the loop headers, i.e. the destination vertices of back edges.
@@ -89,9 +89,9 @@ ldisjunction = L.unionWith disjunction
 -- | Remove all reducible vertices and combine edges through {dis/con}junction.
 prune :: (Ord i) => Graph i LEdge Inst -> Graph i LEdge Inst
 prune graph = foldr removeVertex graph reducible where
-  andEdge (G.HEdge start _, e) (G.HEdge s' end, e')
-    | length s' == 1 = G.addEdgeWith ldisjunction (G.HEdge start end) $ lconjunction e e'
-    | otherwise      = error "hyperedge reduction"
+  andEdge (G.HEdge start end', e) (G.HEdge s' end, e') =
+    G.addEdgeWith ldisjunction
+      (G.HEdge ((s' S.\\ S.singleton end') `S.union` start) end) $ lconjunction e e'
 
   newEdges i g = cartesianProduct andEdge
                  ((toListOf $ G.iedgesTo i . withIndex) g)
