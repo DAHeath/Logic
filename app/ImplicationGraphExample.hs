@@ -33,7 +33,7 @@ s = [i, n]
 example :: Graph Loc Edge Inst
 example = G.fromLists
   [ (Loc 0, emptyInst (Loc 0) s)
-  , (Loc 1, Inst (Loc 1) [] [form|not (i:Int = 13)|])]
+  , (Loc 1, Inst (Loc 1) [] [form|not (i:Int = 41)|])]
   [ ( G.HEdge S.empty (Loc 0), Edge [form|i:Int = 0|] M.empty)
   , ( G.HEdge (S.singleton (Loc 0)) (Loc 0), Edge [form|i/1:Int = i:Int + 2 && i:Int < n:Int|] (M.singleton i i'))
   , ( G.HEdge (S.singleton (Loc 0)) (Loc 1), Edge [form|i:Int >= n:Int|] M.empty)
