@@ -9,6 +9,7 @@ import qualified Data.Set as S
 import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Directed.HyperGraph as G
 import           Data.Maybe (fromJust)
+import           Data.Text.Prettyprint.Doc
 
 import           Logic.Model
 import           Logic.Var
@@ -22,11 +23,14 @@ import qualified Logic.Solver.Z3 as Z3
 interpolate :: (MonadError Model m, MonadIO m)
             => ImplGr -> m ImplGr
 interpolate g = do
-  sol <- interp (G.mapEdge point (G.withoutBackEdges g))
+  let g' = G.withoutBackEdges (G.mapEdge point g)
+  sol <- interp (G.reaches (end g') g')
   let vs = sol ^@.. G.iallVerts
   return $ foldr (\(i', v') g' -> G.addVert i' v' g') g vs
   where
-    interp g' = (`applyModel` g') <$> Z3.solveChc (implGrChc g')
+    interp g' = do
+      liftIO $ print (pretty (implGrChc g'))
+      (`applyModel` g') <$> Z3.solveChc (implGrChc g')
 
 -- | Convert the forward edges of the graph into a system of Constrained Horn Clauses.
 implGrChc :: Graph Idx Edge Inst -> [Chc]

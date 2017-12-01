@@ -19,13 +19,15 @@ import           Logic.Var
 
 import           Logic.ImplicationGraph.JSONParser (parseGraphFromJSON)
 import           Logic.ImplicationGraph.Simplify
+import           Logic.ImplicationGraph.StackFragments
 import qualified Data.ByteString.Lazy.Char8 as BS
 
 main :: IO ()
 main = do
-  G.display "before.dot" example
-  G.display "pruned.dot" (prune (G.mapEdge Leaf example))
-  sol <- solve example
+  G.display "before.dot" example2
+  let toSolve = hyperEdge (Loc 0) (Loc 1) (Loc 1) (G.mapEdge Leaf example2)
+  G.display "toSolve.dot" toSolve
+  sol <- solve toSolve
   case sol of
     Left m -> print (pretty m)
     Right r -> do
@@ -57,23 +59,46 @@ example = G.fromLists
   , ( G.HEdge (S.fromList [Loc 0, Loc 2]) (Loc 3), Edge [form|p:Int = a:Int && a/1:Int = x:Int|] (M.singleton a a'))
   ]
 
+p0, x0 :: Var
+p0  = Free ["r0/p"] 0 T.Int
+p0' = Free ["r0/p"] 1 T.Int
+x0  = Free ["r0/x"] 0 T.Int
+x0' = Free ["r0/x"] 1 T.Int
+
+p1, x1 :: Var
+p1  = Free ["r1/p"] 0 T.Int
+p1' = Free ["r1/p"] 1 T.Int
+x1  = Free ["r1/x"] 0 T.Int
+x1' = Free ["r1/x"] 1 T.Int
+
+a2 :: Var
+a2  = Free ["r2/a"] 0 T.Int
+
+-- f(x) {
+--   if (x < 2) {
+--     f(x+1)
+--   } else {
+--     x
+--   }
+-- }
+--
+
 example2 :: Graph Loc Edge Inst
 example2 = G.fromLists
-  [ (Loc 0, emptyInst (Loc 0) [p, x])
-  , (Loc 1, emptyInst (Loc 1) [pr, xr])
-  , (Loc 2, Inst (Loc 2) [] [form|a:Int = 5|])
+  [ (Loc 0, emptyInst (Loc 0) [p0, x0])
+  , (Loc 1, emptyInst (Loc 1) [p1, x1])
+  , (Loc 2, Inst (Loc 2) [a2] [form|r2/a:Int = 3|])
   ]
-  [ ( G.HEdge S.empty (Loc 0), Edge [form|x:Int = p:Int|] M.empty )
+  [ ( G.HEdge S.empty (Loc 0), Edge [form|r0/x:Int = r0/p:Int|] M.empty )
   , ( G.HEdge (S.fromList [Loc 0, Loc 1]) (Loc 1),
-      Edge [form|pr:Int = x:Int + 1
-              && p:Int < 5
-              && pr/1:Int = p:Int
-              && xr/1:Int = xr:Int
-              |] (M.fromList [(pr, pr'), (xr, xr')]))
+      Edge [form|r1/p:Int = r0/x:Int + 1
+              && r0/p:Int < 3
+              && r1/p/1:Int = r0/p:Int
+              |] (M.fromList [(p1, p1')]))
   , ( G.HEdge (S.singleton (Loc 0)) (Loc 1),
-      Edge [form|p:Int >= 5
-              && pr:Int = p:Int
-              && xr:Int = x:Int|] M.empty)
+      Edge [form|r0/p:Int >= 3
+              && r1/p:Int = r0/p:Int
+              && r1/x:Int = r0/x:Int|] M.empty)
   , ( G.HEdge (S.singleton (Loc 1)) (Loc 2),
-      Edge [form|pr:Int = 0 && a:Int = xr:Int|] M.empty)
+      Edge [form|r1/p:Int = 0 && r2/a:Int = r1/x:Int|] M.empty)
   ]

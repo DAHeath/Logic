@@ -38,6 +38,7 @@ data Loc
 instance Ord Loc where
   Loc i        <= Loc j        = i <= j
   LocPair  i j <= LocPair  k l = i < k || (i == k && j <= l)
+  LocPair  i j <= Loc k        = i < Loc k && j < Loc k
   LocPair _ _  <= a            = True
   a            <= Terminus     = True
   a            <= b            = b >= a
@@ -141,3 +142,7 @@ relabel idx g = evalState (do
 
     -- use the state to create a fresh index
     freshIdx = state (\ins -> (ins, ins+1))
+
+-- | Find the end (query) of the graph
+end :: Ord i => Graph i e v -> i
+end g = maximum $ filter (\i -> lengthOf (G.edgesFrom i) g == 0) (G.idxs g) -- the query has no outgoing edges

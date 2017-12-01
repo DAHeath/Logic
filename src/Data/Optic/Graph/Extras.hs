@@ -58,5 +58,5 @@ dot seper fi fe fv g =
           let mid = "m" ++ concatMap lbl (S.toList i1) ++ "_" ++ lbl i2
           in
           [ mid ++ " [shape=point, width=0.00001,height=0.00001" ++ back ++ "];" ]
-          ++ map (\i -> lbl i ++ " -> " ++ mid ++ " [dir=none];") (S.toList i1)
+          ++ map (\i -> lbl i ++ " -> " ++ mid ++ " [dir=none" ++ back ++ "];") (S.toList i1)
           ++ [ mid ++ " -> " ++ lbl i2 ++ annot ]

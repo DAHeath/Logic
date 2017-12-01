@@ -73,10 +73,6 @@ descendantForms g loc i =
     & filter (\v -> v ^. instLoc == loc) -- only consider those at the location in question
     & map _instForm                      -- fetch the formula
 
--- | Find the end (query) of the graph
-end :: ImplGr -> Idx
-end g = head $ filter (\i -> lengthOf (G.edgesFrom i) g == 0) (G.idxs g) -- the query has no outgoing edges
-
 -- | Unwind the graph until a either a counterxample or an inductive
 -- solution is found.  Perform a step of the unwinding by
 -- 1. interpolating over the current graph
@@ -86,8 +82,8 @@ loop :: MonadIO m => ImplGr -> m (Either Model ImplGr)
 loop = runExceptT . loop'
   where
     loop' g = do
-      -- G.display "step" g
-      -- _ <- liftIO getLine
+      G.display "step" g
+      _ <- liftIO getLine
       itp <- interpolate g                              -- interpolate
       indS <- inductive itp                             -- check inductiveness
       if end g `elem` indS                              -- if the query is inductive...
