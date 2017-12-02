@@ -7,13 +7,14 @@ import           Control.Monad
 import           Data.Data (Data)
 import           Data.Map (Map)
 import qualified Data.Map as M
+import qualified Data.Set as S
 import qualified Data.List as L
 import           Data.List.Split
 import           Data.Text (Text, unpack)
 import           Data.Aeson
 import qualified Data.HashMap.Lazy as HML
-import           Data.Optic.Directed.Graph (Graph)
-import qualified Data.Optic.Directed.Graph as G
+import           Data.Optic.Directed.HyperGraph (Graph)
+import qualified Data.Optic.Directed.HyperGraph as G
 import qualified Data.ByteString.Lazy.Char8 as BS
 import qualified Data.Vector as V
 import           Data.Text.Prettyprint.Doc
@@ -69,7 +70,7 @@ buildGraph edgeHolders vertexMap =
     vertices = map (\(iv, v) -> (iv, case v of
       JInst vs -> Inst (Loc $ lineNo iv) vs (LBool False)
       JQuery q -> Inst (Loc $ lineNo iv) [] q)) $ M.toList vertexMap
-    edges = map (\(EdgeHolder v1 v2 e) -> (G.Pair v1 v2, e)) edgeHolders
+    edges = map (\(EdgeHolder v1 v2 e) -> (G.HEdge (S.singleton v1) v2, e)) edgeHolders
   in
     G.fromLists vertices edges
 

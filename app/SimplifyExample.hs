@@ -14,6 +14,7 @@ import           Logic.ImplicationGraph
 import           Logic.ImplicationGraph.Safety
 import           Logic.ImplicationGraph.Simplify as S
 import           Logic.ImplicationGraph.JSONParser (parseGraphFromJSON)
+import           Logic.ImplicationGraph.LTree
 import qualified Logic.Type as T
 import           Logic.Formula
 import           Logic.Formula.Parser
@@ -32,19 +33,19 @@ main = let
         print $ pretty $ _edgeForm dj
 
         parsedGraph <- fromJust . parseGraphFromJSON <$> BS.readFile "test.json"
-        let pruned = S.prune parsedGraph
+        let pruned = S.prune (G.mapEdge Leaf $ fromGraph parsedGraph)
         putStrLn "Trying to simplify JSON..."
         G.display "before.dot" parsedGraph
         G.display "simplified.dot" pruned
 
-        sol <- solve pruned M.empty
+        sol <- solve parsedGraph
         case sol of
           Left m -> do
             putStrLn "Could not prove safety:"
             print (pretty m)
           Right r -> do
             putStrLn "Safe!"
-            G.display "solved.dot" (r ^. implGr)
+            G.display "solved.dot" r
 
 i :: Var
 i  = Free ["i"] 0 T.Int
@@ -56,22 +57,22 @@ bump o _ = o
 emptyEdge :: (Ord i) => i -> i -> (G.HEdge i, Edge)
 emptyEdge s d = (G.HEdge (S.singleton s) d, Edge [form|i:Int = 0|] M.empty)
 
-irreducibleExample :: Graph Int Edge Inst
+irreducibleExample :: Graph Loc Edge Inst
 irreducibleExample = G.fromLists
-    [ (0, emptyInst 0 [])
-    , (1, emptyInst 1 [])
-    , (2, emptyInst 2 [])
-    , (3, emptyInst 3 [])
-    , (4, emptyInst 4 [])
-    , (5, emptyInst 5 [])]
-    [ emptyEdge 0 1
-    , emptyEdge 1 2
-    , emptyEdge 2 4
-    , emptyEdge 4 5
-    , emptyEdge 1 3
-    , emptyEdge 3 4
-    , emptyEdge 3 5
-    , emptyEdge 4 1]
+    [ (Loc 0, emptyInst (Loc 0) [])
+    , (Loc 1, emptyInst (Loc 1) [])
+    , (Loc 2, emptyInst (Loc 2) [])
+    , (Loc 3, emptyInst (Loc 3) [])
+    , (Loc 4, emptyInst (Loc 4) [])
+    , (Loc 5, emptyInst (Loc 5) [])]
+    [ emptyEdge (Loc 0) (Loc 1)
+    , emptyEdge (Loc 1) (Loc 2)
+    , emptyEdge (Loc 2) (Loc 4)
+    , emptyEdge (Loc 4) (Loc 5)
+    , emptyEdge (Loc 1) (Loc 3)
+    , emptyEdge (Loc 3) (Loc 4)
+    , emptyEdge (Loc 3) (Loc 5)
+    , emptyEdge (Loc 4) (Loc 1)]
 
 disjunctionExample :: (Edge, Edge)
 disjunctionExample =
