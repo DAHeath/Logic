@@ -27,7 +27,7 @@ main = do
   G.display "before.dot" example2
   let toSolve = hyperEdge (Loc 0) (Loc 1) (Loc 1) (G.mapEdge Leaf example2)
   G.display "toSolve.dot" toSolve
-  sol <- solve toSolve
+  sol <- solve example2
   case sol of
     Left m -> print (pretty m)
     Right r -> do
