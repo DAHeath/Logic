@@ -48,52 +48,52 @@ instance Pretty Loc where
   pretty (LocPair i j) = pretty "{" <> pretty i <> pretty "," <> pretty j <> pretty "}"
   pretty Terminus = pretty "END"
 
-data Inst = Inst
+data Inst n = Inst
   { _instLoc :: Loc
-  , _instVars :: [Var]
-  , _instForm :: Form
+  , _instVars :: [Var n]
+  , _instForm :: Form n
   } deriving (Show, Read, Eq, Ord, Data)
 makeLenses ''Inst
 
-data Edge = Edge
-  { _edgeForm :: Form
-  , _edgeMap :: Map Var Var
+data Edge n = Edge
+  { _edgeForm :: Form n
+  , _edgeMap :: Map (Var n) (Var n)
   } deriving (Show, Read, Eq, Ord, Data)
 makeLenses ''Edge
 
-type LEdge = LTree Edge
+type LEdge n = LTree (Edge n)
 
-instance Pretty Edge where
+instance Name n => Pretty (Edge n) where
   pretty (Edge f m) = pretty f <+> pretty (M.toList m)
 
-instance Pretty (LTree Edge) where
+instance Name n => Pretty (LTree (Edge n)) where
   pretty (Leaf e) = pretty e
   pretty (LOnly t) = pretty "L:" <> pretty t
   pretty (ROnly t) = pretty "R:" <> pretty t
   pretty (Br t1 t2) = pretty "L:" <> pretty t1
                   <+> pretty "R:" <> pretty t2
 
-instance Pretty Inst where
+instance Name n => Pretty (Inst n) where
   pretty (Inst l vs f) = pretty l <+> pretty vs <+> pretty f
 
-type ImplGr = Graph Idx LEdge Inst
+type ImplGr n = Graph Idx (LEdge n) (Inst n)
 
 -- | Construct an implication graph by swapping the labels for proper instance labels.
-fromGraph :: Ord i => Graph i e Inst -> Graph Idx e Inst
+fromGraph :: Ord i => Graph i e (Inst n) -> Graph Idx e (Inst n)
 fromGraph g = snd $ relabel (Idx 0) g
 
 -- | An instance which contains no formula.
-emptyInst :: Loc -> [Var] -> Inst
+emptyInst :: Loc -> [Var n] -> Inst n
 emptyInst l vs = Inst l vs (LBool False)
 
 -- | Gather all facts known about each instance of the same index together by disjunction.
-collectAnswer :: MonadIO m => ImplGr -> m (Map Loc Form)
+collectAnswer :: (Name n, MonadIO m) => ImplGr n -> m (Map Loc (Form n))
 collectAnswer g = traverse Z3.superSimplify $ execState (G.itravVert (\_ (Inst loc _ f) ->
   when (f /= LBool True) $ modify (M.insertWith mkOr loc f)) g) M.empty
 
 -- | Unwind all backedges which do not reach an inductive vertex, then compress
 -- the graph to only those vertices which reach the end.
-unwindAll :: [(G.HEdge Idx, LEdge)] -> Set Idx -> Idx -> ImplGr -> ImplGr
+unwindAll :: [(G.HEdge Idx, LEdge n)] -> Set Idx -> Idx -> ImplGr n -> ImplGr n
 unwindAll bes ind end g =
   let relevantBes = bes & filter (\be ->        -- a backedge is relevant if...
         be & fst & G.start                      -- we consider the start of the backedge and...
@@ -113,7 +113,7 @@ unwindAll bes ind end g =
       in G.filterIdxs (`elem` G.idxs compressed) g'
 
 -- | Unwind the graph on the given backedge and update all instances in the unwinding.
-unwind :: (G.HEdge Idx, LEdge) -> ImplGr -> ImplGr
+unwind :: (G.HEdge Idx, LEdge n) -> ImplGr n -> ImplGr n
 unwind (G.HEdge i1 i2, e) g =
   let (m, g') = g                                       -- in order to calculate the unwound subgraph:
         & G.reaches i2                                  -- find the subgraph which reaches the end of backedge

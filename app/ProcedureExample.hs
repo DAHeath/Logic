@@ -24,10 +24,10 @@ import qualified Data.ByteString.Lazy.Char8 as BS
 
 main :: IO ()
 main = do
-  G.display "before.dot" example2
-  let toSolve = hyperEdge (Loc 0) (Loc 1) (Loc 1) (G.mapEdge Leaf example2)
+  G.display "before.dot" example
+  let toSolve = hyperEdge (Loc 0) (Loc 1) (Loc 1) (G.mapEdge Leaf example)
   G.display "toSolve.dot" toSolve
-  sol <- solve example2
+  sol <- solve example
   case sol of
     Left m -> print (pretty m)
     Right r -> do

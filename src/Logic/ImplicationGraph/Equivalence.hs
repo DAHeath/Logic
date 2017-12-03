@@ -13,6 +13,7 @@ import           Data.These
 
 import           Logic.Formula
 import           Logic.Model
+import           Logic.Var
 import           Logic.ImplicationGraph
 import           Logic.ImplicationGraph.Induction
 import           Logic.ImplicationGraph.Chc
@@ -24,10 +25,10 @@ import           Logic.ImplicationGraph.Simplify
 solve :: MonadIO m
       => Loc
       -> Loc
-      -> Form
-      -> Graph Loc Edge Inst
-      -> Graph Loc Edge Inst
-      -> m (Either Model ImplGr)
+      -> Form Counted
+      -> Graph Loc (Edge Counted) (Inst Counted)
+      -> Graph Loc (Edge Counted) (Inst Counted)
+      -> m (Either (Model Counted) (ImplGr Counted))
 solve e1 e2 quer g1 g2 = do
   G.display "before" wQuery
   let gr = fromGraph wQuery

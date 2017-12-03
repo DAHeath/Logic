@@ -1,6 +1,4 @@
 {-# LANGUAGE QuasiQuotes #-}
-import           Control.Lens
-
 import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Directed.HyperGraph as G
 import qualified Data.Optic.Graph.Extras as G
@@ -47,17 +45,17 @@ main = let
             putStrLn "Safe!"
             G.display "solved.dot" r
 
-i :: Var
-i  = Free ["i"] 0 T.Int
+i :: Var Counted
+i  = Free (Counted ["i"] 0) T.Int
 
-bump :: Var -> Int -> Var
-bump (Free p c t) b = Free p (c + b) t
+bump :: Var Counted -> Integer -> Var Counted
+bump (Free (Counted p c) t) b = Free (Counted p (c + b)) t
 bump o _ = o
 
-emptyEdge :: (Ord i) => i -> i -> (G.HEdge i, Edge)
+emptyEdge :: (Ord i) => i -> i -> (G.HEdge i, Edge Counted)
 emptyEdge s d = (G.HEdge (S.singleton s) d, Edge [form|i:Int = 0|] M.empty)
 
-irreducibleExample :: Graph Loc Edge Inst
+irreducibleExample :: Graph Loc (Edge Counted) (Inst Counted)
 irreducibleExample = G.fromLists
     [ (Loc 0, emptyInst (Loc 0) [])
     , (Loc 1, emptyInst (Loc 1) [])
@@ -74,7 +72,7 @@ irreducibleExample = G.fromLists
     , emptyEdge (Loc 3) (Loc 5)
     , emptyEdge (Loc 4) (Loc 1)]
 
-disjunctionExample :: (Edge, Edge)
+disjunctionExample :: (Edge Counted, Edge Counted)
 disjunctionExample =
     let
         i' = bump i 1

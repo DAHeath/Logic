@@ -29,7 +29,7 @@ import           Logic.ImplicationGraph.Equivalence
 --   return r;
 -- }
 
-cs0 :: Graph Loc Edge Inst
+cs0 :: Graph Loc (Edge Counted) (Inst Counted)
 cs0 = G.fromLists
   [ (Loc 0, emptyInst (Loc 0) [n, r])
   , (Loc 1, emptyInst (Loc 1) [n, r, s, p, i])
@@ -62,7 +62,7 @@ cs0 = G.fromLists
 --   return x;
 -- }
 
-cs1 :: Graph Loc Edge Inst
+cs1 :: Graph Loc (Edge Counted) (Inst Counted)
 cs1 = G.fromLists
   [ (Loc 0, emptyInst (Loc 0) [m, x])
   , (Loc 1, emptyInst (Loc 1) [m, x, c1, c2, j])
@@ -79,33 +79,33 @@ cs1 = G.fromLists
   , (G.HEdge (S.singleton (Loc 1)) (Loc 2), Edge [form|j:Int > m:Int && x/1:Int = c2:Int|] (M.fromList [(x, x')]))
   ]
 
-x   = Free ["x"] 0 T.Int
-x'  = Free ["x"] 1 T.Int
-c1  = Free ["c1"] 0 T.Int
-c1' = Free ["c1"] 1 T.Int
-m   = Free ["m"] 0 T.Int
-c2  = Free ["c2"] 0 T.Int
-c2' = Free ["c2"] 1 T.Int
-j   = Free ["j"] 0 T.Int
-j'  = Free ["j"] 1 T.Int
+x   = Free (Counted ["x"]  0) T.Int
+x'  = Free (Counted ["x"]  1) T.Int
+c1  = Free (Counted ["c1"] 0) T.Int
+c1' = Free (Counted ["c1"] 1) T.Int
+m   = Free (Counted ["m"]  0) T.Int
+c2  = Free (Counted ["c2"] 0) T.Int
+c2' = Free (Counted ["c2"] 1) T.Int
+j   = Free (Counted ["j"]  0) T.Int
+j'  = Free (Counted ["j"]  1) T.Int
 
-r  = Free ["r"] 0 T.Int
-r' = Free ["r"] 1 T.Int
-s  = Free ["s"] 0 T.Int
-s' = Free ["s"] 1 T.Int
-n  = Free ["n"] 0 T.Int
-p  = Free ["p"] 0 T.Int
-p' = Free ["p"] 1 T.Int
-i  = Free ["i"] 0 T.Int
-i' = Free ["i"] 1 T.Int
+r  = Free (Counted ["r"] 0) T.Int
+r' = Free (Counted ["r"] 1) T.Int
+s  = Free (Counted ["s"] 0) T.Int
+s' = Free (Counted ["s"] 1) T.Int
+n  = Free (Counted ["n"] 0) T.Int
+p  = Free (Counted ["p"] 0) T.Int
+p' = Free (Counted ["p"] 1) T.Int
+i  = Free (Counted ["i"] 0) T.Int
+i' = Free (Counted ["i"] 1) T.Int
 
-ad0 :: Graph Loc Edge Inst
+ad0 :: Graph Loc (Edge Counted) (Inst Counted)
 ad0 = G.fromLists
   [ (Loc 0, emptyInst (Loc 0) [])
   , (Loc 1, emptyInst (Loc 1) [n, r]) ]
   [ (G.HEdge (S.singleton (Loc 0)) (Loc 1), Edge [form|r:Int = n:Int - 9 * ((n:Int - 1) / 9)|] M.empty) ]
 
-ad1 :: Graph Loc Edge Inst
+ad1 :: Graph Loc (Edge Counted) (Inst Counted)
 ad1 = G.fromLists
   [ (Loc 0, emptyInst (Loc 0) [])
   , (Loc 1, emptyInst (Loc 1) [m, x])

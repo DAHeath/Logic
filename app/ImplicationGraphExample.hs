@@ -22,15 +22,15 @@ main = do
       G.display "test.dot" r
       print . pretty . M.toList =<< collectAnswer r
 
-i, i', n :: Var
-i  = Free ["i"] 0 T.Int
-i' = Free ["i"] 1 T.Int
-n  = Free ["n"] 0 T.Int
+i, i', n :: Var Counted
+i  = Free (Counted ["i"] 0) T.Int
+i' = Free (Counted ["i"] 1) T.Int
+n  = Free (Counted ["n"] 0) T.Int
 
-s :: [Var]
+s :: [Var Counted]
 s = [i, n]
 
-example :: Graph Loc Edge Inst
+example :: Graph Loc (Edge Counted) (Inst Counted)
 example = G.fromLists
   [ (Loc 0, emptyInst (Loc 0) s)
   , (Loc 1, Inst (Loc 1) [] [form|not (i:Int = 41)|])]

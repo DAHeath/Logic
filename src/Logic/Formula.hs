@@ -13,9 +13,9 @@ import           Logic.Type (Type((:=>)), Typed)
 import qualified Logic.Type as T
 import           Logic.Var
 
-data Form
-  = Form :@ Form
-  | V Var
+data Form n
+  = Form n :@ Form n
+  | V (Var n)
 
   | If Type
 
@@ -51,13 +51,13 @@ infixl 9 :@
 
 makePrisms ''Form
 
-instance Plated Form where plate = uniplate
+instance Name n => Plated (Form n) where plate = uniplate
 
-instance Monoid Form where
+instance Name n => Monoid (Form n) where
   mappend = mkAnd
   mempty = LBool True
 
-instance Typed Form where
+instance Typed (Form n) where
   typeOf = \case
     V v         -> T.typeOf v
     v :@ _      -> case T.typeOf v of
@@ -93,7 +93,7 @@ instance Typed Form where
     LInt _      -> T.Int
     LReal _     -> T.Real
 
-instance Pretty Form where
+instance Name n => Pretty (Form n) where
   pretty = \case
     f :@ x :@ y ->
       if isBinaryInfix f
@@ -139,22 +139,22 @@ instance Pretty Form where
         f' -> pretty f' <+> pretty x
 
 class Formulaic a where
-  toForm :: a -> Form
+  toForm :: Name n => a n -> Form n
 
 instance Formulaic Form where
   toForm = id
 
 -- | Apply a function to two arguments.
-app2 :: Form -> Form -> Form -> Form
+app2 :: Form n -> Form n -> Form n -> Form n
 app2 f x y = f :@ x :@ y
 
-app3 :: Form -> Form -> Form -> Form -> Form
+app3 :: Form n -> Form n -> Form n -> Form n -> Form n
 app3 f x y z = f :@ x :@ y :@ z
 
-appMany :: Form -> [Form] -> Form
+appMany :: Form n -> [Form n] -> Form n
 appMany = foldl (:@)
 
-mkAnd :: Form -> Form -> Form
+mkAnd :: Name n => Form n -> Form n -> Form n
 mkAnd x@(Ge t1 :@ x1 :@ y1) y@(Le t2 :@ x2 :@ y2)
   | t1 == t2 && x1 == x2 && y1 == y2 = Eql t1 :@ x1 :@ y1
   | otherwise                        = app2 And x y
@@ -175,7 +175,7 @@ mkAnd x y
   | x == y           = x
   | otherwise        = app2 And x y
 
-mkOr :: Form -> Form -> Form
+mkOr :: Name n => Form n -> Form n -> Form n
 mkOr x y
   | x == LBool True  = LBool True
   | y == LBool True  = LBool True
@@ -184,26 +184,26 @@ mkOr x y
   | x == y           = x
   | otherwise        = app2 Or x y
 
-mkNot :: Form -> Form
+mkNot :: Form n -> Form n
 mkNot (Not :@ y) = y
 mkNot x = Not :@ x
 
-mkEql :: Type -> Form -> Form -> Form
+mkEql :: Name n => Type -> Form n -> Form n -> Form n
 mkEql t x y
   | x == y = LBool True
   | otherwise = let [x', y'] = sort [x, y] in app2 (Eql t) x' y'
 
-manyAnd, manyOr :: Foldable f => f Form -> Form
+manyAnd, manyOr :: (Name n, Foldable f) => f (Form n) -> Form n
 manyAnd = foldr mkAnd (LBool True)
 manyOr  = foldr mkOr (LBool False)
 
-mkIAdd :: Form -> Form -> Form
+mkIAdd :: Form n -> Form n -> Form n
 mkIAdd (LInt 0) x = x
 mkIAdd x (LInt 0) = x
 mkIAdd (LInt x) (LInt y) = LInt (x + y)
 mkIAdd x y = Add T.Int :@ x :@ y
 
-mkIMul :: Form -> Form -> Form
+mkIMul :: Form n -> Form n -> Form n
 mkIMul (LInt 0) _ = LInt 0
 mkIMul _ (LInt 0) = LInt 0
 mkIMul (LInt 1) x = x
@@ -211,12 +211,12 @@ mkIMul x (LInt 1) = x
 mkIMul (LInt x) (LInt y) = LInt (x * y)
 mkIMul x y = Mul T.Int :@ x :@ y
 
-manyIAdd, manyIMul :: Foldable f => f Form -> Form
+manyIAdd, manyIMul :: Foldable f => f (Form n) -> Form n
 manyIAdd = foldr mkIAdd (LInt 0)
 manyIMul = foldr mkIMul (LInt 1)
 
 -- | Is the formula a literal?
-isLit :: Form -> Bool
+isLit :: Form n -> Bool
 isLit = \case
   LUnit   -> True
   LBool _ -> True
@@ -225,13 +225,13 @@ isLit = \case
   _       -> False
 
 -- | Is the formula simply a variable?
-isVar :: Form -> Bool
+isVar :: Form n -> Bool
 isVar = \case
   V _ -> True
   _   -> False
 
 -- | Is the formula an infix operator?
-isBinaryInfix :: Form -> Bool
+isBinaryInfix :: Form n -> Bool
 isBinaryInfix = \case
     And   -> True
     Or    -> True
@@ -250,7 +250,7 @@ isBinaryInfix = \case
     _     -> False
 
 -- | Collect all the variables in this formula
-collectVars :: Form -> Set.Set Var
+collectVars :: Name n => Form n -> Set.Set (Var n)
 collectVars = \case
     V var -> Set.singleton var
     left :@ right -> Set.union (collectVars left) (collectVars right)
@@ -258,7 +258,7 @@ collectVars = \case
 
 
 -- | Map vars to something else
-mapVar :: (Var -> Var) -> Form -> Form
+mapVar :: (Var n -> Var n) -> Form n -> Form n
 mapVar f = \case
     V var -> V $ f var
     left :@ right -> mapVar f left :@ mapVar f right

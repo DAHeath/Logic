@@ -10,13 +10,14 @@ import qualified Data.Set as S
 import           Data.Foldable (toList)
 
 import qualified Logic.Var as V
+import           Logic.Var (Var, Name, Counted)
 import qualified Logic.Type as T
 import           Logic.Formula
 import           Logic.ImplicationGraph
 import           Logic.ImplicationGraph.LTree as L
 
 
-type RenameMap = Map.Map V.Var V.Var
+type RenameMap n = Map.Map (Var n) (Var n)
 
 
 -- | Finds irreducible vertices in a given `ImplGr`.
@@ -36,7 +37,7 @@ cartesianProduct f as bs = [ f a b | a <- as, b <- bs ]
 
 -- | Combine edges that 'execute' after one another, the first argument is
 -- the edge that runs first.
-conjunction :: Edge -> Edge -> Edge
+conjunction :: Edge Counted -> Edge Counted -> Edge Counted
 conjunction edge edge' =
   let
     bumpVarBy bumper var =
@@ -54,7 +55,7 @@ conjunction edge edge' =
     }
 
 
-disjunction :: Edge -> Edge -> Edge
+disjunction :: Name n => Edge n -> Edge n -> Edge n
 disjunction e1 e2 =
   let
     combinedMap = combine (_edgeMap e1) (_edgeMap e2)
@@ -64,13 +65,13 @@ disjunction e1 e2 =
       _edgeMap = combinedMap
     }
   where
-    combine :: RenameMap -> RenameMap -> RenameMap
+    combine :: Name n => RenameMap n -> RenameMap n -> RenameMap n
     combine = Map.unionWith max
 
-    maxTemporality :: V.Var -> RenameMap -> V.Var
+    maxTemporality :: Name n => Var n -> RenameMap n -> Var n
     maxTemporality v rm = fromMaybe v $ max v <$> Map.lookup v rm
 
-    fitEdge :: Edge -> RenameMap -> Form
+    fitEdge :: V.Name n => Edge n -> RenameMap n -> Form n
     fitEdge e rm = foldr folder (_edgeForm e) (Map.toList $ _edgeMap e)
       where
       eqlForm v' v = Eql (T.typeOf v) :@ V v' :@ V v
@@ -78,16 +79,17 @@ disjunction e1 e2 =
       folder (k, v) f = let v' = maxTemporality k rm in
         if v' > v then mkAnd (eqlForm v' v) f else f
 
-lconjunction :: LEdge -> LEdge -> LEdge
+lconjunction :: LEdge Counted -> LEdge Counted -> LEdge Counted
 lconjunction e1 e2 =
   let inc = foldl1 disjunction (toList e1)
   in fmap (conjunction inc) e2
 
-ldisjunction :: LEdge -> LEdge -> LEdge
+ldisjunction :: Name n => LEdge n -> LEdge n -> LEdge n
 ldisjunction = L.unionWith disjunction
 
 -- | Remove all reducible vertices and combine edges through {dis/con}junction.
-prune :: (Ord i) => Graph i LEdge Inst -> Graph i LEdge Inst
+prune :: (Ord i) => Graph i (LEdge Counted) (Inst Counted)
+      -> Graph i (LEdge Counted) (Inst Counted)
 prune graph = foldr removeVertex graph reducible where
   andEdge (G.HEdge start end', e) (G.HEdge s' end, e') =
     G.addEdgeWith ldisjunction

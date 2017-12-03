@@ -20,8 +20,8 @@ import qualified Logic.Solver.Z3 as Z3
 
 -- | Interpolate the facts in the graph using CHC solving to label the vertices
 -- with fresh definitions.
-interpolate :: (MonadError Model m, MonadIO m)
-            => ImplGr -> m ImplGr
+interpolate :: (Name n, MonadError (Model n) m, MonadIO m)
+            => ImplGr n -> m (ImplGr n)
 interpolate g = do
   let g' = G.withoutBackEdges (G.mapEdge point g)
   sol <- interp (G.reaches (end g') g')
@@ -33,7 +33,7 @@ interpolate g = do
       (`applyModel` g') <$> Z3.solveChc (implGrChc g')
 
 -- | Convert the forward edges of the graph into a system of Constrained Horn Clauses.
-implGrChc :: Graph Idx Edge Inst -> [Chc]
+implGrChc :: Name n => Graph Idx (Edge n) (Inst n) -> [Chc n]
 implGrChc g = map rule topConns
   where
     topConns = -- to find the graph connections in topological order...
@@ -52,10 +52,10 @@ implGrChc g = map rule topConns
         _ -> Rule  lhs' f (subst mvs (buildRel (i, v))) -- Otherwise, the vertex is part of a rule.
 
     -- construct an applied predicate from the instance
-    buildRel (i, v) = mkApp ('r' : _Show #i) (v ^. instVars)
+    buildRel (i, v) = fromJust $ mkApp ('r' : _Show #i) (v ^. instVars)
 
 -- | Augment the fact at each vertex in the graph by the fact in the model.
-applyModel :: Model -> Graph Idx Edge Inst -> Graph Idx Edge Inst
+applyModel :: Name n => Model n -> Graph Idx (Edge n) (Inst n) -> Graph Idx (Edge n) (Inst n)
 applyModel model = G.imapVert applyInst
   where
     applyInst i v =

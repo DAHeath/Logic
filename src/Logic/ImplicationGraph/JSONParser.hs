@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
 
 module Logic.ImplicationGraph.JSONParser where
 
@@ -26,7 +26,7 @@ import           Logic.Type
 
 -- | Read a bytestring containing JSON into a graph where the indices are names
 -- for the program position.
-parseGraphFromJSON :: BS.ByteString -> Maybe (Graph Line Edge Inst)
+parseGraphFromJSON :: BS.ByteString -> Maybe (Graph Line (Edge Counted) (Inst Counted))
 parseGraphFromJSON str = getParsedGraph <$> decode str
 
 data Line = LineNo { qualifer :: [String], lineNo :: Integer }
@@ -39,32 +39,33 @@ textToLine txt = LineNo path num
             path = init components
             num = read $ last components
 
-newtype ParsedGraph = ParsedGraph { getParsedGraph :: Graph Line Edge Inst }
+newtype ParsedGraph = ParsedGraph
+  { getParsedGraph :: Graph Line (Edge Counted) (Inst Counted) }
 
 -- | Maps an edge (defined by a start and an end index) to its label.
 data EdgeHolder = EdgeHolder
   { _ehStart :: Line
   , _ehEnd :: Line
-  , _ehEdge :: Edge
+  , _ehEdge :: Edge Counted
   } deriving (Show, Data)
 
 -- | A map from each vertex to its neighbors. (Defines the graph topology.)
-type VertexMap = Map Line [Var]
+type VertexMap = Map Line [Var Counted]
 
 data JSONVertex
-  = JInst [Var]
-  | JQuery Form
+  = JInst [Var Counted]
+  | JQuery (Form Counted)
   deriving (Show, Read, Eq, Ord, Data)
 
 -- | Represents a variable renaming.
-data VarRenaming = VarRenaming Var Var
+data VarRenaming = VarRenaming (Var Counted) (Var Counted)
 
-renameMap :: [VarRenaming] -> Map Var Var
+renameMap :: [VarRenaming] -> Map (Var Counted) (Var Counted)
 renameMap renames =
   M.fromList $ map tupelize renames
   where tupelize (VarRenaming a b) = (a, b)
 
-buildGraph :: [EdgeHolder] -> Map Line JSONVertex -> Graph Line Edge Inst
+buildGraph :: [EdgeHolder] -> Map Line JSONVertex -> Graph Line (Edge Counted) (Inst Counted)
 buildGraph edgeHolders vertexMap =
   let
     vertices = map (\(iv, v) -> (iv, case v of
@@ -133,7 +134,7 @@ instance FromJSON VarRenaming where
       _ -> mzero
   parseJSON _ = mzero
 
-instance FromJSON Form where
+instance FromJSON (Form Counted) where
   parseJSON (Object o) = case Prelude.head (HML.toList o) of
     (str, val) ->
       let withArg f = do
@@ -166,19 +167,19 @@ instance FromJSON Form where
            _          -> return (LBool False)
   parseJSON _ = mzero
 
-instance FromJSON Var where
+instance FromJSON (Var Counted) where
   parseJSON (Object o) =
     case Prelude.head (HML.toList o) of
       ("free", Data.Aeson.Array val) -> do
           qid <- parseJSON $ V.head val
           kind <- parseJSON $ V.last val
-          return $ uncurry Free (unpackQID qid) kind
+          return $ Free (uncurry Counted $ unpackQID qid) kind
       _ -> mzero
   parseJSON _ = mzero
 
-data QID = QID [String] Int
+data QID = QID [String] Integer
 
-unpackQID :: QID -> ([String], Int)
+unpackQID :: QID -> ([String], Integer)
 unpackQID (QID path temporality) = (path, temporality)
 
 instance FromJSON QID where

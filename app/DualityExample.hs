@@ -4,9 +4,10 @@ import Control.Monad.Except
 import Logic.Chc
 import Logic.Solver.Z3
 import Logic.Formula.Parser
+import Logic.Var
 import Data.Text.Prettyprint.Doc
 
-test :: [Chc] -> IO ()
+test :: [Chc Counted] -> IO ()
 test t = do
   sol <- liftIO (runExceptT (solveChc t))
   case sol of
@@ -18,7 +19,7 @@ test t = do
 main :: IO ()
 main = test test1
 
-test1, test2 :: [Chc]
+test1, test2 :: [Chc Counted]
 test1 = [chc| i:Int = 0 => {r i:Int}
               {r i:Int} i':Int = i:Int + 2 && i:Int < n:Int => {r i':Int}
               {r i:Int} i:Int >= n:Int => not (i:Int = 41) |]
