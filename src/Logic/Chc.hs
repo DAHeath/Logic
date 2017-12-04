@@ -10,6 +10,7 @@ import           Data.Text.Prettyprint.Doc hiding ((<>))
 import           Logic.Formula
 import           Logic.Model
 import           Logic.Var
+import           Logic.Name
 import qualified Logic.Type as T
 
 data Chc n
@@ -20,10 +21,8 @@ data Chc n
 data App n = App { appOperator :: Var n, appOperands :: [Var n] }
   deriving (Show, Eq, Ord, Data)
 
-mkApp :: Name n => String -> [Var n] -> Maybe (App n)
-mkApp s vs = do
-  n <- s ^? name
-  return $ App (Free n (T.curryType (map T.typeOf vs) T.Bool)) vs
+mkApp :: Name n => n -> [Var n] -> App n
+mkApp n vs = App (Free n (T.curryType (map T.typeOf vs) T.Bool)) vs
 
 instance Formulaic Chc where
   toForm (Rule lhs phi rhs) = app2 Impl (manyAnd (map toForm lhs ++ [phi])) (toForm rhs)

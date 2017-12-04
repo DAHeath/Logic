@@ -8,6 +8,7 @@ import qualified Data.Map as M
 import           Data.Text.Prettyprint.Doc
 
 import           Logic.Var
+import           Logic.Name
 import           Logic.Formula
 
 -- | A model is an assignment of variables to formulas.

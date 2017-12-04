@@ -26,7 +26,7 @@ import           Logic.Type
 
 -- | Read a bytestring containing JSON into a graph where the indices are names
 -- for the program position.
-parseGraphFromJSON :: BS.ByteString -> Maybe (Graph Line (Edge Counted) (Inst Counted))
+parseGraphFromJSON :: BS.ByteString -> Maybe (Graph Line (Edge BasicName) (Inst BasicName))
 parseGraphFromJSON str = getParsedGraph <$> decode str
 
 data Line = LineNo { qualifer :: [String], lineNo :: Integer }
@@ -40,32 +40,32 @@ textToLine txt = LineNo path num
             num = read $ last components
 
 newtype ParsedGraph = ParsedGraph
-  { getParsedGraph :: Graph Line (Edge Counted) (Inst Counted) }
+  { getParsedGraph :: Graph Line (Edge BasicName) (Inst BasicName) }
 
 -- | Maps an edge (defined by a start and an end index) to its label.
 data EdgeHolder = EdgeHolder
   { _ehStart :: Line
   , _ehEnd :: Line
-  , _ehEdge :: Edge Counted
+  , _ehEdge :: Edge BasicName
   } deriving (Show, Data)
 
 -- | A map from each vertex to its neighbors. (Defines the graph topology.)
-type VertexMap = Map Line [Var Counted]
+type VertexMap = Map Line [Var BasicName]
 
 data JSONVertex
-  = JInst [Var Counted]
-  | JQuery (Form Counted)
+  = JInst [Var BasicName]
+  | JQuery (Form BasicName)
   deriving (Show, Read, Eq, Ord, Data)
 
 -- | Represents a variable renaming.
-data VarRenaming = VarRenaming (Var Counted) (Var Counted)
+data VarRenaming = VarRenaming (Var BasicName) (Var BasicName)
 
-renameMap :: [VarRenaming] -> Map (Var Counted) (Var Counted)
+renameMap :: [VarRenaming] -> Map (Var BasicName) (Var BasicName)
 renameMap renames =
   M.fromList $ map tupelize renames
   where tupelize (VarRenaming a b) = (a, b)
 
-buildGraph :: [EdgeHolder] -> Map Line JSONVertex -> Graph Line (Edge Counted) (Inst Counted)
+buildGraph :: [EdgeHolder] -> Map Line JSONVertex -> Graph Line (Edge BasicName) (Inst BasicName)
 buildGraph edgeHolders vertexMap =
   let
     vertices = map (\(iv, v) -> (iv, case v of
@@ -134,7 +134,7 @@ instance FromJSON VarRenaming where
       _ -> mzero
   parseJSON _ = mzero
 
-instance FromJSON (Form Counted) where
+instance FromJSON (Form BasicName) where
   parseJSON (Object o) = case Prelude.head (HML.toList o) of
     (str, val) ->
       let withArg f = do
@@ -167,14 +167,14 @@ instance FromJSON (Form Counted) where
            _          -> return (LBool False)
   parseJSON _ = mzero
 
-instance FromJSON (Var Counted) where
-  parseJSON (Object o) =
-    case Prelude.head (HML.toList o) of
-      ("free", Data.Aeson.Array val) -> do
-          qid <- parseJSON $ V.head val
-          kind <- parseJSON $ V.last val
-          return $ Free (uncurry Counted $ unpackQID qid) kind
-      _ -> mzero
+instance FromJSON (Var BasicName) where
+  parseJSON (Object o) = undefined
+    -- case Prelude.head (HML.toList o) of 
+    --   ("free", Data.Aeson.Array val) -> do
+    --       qid <- parseJSON $ V.head val
+    --       kind <- parseJSON $ V.last val
+    --       return $ Free (uncurry $ unpackQID qid) kind
+    --   _ -> mzero
   parseJSON _ = mzero
 
 data QID = QID [String] Integer

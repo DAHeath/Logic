@@ -1,4 +1,8 @@
-{-# LANGUAGE DeriveDataTypeable, TypeFamilies, TemplateHaskell, ConstraintKinds, FlexibleInstances #-}
+{-# LANGUAGE DeriveDataTypeable
+           , TypeFamilies
+           , TemplateHaskell
+           , ConstraintKinds
+           , FlexibleInstances #-}
 module Logic.ImplicationGraph where
 
 import           Control.Lens
@@ -18,6 +22,7 @@ import           Data.Text.Prettyprint.Doc
 
 import           Logic.Formula
 import           Logic.Var
+import           Logic.Name
 import qualified Logic.Solver.Z3 as Z3
 import           Logic.ImplicationGraph.LTree
 
@@ -29,25 +34,6 @@ instance Ord Idx where Idx a <= Idx b = b <= a
 instance Show Idx where show (Idx a) = show a
 instance Read Idx where readsPrec i = map (first Idx) . readsPrec i
 
-data Loc
-  = Loc Integer
-  | LocPair Loc Loc
-  | Terminus
-  deriving (Show, Read, Eq, Data)
-
-instance Ord Loc where
-  Loc i        <= Loc j        = i <= j
-  LocPair  i j <= LocPair  k l = i < k || (i == k && j <= l)
-  LocPair  i j <= Loc k        = i < Loc k && j < Loc k
-  LocPair _ _  <= a            = True
-  a            <= Terminus     = True
-  a            <= b            = b >= a
-
-instance Pretty Loc where
-  pretty (Loc i) = pretty i
-  pretty (LocPair i j) = pretty "{" <> pretty i <> pretty "," <> pretty j <> pretty "}"
-  pretty Terminus = pretty "END"
-
 data Inst n = Inst
   { _instLoc :: Loc
   , _instVars :: [Var n]
@@ -55,18 +41,9 @@ data Inst n = Inst
   } deriving (Show, Read, Eq, Ord, Data)
 makeLenses ''Inst
 
-data Edge n = Edge
-  { _edgeForm :: Form n
-  , _edgeMap :: Map (Var n) (Var n)
-  } deriving (Show, Read, Eq, Ord, Data)
-makeLenses ''Edge
+type Edge n = LTree (Form n)
 
-type LEdge n = LTree (Edge n)
-
-instance Name n => Pretty (Edge n) where
-  pretty (Edge f m) = pretty f <+> pretty (M.toList m)
-
-instance Name n => Pretty (LTree (Edge n)) where
+instance Name n => Pretty (LTree (Form n)) where
   pretty (Leaf e) = pretty e
   pretty (LOnly t) = pretty "L:" <> pretty t
   pretty (ROnly t) = pretty "R:" <> pretty t
@@ -76,7 +53,7 @@ instance Name n => Pretty (LTree (Edge n)) where
 instance Name n => Pretty (Inst n) where
   pretty (Inst l vs f) = pretty l <+> pretty vs <+> pretty f
 
-type ImplGr n = Graph Idx (LEdge n) (Inst n)
+type ImplGr n = Graph Idx (Edge n) (Inst n)
 
 -- | Construct an implication graph by swapping the labels for proper instance labels.
 fromGraph :: Ord i => Graph i e (Inst n) -> Graph Idx e (Inst n)
@@ -93,7 +70,7 @@ collectAnswer g = traverse Z3.superSimplify $ execState (G.itravVert (\_ (Inst l
 
 -- | Unwind all backedges which do not reach an inductive vertex, then compress
 -- the graph to only those vertices which reach the end.
-unwindAll :: [(G.HEdge Idx, LEdge n)] -> Set Idx -> Idx -> ImplGr n -> ImplGr n
+unwindAll :: [(G.HEdge Idx, Edge n)] -> Set Idx -> Idx -> ImplGr n -> ImplGr n
 unwindAll bes ind end g =
   let relevantBes = bes & filter (\be ->        -- a backedge is relevant if...
         be & fst & G.start                      -- we consider the start of the backedge and...
@@ -113,7 +90,7 @@ unwindAll bes ind end g =
       in G.filterIdxs (`elem` G.idxs compressed) g'
 
 -- | Unwind the graph on the given backedge and update all instances in the unwinding.
-unwind :: (G.HEdge Idx, LEdge n) -> ImplGr n -> ImplGr n
+unwind :: (G.HEdge Idx, Edge n) -> ImplGr n -> ImplGr n
 unwind (G.HEdge i1 i2, e) g =
   let (m, g') = g                                       -- in order to calculate the unwound subgraph:
         & G.reaches i2                                  -- find the subgraph which reaches the end of backedge

@@ -18,6 +18,7 @@ import           Logic.Type (Type)
 import qualified Logic.Type as T
 import           Logic.Formula
 import           Logic.Var
+import           Logic.Name
 import           Logic.Chc
 
 lexeme :: Stream s m Char => ParsecT s u m b -> ParsecT s u m b
@@ -161,15 +162,15 @@ promote par (file, line, col) s =
            return x
 
 form :: QuasiQuoter
-form = QuasiQuoter { quoteExp = quoteFormExp (parseForm :: CharParser st (Form Counted))
-                   , quotePat = quoteFormPat (parseForm :: CharParser st (Form Counted))
+form = QuasiQuoter { quoteExp = quoteFormExp (parseForm :: CharParser st (Form BasicName))
+                   , quotePat = quoteFormPat (parseForm :: CharParser st (Form BasicName))
                    , quoteType = undefined
                    , quoteDec = undefined
                    }
 
 chc :: QuasiQuoter
-chc = QuasiQuoter { quoteExp = quoteFormExp (parseChc :: CharParser st [Chc Counted])
-                  , quotePat = quoteFormPat (parseChc :: CharParser st [Chc Counted])
+chc = QuasiQuoter { quoteExp = quoteFormExp (parseChc :: CharParser st [Chc BasicName])
+                  , quotePat = quoteFormPat (parseChc :: CharParser st [Chc BasicName])
                   , quoteType = undefined
                   , quoteDec = undefined
                   }
@@ -187,7 +188,7 @@ quoteFormExp par s = do pos <- thPos
                         ex <- promote par pos s
                         dataToExpQ (const Nothing `extQ` metaExp) ex
 
-metaExp :: Form Counted -> Maybe TH.ExpQ
+metaExp :: Form BasicName -> Maybe TH.ExpQ
 metaExp (V (Free n _))
   | head (name # n) == '$' = Just [| $(TH.varE (TH.mkName (tail $ name # n))) |]
   | head (name # n) == '@' = Just [| V $ $(TH.varE (TH.mkName (tail $ name # n))) |]
@@ -199,9 +200,9 @@ quoteFormPat par s = do pos <- thPos
                         dataToPatQ (const Nothing) ex
 
 lexer :: T.GenTokenParser String u Identity
-lexer = T.makeTokenParser (emptyDef { T.identStart = letter <|> char '_' <|> char '$'
+lexer = T.makeTokenParser (emptyDef { T.identStart = letter <|> char '_' <|> char '$' <|> char '#'
                                     , T.identLetter = alphaNum
-                                                  <|> char '_' <|> char '/' <|> char '$' <|> char '\''
+                                                  <|> char '_' <|> char '/' <|> char '$' <|> char '\'' <|> char '#' <|> char '/'
                                     , T.reservedOpNames = [ "->" , "<-" , "<->" , "=>"
                                                           , "||"
                                                           , "&&"

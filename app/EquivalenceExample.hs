@@ -9,6 +9,8 @@ import qualified Data.Set as S
 import           Data.Text.Prettyprint.Doc
 
 import           Logic.Var
+import           Logic.Name
+import           Logic.Formula
 import           Logic.Formula.Parser
 import qualified Logic.Type as T
 import           Logic.ImplicationGraph
@@ -29,21 +31,21 @@ import           Logic.ImplicationGraph.Equivalence
 --   return r;
 -- }
 
-cs0 :: Graph Loc (Edge Counted) (Inst Counted)
-cs0 = G.fromLists
-  [ (Loc 0, emptyInst (Loc 0) [n, r])
-  , (Loc 1, emptyInst (Loc 1) [n, r, s, p, i])
-  , (Loc 2, emptyInst (Loc 2) [n, r])
-  ]
-  [ (G.HEdge S.empty (Loc 0), Edge [form|r:Int = 0|] M.empty)
-  , (G.HEdge (S.singleton (Loc 0)) (Loc 2), Edge [form|n:Int <= 1 && r/1:Int = 1|] (M.fromList [(r, r')]))
-  , (G.HEdge (S.singleton (Loc 0)) (Loc 1), Edge [form|n:Int > 1 && s:Int = 2 && p:Int = 1 && i:Int = 2|] M.empty)
-  , (G.HEdge (S.singleton (Loc 1)) (Loc 1), Edge [form|i:Int < n:Int
-                   && i/1:Int = i:Int+1
-                   && s/1:Int = s:Int + p:Int
-                   && p/1:Int = s:Int |] (M.fromList [(i, i'), (s, s'), (p, p')]))
-  , (G.HEdge (S.singleton (Loc 1)) (Loc 2) , Edge [form|i:Int >= n:Int && r/1:Int = s:Int|] (M.fromList [(r, r')]))
-  ]
+-- cs0 :: Graph Loc (Edge Counted) (Inst Counted)
+-- cs0 = G.fromLists
+--   [ (Loc 0, emptyInst (Loc 0) [n, r])
+--   , (Loc 1, emptyInst (Loc 1) [n, r, s, p, i])
+--   , (Loc 2, emptyInst (Loc 2) [n, r])
+--   ]
+--   [ (G.HEdge S.empty (Loc 0), Edge [form|r:Int = 0|] M.empty)
+--   , (G.HEdge (S.singleton (Loc 0)) (Loc 2), Edge [form|n:Int <= 1 && r/1:Int = 1|] (M.fromList [(r, r')]))
+--   , (G.HEdge (S.singleton (Loc 0)) (Loc 1), Edge [form|n:Int > 1 && s:Int = 2 && p:Int = 1 && i:Int = 2|] M.empty)
+--   , (G.HEdge (S.singleton (Loc 1)) (Loc 1), Edge [form|i:Int < n:Int
+--                    && i/1:Int = i:Int+1
+--                    && s/1:Int = s:Int + p:Int
+--                    && p/1:Int = s:Int |] (M.fromList [(i, i'), (s, s'), (p, p')]))
+--   , (G.HEdge (S.singleton (Loc 1)) (Loc 2) , Edge [form|i:Int >= n:Int && r/1:Int = s:Int|] (M.fromList [(r, r')]))
+--   ]
 
 
 -- public int climbStairs1(int m) {
@@ -62,58 +64,50 @@ cs0 = G.fromLists
 --   return x;
 -- }
 
-cs1 :: Graph Loc (Edge Counted) (Inst Counted)
-cs1 = G.fromLists
-  [ (Loc 0, emptyInst (Loc 0) [m, x])
-  , (Loc 1, emptyInst (Loc 1) [m, x, c1, c2, j])
-  , (Loc 2, emptyInst (Loc 2) [m, x])
-  ]
-  [ (G.HEdge S.empty (Loc 0), Edge [form|x:Int = 0|] M.empty)
-  , (G.HEdge (S.singleton (Loc 0)) (Loc 2), Edge [form|m:Int <= 1 && x/1:Int = 1|] (M.fromList [(x, x')]))
-  , (G.HEdge (S.singleton (Loc 0)) (Loc 1), Edge [form|m:Int > 1 && c1:Int = 1 && c2:Int = 1 && j:Int = 2|] M.empty)
-  , (G.HEdge (S.singleton (Loc 1)) (Loc 1), Edge [form|j:Int <= m:Int
-                   && j/1:Int = j:Int+1
-                   && c2/1:Int = c2:Int + c1:Int
-                   && c1/1:Int = c2:Int |]
-           (M.fromList [(j, j'), (c1, c1'), (c2, c2')]))
-  , (G.HEdge (S.singleton (Loc 1)) (Loc 2), Edge [form|j:Int > m:Int && x/1:Int = c2:Int|] (M.fromList [(x, x')]))
-  ]
+-- cs1 :: Graph Loc (Edge Counted) (Inst Counted)
+-- cs1 = G.fromLists
+--   [ (Loc 0, emptyInst (Loc 0) [m, x])
+--   , (Loc 1, emptyInst (Loc 1) [m, x, c1, c2, j])
+--   , (Loc 2, emptyInst (Loc 2) [m, x])
+--   ]
+--   [ (G.HEdge S.empty (Loc 0), Edge [form|x:Int = 0|] M.empty)
+--   , (G.HEdge (S.singleton (Loc 0)) (Loc 2), Edge [form|m:Int <= 1 && x/1:Int = 1|] (M.fromList [(x, x')]))
+--   , (G.HEdge (S.singleton (Loc 0)) (Loc 1), Edge [form|m:Int > 1 && c1:Int = 1 && c2:Int = 1 && j:Int = 2|] M.empty)
+--   , (G.HEdge (S.singleton (Loc 1)) (Loc 1), Edge [form|j:Int <= m:Int
+--                    && j/1:Int = j:Int+1
+--                    && c2/1:Int = c2:Int + c1:Int
+--                    && c1/1:Int = c2:Int |]
+--            (M.fromList [(j, j'), (c1, c1'), (c2, c2')]))
+--   , (G.HEdge (S.singleton (Loc 1)) (Loc 2), Edge [form|j:Int > m:Int && x/1:Int = c2:Int|] (M.fromList [(x, x')]))
+--   ]
 
-x   = Free (Counted ["x"]  0) T.Int
-x'  = Free (Counted ["x"]  1) T.Int
-c1  = Free (Counted ["c1"] 0) T.Int
-c1' = Free (Counted ["c1"] 1) T.Int
-m   = Free (Counted ["m"]  0) T.Int
-c2  = Free (Counted ["c2"] 0) T.Int
-c2' = Free (Counted ["c2"] 1) T.Int
-j   = Free (Counted ["j"]  0) T.Int
-j'  = Free (Counted ["j"]  1) T.Int
+r1  = Free (NoAlias (Located 1 ["r"])) T.Int
+n1  = Free (NoAlias (Located 1 ["n"])) T.Int
 
-r  = Free (Counted ["r"] 0) T.Int
-r' = Free (Counted ["r"] 1) T.Int
-s  = Free (Counted ["s"] 0) T.Int
-s' = Free (Counted ["s"] 1) T.Int
-n  = Free (Counted ["n"] 0) T.Int
-p  = Free (Counted ["p"] 0) T.Int
-p' = Free (Counted ["p"] 1) T.Int
-i  = Free (Counted ["i"] 0) T.Int
-i' = Free (Counted ["i"] 1) T.Int
+m1  = Free (NoAlias (Located 1 ["m"])) T.Int
+x1  = Free (NoAlias (Located 1 ["x"])) T.Int
+m2  = Free (NoAlias (Located 2 ["m"])) T.Int
+x2  = Free (NoAlias (Located 2 ["x"])) T.Int
 
-ad0 :: Graph Loc (Edge Counted) (Inst Counted)
+ad0 :: Graph Loc (Form BasicName) (Inst BasicName)
 ad0 = G.fromLists
   [ (Loc 0, emptyInst (Loc 0) [])
-  , (Loc 1, emptyInst (Loc 1) [n, r]) ]
-  [ (G.HEdge (S.singleton (Loc 0)) (Loc 1), Edge [form|r:Int = n:Int - 9 * ((n:Int - 1) / 9)|] M.empty) ]
+  , (Loc 1, emptyInst (Loc 1) [n1, r1]) ]
+  [ (G.HEdge (S.singleton (Loc 0)) (Loc 1), [form|#v1/r:Int = #v1/n:Int - 9 * ((#v1/n:Int - 1) / 9)|]) ]
 
-ad1 :: Graph Loc (Edge Counted) (Inst Counted)
+ad1 :: Graph Loc (Form BasicName) (Inst BasicName)
 ad1 = G.fromLists
   [ (Loc 0, emptyInst (Loc 0) [])
-  , (Loc 1, emptyInst (Loc 1) [m, x])
-  , (Loc 2, emptyInst (Loc 2) [m, x])
+  , (Loc 1, emptyInst (Loc 1) [m1, x1])
+  , (Loc 2, emptyInst (Loc 2) [m2, x2])
   ]
-  [ (G.HEdge (S.singleton (Loc 0)) (Loc 1), Edge [form|x:Int = m:Int|] M.empty)
-  , (G.HEdge (S.singleton (Loc 1)) (Loc 1), Edge [form|x:Int > 9 && x/1:Int = x:Int / 10 + x:Int % 10|] (M.fromList [(x, x')]))
-  , (G.HEdge (S.singleton (Loc 1)) (Loc 2), Edge [form|x:Int <= 9|] M.empty)
+  [ (G.HEdge (S.singleton (Loc 0)) (Loc 1), [form|#v1/x:Int = #v1/m:Int|])
+  , (G.HEdge (S.singleton (Loc 1)) (Loc 1), [form| v1/x:Int > 9
+                                                && #v1/x:Int = v1/x:Int / 10 + v1/x:Int % 10
+                                                && #v1/m:Int = v1/m:Int|])
+  , (G.HEdge (S.singleton (Loc 1)) (Loc 2), [form|v1/x:Int <= 9
+                                                && #v2/x:Int = v1/x:Int
+                                                && #v2/m:Int = v2/m:Int |])
   ]
 
 -- main :: IO ()
@@ -126,7 +120,7 @@ ad1 = G.fromLists
 
 main :: IO ()
 main = do
-  sol <- solve (Loc 1) (Loc 2) [form|n:Int > 0 && n:Int = m:Int -> x:Int = r:Int|] ad0 ad1
+  sol <- solve (Loc 1) (Loc 2) [form|v1/n:Int > 0 && v1/n:Int = v1/m:Int -> v2/x:Int = v1/r:Int|] ad0 ad1
   case sol of
     Left e -> print (pretty e)
     Right m ->

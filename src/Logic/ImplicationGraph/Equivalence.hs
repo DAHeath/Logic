@@ -25,15 +25,16 @@ import           Logic.ImplicationGraph.Simplify
 solve :: MonadIO m
       => Loc
       -> Loc
-      -> Form Counted
-      -> Graph Loc (Edge Counted) (Inst Counted)
-      -> Graph Loc (Edge Counted) (Inst Counted)
-      -> m (Either (Model Counted) (ImplGr Counted))
+      -> Form BasicName
+      -> Graph Loc (Form BasicName) (Inst BasicName)
+      -> Graph Loc (Form BasicName) (Inst BasicName)
+      -> m (Either (Model BasicName) (ImplGr BasicName))
 solve e1 e2 quer g1 g2 = do
   G.display "before" wQuery
   let gr = fromGraph wQuery
   loop gr
   where
+    -- wQuery = equivProduct g1 g2 & ix (LocPair e1 e2) . instForm .~ quer
     wQuery = prune $ equivProduct g1 g2 & ix (LocPair e1 e2) . instForm .~ quer
 
     equivProduct g1 g2 =

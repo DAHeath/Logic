@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, DeriveFunctor, DeriveTraversable #-}
 module Logic.Formula where
 
 import           Control.Lens
@@ -12,6 +12,7 @@ import           Data.Text.Prettyprint.Doc
 import           Logic.Type (Type((:=>)), Typed)
 import qualified Logic.Type as T
 import           Logic.Var
+import           Logic.Name
 
 data Form n
   = Form n :@ Form n
@@ -45,13 +46,15 @@ data Form n
   | LBool Bool
   | LInt Integer
   | LReal Double
-  deriving (Show, Read, Eq, Ord, Data)
+  deriving (Show, Read, Eq, Ord, Data, Functor, Foldable, Traversable)
 
 infixl 9 :@
 
 makePrisms ''Form
 
 instance Name n => Plated (Form n) where plate = uniplate
+
+type BasicName = Aliasable (Located [String])
 
 instance Name n => Monoid (Form n) where
   mappend = mkAnd

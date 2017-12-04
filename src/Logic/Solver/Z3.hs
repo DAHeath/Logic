@@ -16,6 +16,7 @@ import qualified Logic.Chc as C
 import           Logic.Formula (Form((:@)))
 import qualified Logic.Formula as F
 import           Logic.Var
+import           Logic.Name
 import           Logic.Type (Type((:=>)))
 import qualified Logic.Type as T
 import qualified Logic.Model as M
@@ -37,24 +38,23 @@ solveChc hcs = do
     Left e -> throwError e
     Right m -> return m
   where
-    sc =
+    sc = do
       let (queries, rules) = partition C.isQuery hcs
-          qids = map (const "q") queries
-          qs = zipWith mkQuery queries qids
-          satForms = map F.toForm rules ++ qs
-          rids = map (\n -> "RULE" ++ show n) [0..length hcs-1]
-      in do
-        useDuality
-        forms <- traverse formToAst satForms
-        rids' <- traverse mkStringSymbol rids
-        zipWithM_ fixedpointAddRule forms rids'
+      let qids = map (const "x0/q") queries
+      let qs = zipWith mkQuery queries qids
+      let satForms = map F.toForm rules ++ qs
+      let rids = map (\n -> "RULE" ++ show n) [0..length hcs-1]
+      useDuality
+      forms <- traverse formToAst satForms
+      rids' <- traverse mkStringSymbol rids
+      zipWithM_ fixedpointAddRule forms rids'
 
-        let quers = [Free (fromJust $ "q" ^? name) T.Bool]
-        quers' <- traverse funcToDecl quers
-        res <- fixedpointQueryRelations quers'
-        case res of
-          Unsat -> Right <$> (modelToModel =<< fixedpointGetModel)
-          _     -> Left <$> (modelToModel =<< fixedpointGetRefutation)
+      let quers = [Free (fromJust $ "x0/q" ^? name) T.Bool]
+      quers' <- traverse funcToDecl quers
+      res <- fixedpointQueryRelations quers'
+      case res of
+        Unsat -> Right <$> (modelToModel =<< fixedpointGetModel)
+        _     -> Left <$> (modelToModel =<< fixedpointGetRefutation)
 
     mkQuery q n =
       let theQuery = F.V $ Free (fromJust $ n ^? name) T.Bool in
@@ -294,7 +294,9 @@ modelToModel m = M.Model <$> (traverse superSimplify =<< M.union <$> functions <
       n <- declName fd
       domain <- traverse sortToType =<< getDomain fd
       range  <- sortToType =<< getRange fd
-      return $ varForName n (T.curryType domain range)
+      if n == "@Fail!0"
+      then return $ varForName "x0/Fail" (T.curryType domain range)
+      else return $ varForName n (T.curryType domain range)
 
 -- | Convert the Z3 internal representation of a formula to the AST representation.
 astToForm :: (Name n, MonadZ3 z3) => AST -> z3 (Form n)
@@ -335,10 +337,6 @@ varForName :: Name n => String -> Type -> Var n
 varForName n t = case n of
   '!' : n' -> Bound (read n') t
   n' -> Free (fromJust $ n' ^? name) t
-    -- let ws = splitOn "/" n'
-    -- in case readMaybe (last ws) of
-    --   Nothing -> Free ws 0 t
-    --   Just num -> Free (init ws) num t
 
 typeToSort :: MonadZ3 z3 => Type -> z3 Sort
 typeToSort = \case

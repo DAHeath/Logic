@@ -15,6 +15,7 @@ import           Data.Maybe (mapMaybe)
 import           Logic.Formula
 import           Logic.Model
 import           Logic.Var
+import           Logic.Name
 import qualified Logic.Solver.Z3 as Z3
 import           Logic.ImplicationGraph
 import           Logic.ImplicationGraph.Chc
@@ -81,7 +82,8 @@ descendantForms g loc i =
 -- 1. interpolating over the current graph
 -- 2. checking if the solution is inductive (and terminating if it is)
 -- 3. unwinding the graph over all backedges
-loop :: (Name n, MonadIO m) => ImplGr n -> m (Either (Model n) (ImplGr n))
+loop :: (Name n, MonadIO m)
+     => ImplGr (Aliasable n) -> m (Either (Model (Aliasable n)) (ImplGr (Aliasable n)))
 loop = runExceptT . loop'
   where
     loop' g = do
