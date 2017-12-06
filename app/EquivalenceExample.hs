@@ -107,7 +107,7 @@ ad1 = G.fromLists
                                                 && #v1/m:Int = v1/m:Int|])
   , (G.HEdge (S.singleton (Loc 1)) (Loc 2), [form|v1/x:Int <= 9
                                                 && #v2/x:Int = v1/x:Int
-                                                && #v2/m:Int = v2/m:Int |])
+                                                && #v2/m:Int = v1/m:Int |])
   ]
 
 -- main :: IO ()
@@ -120,7 +120,7 @@ ad1 = G.fromLists
 
 main :: IO ()
 main = do
-  sol <- solve (Loc 1) (Loc 2) [form|v1/n:Int > 0 && v1/n:Int = v1/m:Int -> v2/x:Int = v1/r:Int|] ad0 ad1
+  sol <- solve (Loc 1) (Loc 2) [form|v1/n:Int > 0 && v1/n:Int = v2/m:Int -> v2/x:Int = v1/r:Int|] ad0 ad1
   case sol of
     Left e -> print (pretty e)
     Right m ->

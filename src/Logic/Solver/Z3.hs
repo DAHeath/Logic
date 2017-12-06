@@ -16,22 +16,21 @@ import qualified Logic.Chc as C
 import           Logic.Formula (Form((:@)))
 import qualified Logic.Formula as F
 import           Logic.Var
-import           Logic.Name
 import           Logic.Type (Type((:=>)))
 import qualified Logic.Type as T
 import qualified Logic.Model as M
 
 import           Z3.Monad hiding (local)
 
-data Env n = Env { _envVars :: Map (Var n) AST
-                 , _envFuns :: Map (Var n) FuncDecl
-                 } deriving (Show, Eq, Ord)
+data Env = Env { _envVars :: Map Var AST
+               , _envFuns :: Map Var FuncDecl
+               } deriving (Show, Eq, Ord)
 makeLenses ''Env
 
-type SMT n m = (MonadState (Env n) m, MonadZ3 m)
+type SMT n m = (MonadState Env m, MonadZ3 m)
 
 -- | Invoke `duality` to solve the relational post fixed-point problem.
-solveChc :: (Name n, MonadError (M.Model n) m, MonadIO m) => [Chc n] -> m (M.Model n)
+solveChc :: (MonadError M.Model m, MonadIO m) => [Chc] -> m M.Model
 solveChc hcs = do
   res <- runEnvZ3 sc
   case res of
@@ -49,7 +48,7 @@ solveChc hcs = do
       rids' <- traverse mkStringSymbol rids
       zipWithM_ fixedpointAddRule forms rids'
 
-      let quers = [Free (fromJust $ "x0/q" ^? name) T.Bool]
+      let quers = [Free (FreeV ["x"] 0 False) T.Bool]
       quers' <- traverse funcToDecl quers
       res <- fixedpointQueryRelations quers'
       case res of
@@ -57,7 +56,7 @@ solveChc hcs = do
         _     -> Left <$> (modelToModel =<< fixedpointGetRefutation)
 
     mkQuery q n =
-      let theQuery = F.V $ Free (fromJust $ n ^? name) T.Bool in
+      let theQuery = F.V $ Free (parseFreeV n) T.Bool in
       F.app2 F.Impl (F.mkNot $ F.toForm q) theQuery
 
     useDuality = do
@@ -66,7 +65,7 @@ solveChc hcs = do
       fixedpointSetParams pars
 
 -- | Find a satisfying model of an input formula (if one exists).
-satisfy :: (Name n, MonadIO m) => Form n -> m (Maybe (M.Model n))
+satisfy :: MonadIO m => Form -> m (Maybe M.Model)
 satisfy f = runEnvZ3 $ do
   assert =<< formToAst f
   (_, m) <- solverCheckAndGetModel
@@ -75,7 +74,7 @@ satisfy f = runEnvZ3 $ do
     Just m' -> Just <$> modelToModel m'
 
 -- | The the satisfiability of the input formula.
-isSat :: (Name n, MonadIO m) => Form n -> m Bool
+isSat :: MonadIO m => Form -> m Bool
 isSat f = do
   sol <- runEnvZ3 sc
   case sol of
@@ -84,7 +83,7 @@ isSat f = do
   where sc = (assert =<< formToAst f) >> check
 
 -- | Test the validity of the input formula.
-isValid :: (Name n, MonadIO m) => Form n -> m Bool
+isValid :: MonadIO m => Form -> m Bool
 isValid f = runEnvZ3 $ do
   sol <- sc
   case sol of
@@ -93,13 +92,13 @@ isValid f = runEnvZ3 $ do
   where sc = (assert =<< formToAst (F.mkNot f)) >> check
 
 -- | Is `f -> g` a valid formula?
-entails :: (Name n, MonadIO m) => Form n -> Form n -> m Bool
+entails :: MonadIO m => Form -> Form -> m Bool
 entails f g = isValid (F.app2 F.Impl f g)
 
-simplify :: (Name n, MonadIO m) => Form n -> m (Form n)
+simplify :: MonadIO m => Form -> m Form
 simplify f = runEnvZ3 $ astToForm =<< Z3.Monad.simplify =<< formToAst f
 
-superSimplify :: (Name n, MonadIO m) => Form n -> m (Form n)
+superSimplify :: MonadIO m => Form -> m Form
 superSimplify (F.LInt n) = return (F.LInt n)
 superSimplify f = runEnvZ3 $ astToForm =<< superSimp =<< formToAst f
   where
@@ -119,11 +118,11 @@ superSimplify f = runEnvZ3 $ astToForm =<< superSimp =<< formToAst f
 -- | A monadic context for Z3 actions which caches the variables and functions
 -- which have already been created. It also resolve DeBrujin indices which Z3
 -- uses to represent variables.
-newtype EnvZ3 n a = EnvZ3 { getEnvZ3 :: StateT (Env n) Z3 a }
+newtype EnvZ3 n a = EnvZ3 { getEnvZ3 :: StateT Env Z3 a }
   deriving ( Functor
            , Applicative
            , Monad
-           , MonadState (Env n)
+           , MonadState Env
            , MonadIO
            )
 
@@ -132,14 +131,14 @@ instance MonadZ3 (EnvZ3 n) where
   getContext    = EnvZ3 $ lift getContext
   getFixedpoint = EnvZ3 $ lift getFixedpoint
 
-runEnvZ3 :: (Name n, MonadIO m) => EnvZ3 n a -> m a
+runEnvZ3 :: MonadIO m => EnvZ3 n a -> m a
 runEnvZ3 ac = liftIO $ evalZ3 (evalStateT (getEnvZ3 ac') emptyEnv)
   where
     ac' = push *> ac <* reset
     emptyEnv = Env M.empty M.empty
 
 -- | Convert the ADT formula to a Z3 formula.
-formToAst :: (Name n, SMT n m) => Form n -> m AST
+formToAst :: SMT n m => Form -> m AST
 formToAst f =
   case f of
     F.V v               -> var v
@@ -152,7 +151,7 @@ formToAst f =
                            in appToZ3 f'' as
     _ -> undefined
   where
-    gatherApp :: Name n => Form n -> [Form n] -> (Form n, [Form n])
+    gatherApp :: Form -> [Form] -> (Form, [Form])
     gatherApp (f' :@ a) args = gatherApp f' (a : args)
     gatherApp x args = (x, args)
 
@@ -170,7 +169,7 @@ formToAst f =
         Just v' -> return v'
 
 -- | Convert a function application to a Z3 formula.
-appToZ3 :: (Name n, SMT n m) => Form n -> [Form n] -> m AST
+appToZ3 :: SMT n m => Form -> [Form] -> m AST
 appToZ3 f args =
   case f of
     F.V v        -> join $ mkApp <$> funcToDecl v <*> traverse formToAst args
@@ -209,7 +208,7 @@ appToZ3 f args =
                        <*> formToAst (args !! 1)
                        <*> formToAst (args !! 2)
 
-funcToDecl :: (Name n, MonadState (Env n) z3, MonadZ3 z3) => Var n -> z3 FuncDecl
+funcToDecl :: (MonadState Env z3, MonadZ3 z3) => Var -> z3 FuncDecl
 funcToDecl r = do
   let t = T.typeOf r
   let n = varName r
@@ -224,7 +223,7 @@ funcToDecl r = do
       return r'
     Just r' -> return r'
 
-formFromApp :: (Name n, MonadZ3 z3) => String -> [AST] -> Sort -> z3 (Form n)
+formFromApp :: MonadZ3 z3 => String -> [AST] -> Sort -> z3 Form
 formFromApp n args range
   | n == "true"  = return $ F.LBool True
   | n == "false" = return $ F.LBool False
@@ -272,8 +271,8 @@ formFromApp n args range
         liftMany f = F.appMany f <$> traverse astToForm args
 
 -- | Convert a Z3 model to the AST-based formula model.
-modelToModel :: (Name n, MonadState (Env n) z3, MonadZ3 z3)
-             => Model -> z3 (M.Model n)
+modelToModel :: (MonadState Env z3, MonadZ3 z3)
+             => Model -> z3 M.Model
 modelToModel m = M.Model <$> (traverse superSimplify =<< M.union <$> functions <*> constants)
   where
     functions = do
@@ -299,7 +298,7 @@ modelToModel m = M.Model <$> (traverse superSimplify =<< M.union <$> functions <
       else return $ varForName n (T.curryType domain range)
 
 -- | Convert the Z3 internal representation of a formula to the AST representation.
-astToForm :: (Name n, MonadZ3 z3) => AST -> z3 (Form n)
+astToForm :: MonadZ3 z3 => AST -> z3 Form
 astToForm arg = do
   k <- getAstKind arg
   case k of
@@ -333,10 +332,10 @@ astToForm arg = do
     Z3_UNKNOWN_AST -> do liftIO $ putStrLn "unknown!"
                          undefined
 
-varForName :: Name n => String -> Type -> Var n
+varForName :: String -> Type -> Var
 varForName n t = case n of
   '!' : n' -> Bound (read n') t
-  n' -> Free (fromJust $ n' ^? name) t
+  n' -> Free (parseFreeV n) t
 
 typeToSort :: MonadZ3 z3 => Type -> z3 Sort
 typeToSort = \case
@@ -374,7 +373,7 @@ getType = getSort >=> sortToType
 declName :: MonadZ3 z3 => FuncDecl -> z3 String
 declName = getDeclName >=> getSymbolString
 
-varDec :: (Name n, MonadZ3 z3) => Var n -> z3 FuncDecl
+varDec :: MonadZ3 z3 => Var -> z3 FuncDecl
 varDec v = do
   let t = T.typeOf v
   let n = varName v

@@ -26,32 +26,32 @@ main = do
       G.display "test.dot" r
       print . pretty . M.toList =<< collectAnswer r
 
-i0  = Free (NoAlias (Located 0 ["i"])) T.Int
-n0  = Free (NoAlias (Located 0 ["n"])) T.Int
-i1  = Free (NoAlias (Located 1 ["i"])) T.Int
-n1  = Free (NoAlias (Located 1 ["n"])) T.Int
+i0  = Free (FreeV ["i"] 0 False) T.Int
+n0  = Free (FreeV ["i"] 0 False) T.Int
+i1  = Free (FreeV ["i"] 1 False) T.Int
+n1  = Free (FreeV ["i"] 1 False) T.Int
 
-example :: Graph Loc (Form BasicName) (Inst BasicName)
+example :: Graph Loc Form Inst
 example = G.fromLists
   [ emp 0 [i0, n0]
-  , inst 1 [i1] [form|not (v1/i:Int = 7)|]]
+  , inst 1 [i1] [form|not (i/1:Int = 3)|]]
   [
-    entry 0 ([form|#v0/i:Int = 0|])
+    entry 0 ([form|#i/0:Int = 0|])
   , simpleEdge 0 0
-      [form|#v0/i:Int = v0/i:Int + 2 && v0/i:Int < v0/n:Int
-         && #v0/n:Int = v0/n:Int |]
+      [form|#i/0:Int = i/0:Int + 2 && i/0:Int < n/0:Int
+         && #n/0:Int = n/0:Int |]
   , simpleEdge 0 1
-    [form|v0/i:Int >= v0/n:Int && #v1/i:Int = v0/i:Int|]
+    [form|i/0:Int >= n/0:Int && #i/1:Int = i/0:Int|]
   ]
 
-simpleEdge :: Integer -> Integer -> Form BasicName -> (G.HEdge Loc, Form BasicName)
+simpleEdge :: Integer -> Integer -> Form -> (G.HEdge Loc, Form)
 simpleEdge l1 l2 e = (G.HEdge (S.singleton (Loc l1)) (Loc l2), e)
 
-entry :: Integer -> Form BasicName -> (G.HEdge Loc, Form BasicName)
+entry :: Integer -> Form -> (G.HEdge Loc, Form)
 entry l e = (G.HEdge S.empty (Loc l), e)
 
-inst :: Integer -> [Var BasicName] -> Form BasicName -> (Loc, Inst BasicName)
+inst :: Integer -> [Var] -> Form -> (Loc, Inst)
 inst l vs f = (Loc l, Inst (Loc l) vs f)
 
-emp :: Integer -> [Var BasicName] -> (Loc, Inst BasicName)
+emp :: Integer -> [Var] -> (Loc, Inst)
 emp l vs = inst l vs (LBool False)

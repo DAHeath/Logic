@@ -25,10 +25,10 @@ import           Logic.ImplicationGraph.Simplify
 solve :: MonadIO m
       => Loc
       -> Loc
-      -> Form BasicName
-      -> Graph Loc (Form BasicName) (Inst BasicName)
-      -> Graph Loc (Form BasicName) (Inst BasicName)
-      -> m (Either (Model BasicName) (ImplGr BasicName))
+      -> Form
+      -> Graph Loc Form Inst
+      -> Graph Loc Form Inst
+      -> m (Either Model ImplGr)
 solve e1 e2 quer g1 g2 = do
   G.display "before" wQuery
   let gr = fromGraph wQuery

@@ -22,24 +22,24 @@ import           Logic.ImplicationGraph.Chc
 import           Logic.ImplicationGraph.LTree
 
 -- | Find the vertex labels in the graph which are inductive.
-inductive :: (Name n, MonadIO m) => ImplGr n -> m (Set Idx)
+inductive :: (MonadIO m) => ImplGr -> m (Set Idx)
 inductive g = M.keysSet . M.filter id <$> execStateT (ind g (end g)) M.empty
 
 -- | Decide if the given index is inductive.
-ind :: (Name n, MonadIO m, MonadState (Map Idx Bool) m) => ImplGr n -> Idx -> m Bool
+ind :: (MonadIO m, MonadState (Map Idx Bool) m) => ImplGr -> Idx -> m Bool
 ind g i =
   maybe
     (computeInd g i)     -- compute inductiveness when we don't know the answer
     return               -- if we memoized the answer, we're done
     . M.lookup i =<< get -- look up the answer from the state
 
-indPred :: (Name n, MonadIO m, MonadState (Map Idx Bool) m) => ImplGr n -> Idx -> Idx -> m Bool
+indPred :: (MonadIO m, MonadState (Map Idx Bool) m) => ImplGr -> Idx -> Idx -> m Bool
 indPred g i i' =
   if i <= i'        -- if we check the 'predecessor' and it occurs after the current index (back edge)
   then return False -- then it is automatically not inductive
   else ind g i'     -- otherwise, we recurse
 
-computeInd :: (Name n, MonadIO m, MonadState (Map Idx Bool) m) => ImplGr n -> Idx -> m Bool
+computeInd :: (MonadIO m, MonadState (Map Idx Bool) m) => ImplGr -> Idx -> m Bool
 computeInd g i =
   (at i <?=) =<< -- find the answer and update the memoization table
     maybe
@@ -52,8 +52,7 @@ computeInd g i =
           , inductiveByPred g i          --  it's predecessors are inductive
           ]) (g ^. at i)
 
-inductiveByPred :: (Name n, MonadIO m, MonadState (Map Idx Bool) m)
-                => ImplGr n -> Idx -> m Bool
+inductiveByPred :: (MonadIO m, MonadState (Map Idx Bool) m) => ImplGr -> Idx -> m Bool
 inductiveByPred g i = do
   let ies = g ^@.. G.iedgesTo i
   let m = foldr (\(i', e) m' ->
@@ -63,12 +62,11 @@ inductiveByPred g i = do
   or <$> traverse (fmap and . traverse (indPred g i)) cats
 
 -- | Are all predecessors inductive?
-allInd :: (Name n, MonadIO m, MonadState (Map Idx Bool) m)
-       => ImplGr n -> Idx -> [Idx] -> m Bool
+allInd :: (MonadIO m, MonadState (Map Idx Bool) m) => ImplGr -> Idx -> [Idx] -> m Bool
 allInd g i is = and <$> mapM (indPred g i) is
 
 -- | Find the formulas of descendants at the same location.
-descendantForms :: ImplGr n -> Loc -> Idx -> [Form n]
+descendantForms :: ImplGr -> Loc -> Idx -> [Form]
 descendantForms g loc i =
   G.descendants i g                      -- look at all descendants
     & S.delete i                         -- an instance cannot entail itself
@@ -82,9 +80,9 @@ descendantForms g loc i =
 -- 1. interpolating over the current graph
 -- 2. checking if the solution is inductive (and terminating if it is)
 -- 3. unwinding the graph over all backedges
-loop :: (Name n, MonadIO m)
-     => ImplGr (Aliasable n) -> m (Either (Model (Aliasable n)) (ImplGr (Aliasable n)))
-loop = runExceptT . loop'
+loop :: (MonadIO m) => ImplGr -> m (Either Model ImplGr)
+loop =
+  runExceptT . loop'
   where
     loop' g = do
       G.display "step" g
