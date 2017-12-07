@@ -15,6 +15,5 @@ import           Logic.ImplicationGraph.Simplify
 
 -- | Repeatedly unwind the program until a counterexample is found or inductive
 -- invariants are found.
-solve :: (Ord i, MonadIO m) => Graph i Form Inst -> m (Either Model ImplGr)
-solve = loop . G.mapEdge Leaf . fromGraph
--- solve = loop . fromGraph
+solve :: (Ord i, MonadIO m) => Graph i Edge Inst -> m (Either Model ImplGr)
+solve = loop . fromGraph

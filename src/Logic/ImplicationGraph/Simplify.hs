@@ -50,7 +50,10 @@ disjunction = L.unionWith disj
 -- | Remove all reducible vertices and combine edges through {dis/con}junction.
 prune :: (Ord i) => Graph i Edge Inst
       -> Graph i Edge Inst
-prune graph = foldr removeVertex graph reducible where
+prune graph =
+  let g = foldr removeVertex graph reducible
+  in G.imapEdge (cleanEdgeVars g) g
+  where
   andEdge (G.HEdge s1 e1, f1) (G.HEdge s2 e2, f2) =
     G.addEdgeWith disjunction
       (G.HEdge ((s2 S.\\ S.singleton e1) `S.union` s1) e2) $ conjunction f1 f2
@@ -62,3 +65,12 @@ prune graph = foldr removeVertex graph reducible where
   removeVertex i g = foldr ($) (G.delIdx i g) $ newEdges i g
 
   reducible = filter (not . flip elem (irreducible graph)) $ G.idxs graph
+
+  cleanEdgeVars :: Ord i => Graph i Edge Inst -> G.HEdge i -> Edge -> Edge
+  cleanEdgeVars g (G.HEdge is i) e =
+    let vsBef = concatMap (\i' -> g ^?! ix i' . instVars) is
+        vsAft = (g ^?! ix i . instVars) & map setNew
+        conserve = S.fromList (vsBef ++ vsAft)
+    in fmap (varElim conserve) e
+
+  setNew v = v & _Free . _1 . freeVNew .~ True

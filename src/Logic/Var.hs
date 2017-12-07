@@ -38,9 +38,9 @@ instance Pretty Loc where
   pretty Terminus = pretty "END"
 
 data FreeV = FreeV
-  { freeVName :: [String]
-  , freeVLoc :: Integer
-  , freeVNew :: Bool
+  { _freeVName :: [String]
+  , _freeVLoc :: Integer
+  , _freeVNew :: Bool
   } deriving (Show, Read, Eq, Ord, Data)
 makeLenses ''FreeV
 

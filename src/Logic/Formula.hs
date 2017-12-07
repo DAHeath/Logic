@@ -2,8 +2,11 @@
 module Logic.Formula where
 
 import           Control.Lens
+import           Control.Monad.State
 
-import qualified Data.Set as Set
+import           Data.Set (Set)
+import qualified Data.Set as S
+import qualified Data.Map as M
 import           Data.Data (Data)
 import           Data.Data.Lens (uniplate)
 import           Data.List (sort)
@@ -57,7 +60,7 @@ instance Monoid Form where
   mappend = mkAnd
   mempty = LBool True
 
-instance Typed (Form) where
+instance Typed Form where
   typeOf = \case
     V v         -> T.typeOf v
     v :@ _      -> case T.typeOf v of
@@ -93,7 +96,7 @@ instance Typed (Form) where
     LInt _      -> T.Int
     LReal _     -> T.Real
 
-instance Pretty (Form) where
+instance Pretty Form where
   pretty = \case
     f :@ x :@ y ->
       if isBinaryInfix f
@@ -193,7 +196,7 @@ mkEql t x y
   | x == y = LBool True
   | otherwise = let [x', y'] = sort [x, y] in app2 (Eql t) x' y'
 
-manyAnd, manyOr :: Foldable f => f (Form) -> Form
+manyAnd, manyOr :: Foldable f => f Form -> Form
 manyAnd = foldr mkAnd (LBool True)
 manyOr  = foldr mkOr (LBool False)
 
@@ -211,7 +214,7 @@ mkIMul x (LInt 1) = x
 mkIMul (LInt x) (LInt y) = LInt (x * y)
 mkIMul x y = Mul T.Int :@ x :@ y
 
-manyIAdd, manyIMul :: Foldable f => f (Form) -> Form
+manyIAdd, manyIMul :: Foldable f => f Form -> Form
 manyIAdd = foldr mkIAdd (LInt 0)
 manyIMul = foldr mkIMul (LInt 1)
 
@@ -250,11 +253,11 @@ isBinaryInfix = \case
     _     -> False
 
 -- | Collect all the variables in this formula
-collectVars :: Form -> Set.Set Var
+collectVars :: Form -> Set Var
 collectVars = \case
-    V var -> Set.singleton var
-    left :@ right -> Set.union (collectVars left) (collectVars right)
-    _ -> Set.empty
+    V var -> S.singleton var
+    left :@ right -> S.union (collectVars left) (collectVars right)
+    _ -> S.empty
 
 
 -- | Map vars to something else
@@ -263,3 +266,34 @@ mapVar f = \case
     V var -> V $ f var
     left :@ right -> mapVar f left :@ mapVar f right
     other -> other
+
+-- | Remove simple assignments such as `v1 = v2` by rewriting the rest of the
+-- formula with one side of the equality. Variables provided in the set will
+-- not be eliminated from the formula.
+varElim :: Set Var -> Form -> Form
+varElim conserve = clean . loop
+  where
+    loop :: Form -> Form
+    loop f =
+      let (f', st) =
+            runState (
+              transformM (\f -> do
+                case f of
+                  Eql t :@ V v1 :@ V v2
+                    | v1 `notElem` conserve -> put (Just (v1, v2))
+                    | v2 `notElem` conserve -> put (Just (v2, v1))
+                    | otherwise -> return ()
+                  _ -> return ()
+                return f) f) Nothing
+      in case st of
+        Nothing -> f'
+        Just (v1, v2) -> loop (subst (M.singleton v1 v2) f')
+
+clean :: Form -> Form
+clean = transform (\case
+  Eql t :@ f1 :@ f2
+    | f1 == f2 -> LBool True
+    | otherwise -> Eql t :@ f1 :@ f2
+  And :@ LBool True :@ f -> f
+  And :@ f :@ LBool True -> f
+  f ->  f)
