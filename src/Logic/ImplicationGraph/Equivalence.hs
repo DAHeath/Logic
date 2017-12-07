@@ -25,22 +25,21 @@ import           Logic.ImplicationGraph.Simplify
 solve :: MonadIO m
       => Loc
       -> Loc
-      -> Form BasicName
-      -> Graph Loc (Form BasicName) (Inst BasicName)
-      -> Graph Loc (Form BasicName) (Inst BasicName)
-      -> m (Either (Model BasicName) (ImplGr BasicName))
+      -> Form
+      -> Graph Loc Form Inst
+      -> Graph Loc Form Inst
+      -> m (Either Model ImplGr)
 solve e1 e2 quer g1 g2 = do
   G.display "before" wQuery
   let gr = fromGraph wQuery
   loop gr
   where
-    wQuery = equivProduct g1 g2 & ix (LocPair e1 e2) . instForm .~ quer
-    -- wQuery = prune $ equivProduct g1 g2 & ix (LocPair e1 e2) . instForm .~ quer
+    wQuery = prune $ equivProduct g1 g2 & ix (LocPair e1 e2) . instForm .~ quer
 
     equivProduct g1 g2 =
       cleanIntros (G.cartesianProductWith edgeMerge const LocPair vertMerge
-                   (G.mapEdge (LOnly . Leaf) g1)
-                   (G.mapEdge (ROnly . Leaf) g2))
+                           (G.mapEdge (LOnly . Leaf) g1)
+                           (G.mapEdge (ROnly . Leaf) g2))
 
     cleanIntros g =
       let es = g ^@.. G.iallEdges
@@ -53,4 +52,5 @@ solve e1 e2 quer g1 g2 = do
     edgeMerge e1 _ = e1
 
     vertMerge v1 v2 = case (v1, v2) of
-      (Inst i vs1 _, Inst j vs2 _) -> emptyInst (LocPair i j) (vs1 ++ vs2)
+      (Inst i vs1 _, Inst j vs2 _) ->
+        emptyInst (LocPair i j) (vs1 ++ vs2)

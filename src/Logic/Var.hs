@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, DeriveFunctor, DeriveTraversable #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Logic.Var where
 
 import           Control.Lens
@@ -10,10 +10,13 @@ import qualified Data.Map as M
 import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Text.Prettyprint.Doc
+import           Data.List (intercalate)
+import           Data.List.Split (splitOn)
 
 import           Logic.Type (Type, Typed)
 import qualified Logic.Type as T
-import           Logic.Name
+
+import           Text.Read (readMaybe)
 
 data Loc
   = Loc Integer
@@ -31,49 +34,73 @@ instance Ord Loc where
 
 instance Pretty Loc where
   pretty (Loc i) = pretty i
-  pretty (LocPair i j) = pretty "{" <> pretty i <> pretty "," <> pretty j <> pretty "}"
+  pretty (LocPair i j) = pretty "{" <> pretty i <> pretty "." <> pretty j <> pretty "}"
   pretty Terminus = pretty "END"
 
-data Var n
+data FreeV = FreeV
+  { freeVName :: [String]
+  , freeVLoc :: Integer
+  , freeVNew :: Bool
+  } deriving (Show, Read, Eq, Ord, Data)
+makeLenses ''FreeV
+
+data Var
   = Bound Integer Type
-  | Free n Type
-  deriving (Show, Read, Eq, Ord, Data, Functor, Foldable, Traversable)
+  | Free FreeV Type
+  deriving (Show, Read, Eq, Ord, Data)
 makePrisms ''Var
 
-instance Typed (Var n)
+instance Typed Var
   where typeOf (Bound _ t) = t
         typeOf (Free _ t) = t
 
-instance Name n => Pretty (Var n)
+instance Pretty Var
   where pretty = pretty . varName
 
 -- | A name for the variable. If the variable is bound, it is a textual
 -- representation of the index. Otherwise, it is just the variable name.
-varName :: Name n => Var n -> String
+varName :: Var -> String
 varName (Bound i _) = "!" ++ show i
-varName (Free n _) = name # n
+varName (Free n _) = showFreeV n
+
+parseFreeV :: String -> FreeV
+parseFreeV n =
+  let (n', b) = case n of
+       '#':rest -> (rest, True)
+       _ -> (n, False)
+      ws = splitOn "/" n'
+  in
+  case readMaybe (last ws) of
+    Just n  -> FreeV (init ws) n b
+    Nothing -> FreeV ws 0 b
+
+showFreeV :: FreeV -> String
+showFreeV (FreeV n l nw) = (if nw then "#" else "") ++ intercalate "/" (n ++ [show $ pretty l])
 
 -- | A traversal which targets all of the variables in a given expression.
-vars :: (Name n, Data a) => Traversal' a (Var n)
+vars :: Data a => Traversal' a Var
 vars = biplate
 
 -- | Perform substitution over the variables in the expression. If a given
 -- variable does not appear in the mapping, it is left untouched.
-subst :: (Name n, Data a) => Map (Var n) (Var n) -> a -> a
+subst :: Data a => Map Var Var -> a -> a
 subst m = over vars (\v -> M.findWithDefault v v m)
 
+mapVars :: Data a => (Var -> Var) -> a -> a
+mapVars = over vars
+
 -- | The set of all variables in the expression.
-varSet :: (Name n, Data a) => a -> Set (Var n)
+varSet :: Data a => a -> Set Var
 varSet x = S.fromList (x ^.. vars)
 
 -- | Replace the variables in the structure by bound variables if they are in the list.
-abstract :: (Name n, Data a) => [Var n] -> a -> a
+abstract :: Data a => [Var] -> a -> a
 abstract vs f =
   let m = foldl (\(n, m') v -> (n + 1, M.insert v (Bound n (T.typeOf v)) m')) (0, M.empty) vs
   in subst (snd m) f
 
 -- | Replace bound variables in the structure by those in the list.
-instantiate :: (Name n, Data a) => [Var n] -> a -> a
+instantiate :: Data a => [Var] -> a -> a
 instantiate vs =
   let ts = map T.typeOf vs
       bs = zipWith Bound [0..] ts

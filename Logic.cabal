@@ -19,7 +19,6 @@ library
                      , Logic.Var
                      , Logic.Type
                      , Logic.Model
-                     , Logic.Name
                      , Logic.Chc
                      , Logic.ImplicationGraph
                      , Logic.ImplicationGraph.Chc

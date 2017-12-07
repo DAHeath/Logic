@@ -10,19 +10,18 @@ import           Data.Text.Prettyprint.Doc hiding ((<>))
 import           Logic.Formula
 import           Logic.Model
 import           Logic.Var
-import           Logic.Name
 import qualified Logic.Type as T
 
-data Chc n
-  = Rule [App n] (Form n) (App n)
-  | Query [App n] (Form n) (Form n)
+data Chc
+  = Rule [App] Form App
+  | Query [App] Form Form
   deriving (Show, Eq, Ord, Data)
 
-data App n = App { appOperator :: Var n, appOperands :: [Var n] }
+data App = App { appOperator :: Var, appOperands :: [Var] }
   deriving (Show, Eq, Ord, Data)
 
-mkApp :: Name n => n -> [Var n] -> App n
-mkApp n vs = App (Free n (T.curryType (map T.typeOf vs) T.Bool)) vs
+mkApp :: String -> [Var] -> App
+mkApp n vs = App (Free (FreeV [n] 0 False) (T.curryType (map T.typeOf vs) T.Bool)) vs
 
 instance Formulaic Chc where
   toForm (Rule lhs phi rhs) = app2 Impl (manyAnd (map toForm lhs ++ [phi])) (toForm rhs)
@@ -31,39 +30,39 @@ instance Formulaic Chc where
 instance Formulaic App where
   toForm (App rel vs) = appMany (V rel) (map V vs)
 
-chcContext :: Name n => Chc n -> Form n
+chcContext :: Chc -> Form
 chcContext (Rule _ ctx _) = ctx
 chcContext (Query _ ctx rhs) = ctx <> mkNot rhs
 
-chcLhs :: Chc n -> [App n]
+chcLhs :: Chc -> [App]
 chcLhs (Rule lhs _ _) = lhs
 chcLhs (Query lhs _ _) = lhs
 
-chcBindings :: Chc n -> [Var n]
+chcBindings :: Chc -> [Var]
 chcBindings (Rule _ _ rhs) = appOperands rhs
 chcBindings Query{} = []
 
-predicates :: Chc n -> [Var n]
+predicates :: Chc -> [Var]
 predicates (Rule lhs _ rhs) = map appOperator (lhs ++ [rhs])
 predicates (Query lhs _ _) = map appOperator lhs
 
-applyChc :: Name n => (App n -> Form n) -> Chc n -> Form n
+applyChc :: (App -> Form) -> Chc -> Form
 applyChc f = \case
   Query lhs ctx rhs -> app2 Impl (manyAnd (ctx : map f lhs)) rhs
   Rule  lhs ctx rhs -> app2 Impl (manyAnd (ctx : map f lhs)) (f rhs)
 
-isQuery :: Chc n -> Bool
+isQuery :: Chc -> Bool
 isQuery Query{} = True
 isQuery _ = False
 
-instance Name n => Pretty (Chc n) where
+instance Pretty Chc where
   pretty (Rule as f h)  = sep (map pretty as ++ [pretty f, pretty "=>", pretty h])
   pretty (Query as f h) = sep (map pretty as ++ [pretty f, pretty "=>", pretty h])
 
-instance Name n => Pretty (App n) where
+instance Pretty App where
   pretty a = braces (sep
     (pretty (varName (appOperator a)) : map pretty (appOperands a)))
 
-applyModelToApp :: Name n => Model n -> App n -> Form n
+applyModelToApp :: Model -> App -> Form
 applyModelToApp (Model m) (App fun vs) =
   instantiate vs ((\f -> M.findWithDefault (LBool False) f m) fun)

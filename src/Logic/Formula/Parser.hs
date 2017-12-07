@@ -18,37 +18,36 @@ import           Logic.Type (Type)
 import qualified Logic.Type as T
 import           Logic.Formula
 import           Logic.Var
-import           Logic.Name
 import           Logic.Chc
 
 lexeme :: Stream s m Char => ParsecT s u m b -> ParsecT s u m b
 lexeme p = do { x <- p; spaces; return x  }
 
-parseForm :: Name n => CharParser st (Form n)
+parseForm :: CharParser st Form
 parseForm = ex1
 
-ex1 :: Name n => CharParser st (Form n)
+ex1 :: CharParser st Form
 ex1 = ex2 `chainl1` impop
 
-ex2 :: Name n => CharParser st (Form n)
+ex2 :: CharParser st Form
 ex2 = ex3 `chainl1` (op "||" >> return (\x y -> manyOr [x, y]))
 
-ex3 :: Name n => CharParser st (Form n)
+ex3 :: CharParser st Form
 ex3 = ex4 `chainl1` (op "&&" >> return (\x y -> manyAnd [x, y]))
 
-ex4 :: Name n => CharParser st (Form n)
+ex4 :: CharParser st Form
 ex4 = ex6 `chainl1` compareop
 
-ex6 :: Name n => CharParser st (Form n)
+ex6 :: CharParser st Form
 ex6 = ex7 `chainl1` addop
 
-ex7 :: Name n => CharParser st (Form n)
+ex7 :: CharParser st Form
 ex7 = exInf `chainl1` mulop
 
-exInf :: Name n => CharParser st (Form n)
+exInf :: CharParser st Form
 exInf = atom
 
-atom :: Name n => CharParser st (Form n)
+atom :: CharParser st Form
 atom = try app <|> nonapp
   where
     nonapp = parens parseForm <|> (V <$> try var) <|> bool <|> integer
@@ -68,12 +67,10 @@ atom = try app <|> nonapp
               let ts = map T.typeOf args
               return $ appMany (V $ Free n (T.curryType ts t)) args)
 
-pName :: Name n => CharParser st n
-pName = do
-  i <- ident
-  maybe (fail ("invalid identifier " ++ i)) return (i ^? name)
+pName :: CharParser st FreeV
+pName = parseFreeV <$> ident
 
-bool :: CharParser st (Form n)
+bool :: CharParser st Form
 bool = const (LBool True)  <$> res "true"
    <|> const (LBool False) <$> res "false"
 
@@ -90,16 +87,14 @@ typ = (do res "Arr"
   <|> (res "Real" >> return T.Real)
   <|> (res "Unit" >> return T.Unit)
 
-var :: Name n => CharParser st (Var n)
+var :: CharParser st Var
 var = do
-  i <- ident
+  n <- pName
   op ":"
   t <- typ
-  case i ^? name of
-    Nothing -> fail ("invalid identifier " ++ i)
-    Just n -> return $ Free n t
+  return $ Free n t
 
-impop, compareop, mulop, addop :: Name n => CharParser st (Form n -> Form n -> Form n)
+impop, compareop, mulop, addop :: CharParser st (Form -> Form -> Form)
 
 impop = (op "<->" >> return (app2 Iff))
     <|> (op "->"  >> return (app2 Impl))
@@ -118,13 +113,13 @@ mulop = (op "*" >> return (app2 $ Mul T.Int))
 addop = (op "+" >> return (app2 $ Add T.Int))
     <|> (op "-" >> return (app2 $ Sub T.Int))
 
-integer :: Name n => CharParser st (Form n)
+integer :: CharParser st Form
 integer = lexeme $ do { ds <- many1 digit ; return $ LInt (read ds) }
 
-parseChc :: Name n => CharParser st [Chc n]
+parseChc :: CharParser st [Chc]
 parseChc = many parseChc'
   where
-    parseChc' :: Name n => CharParser st (Chc n)
+    parseChc' :: CharParser st Chc
     parseChc' = do
       (as, f) <- lhs
       op "=>"
@@ -133,13 +128,13 @@ parseChc = many parseChc'
         Left a  -> return $ Rule as f a
         Right q -> return $ Query as f q
 
-    lhs :: Name n => CharParser st ([App n], Form n)
+    lhs :: CharParser st ([App], Form)
     lhs = (,) <$> many app <*> (try parseForm <|> return (LBool True))
 
-    rhs :: Name n => CharParser st (Either (App n) (Form n))
+    rhs :: CharParser st (Either App Form)
     rhs = (Left <$> app) <|> (Right <$> parseForm)
 
-    app :: Name n => CharParser st (App n)
+    app :: CharParser st App
     app = braces $ do n <- pName
                       args <- many var
                       let ts = map T.typeOf args
@@ -162,15 +157,15 @@ promote par (file, line, col) s =
            return x
 
 form :: QuasiQuoter
-form = QuasiQuoter { quoteExp = quoteFormExp (parseForm :: CharParser st (Form BasicName))
-                   , quotePat = quoteFormPat (parseForm :: CharParser st (Form BasicName))
+form = QuasiQuoter { quoteExp = quoteFormExp parseForm
+                   , quotePat = quoteFormPat parseForm
                    , quoteType = undefined
                    , quoteDec = undefined
                    }
 
 chc :: QuasiQuoter
-chc = QuasiQuoter { quoteExp = quoteFormExp (parseChc :: CharParser st [Chc BasicName])
-                  , quotePat = quoteFormPat (parseChc :: CharParser st [Chc BasicName])
+chc = QuasiQuoter { quoteExp = quoteFormExp parseChc
+                  , quotePat = quoteFormPat parseChc
                   , quoteType = undefined
                   , quoteDec = undefined
                   }
@@ -188,10 +183,10 @@ quoteFormExp par s = do pos <- thPos
                         ex <- promote par pos s
                         dataToExpQ (const Nothing `extQ` metaExp) ex
 
-metaExp :: Form BasicName -> Maybe TH.ExpQ
+metaExp :: Form -> Maybe TH.ExpQ
 metaExp (V (Free n _))
-  | head (name # n) == '$' = Just [| $(TH.varE (TH.mkName (tail $ name # n))) |]
-  | head (name # n) == '@' = Just [| V $ $(TH.varE (TH.mkName (tail $ name # n))) |]
+  | head (showFreeV n) == '$' = Just [| $(TH.varE (TH.mkName (tail $ showFreeV n))) |]
+  | head (showFreeV n) == '@' = Just [| V $ $(TH.varE (TH.mkName (tail $ showFreeV n))) |]
 metaExp _ = Nothing
 
 quoteFormPat :: Data a => CharParser () a -> String -> TH.PatQ
@@ -202,7 +197,7 @@ quoteFormPat par s = do pos <- thPos
 lexer :: T.GenTokenParser String u Identity
 lexer = T.makeTokenParser (emptyDef { T.identStart = letter <|> char '_' <|> char '$' <|> char '#'
                                     , T.identLetter = alphaNum
-                                                  <|> char '_' <|> char '/' <|> char '$' <|> char '\'' <|> char '#' <|> char '/'
+                                    <|> char '_' <|> char '/' <|> char '$' <|> char '\'' <|> char '#' <|> char '/' <|> char '{' <|> char '}' <|> char '.'
                                     , T.reservedOpNames = [ "->" , "<-" , "<->" , "=>"
                                                           , "||"
                                                           , "&&"
