@@ -78,10 +78,10 @@ unwindAll bes ind end g =
                            & G.reached i'       -- the subgraph reached by the start of the backedge...
                            & G.idxs             -- contains no inductive indices
                            & none (`elem` ind)))
-  in g & flip (foldr unwind) relevantBes                  -- unwind all the relevant backedges
-       & G.ifilterEdges (\i _ -> i `notElem` map fst bes) -- filter out the old backedges
-       & reachEndWithoutBackedge                          -- select the portion which reaches the query
-       & relabel (Idx 0) & snd                            -- relabel to account for discarded indices
+  in g & flip (foldr unwind) relevantBes                          -- unwind all the relevant backedges
+       & G.ifilterEdges (\i _ -> i `notElem` map fst relevantBes) -- filter out the old backedges
+       & reachEndWithoutBackedge                                  -- select the portion which reaches the query
+       & relabel (Idx 0) & snd                                    -- relabel to account for discarded indices
   where
     reachEndWithoutBackedge g' =
       let compressed = g'        -- find the subgraph which...
@@ -122,4 +122,7 @@ relabel idx g = evalState (do
 
 -- | Find the end (query) of the graph
 end :: Ord i => Graph i e v -> i
-end g = maximum $ filter (\i -> lengthOf (G.edgesFrom i) g == 0) (G.idxs g) -- the query has no outgoing edges
+end g =
+  -- the query has no outgoing edges
+  maximum $ filter
+  (\i -> lengthOf (G.edgesFrom i) (G.withoutBackEdges g) == 0) (G.idxs g)

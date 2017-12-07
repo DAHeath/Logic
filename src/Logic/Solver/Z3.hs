@@ -23,6 +23,8 @@ import qualified Logic.Model as M
 
 import           Z3.Monad hiding (local)
 
+import Debug.Trace
+
 data Env n = Env { _envVars :: Map (Var n) AST
                  , _envFuns :: Map (Var n) FuncDecl
                  } deriving (Show, Eq, Ord)
@@ -336,7 +338,8 @@ astToForm arg = do
 varForName :: Name n => String -> Type -> Var n
 varForName n t = case n of
   '!' : n' -> Bound (read n') t
-  n' -> Free (fromJust $ n' ^? name) t
+  n' -> traceShow n' $
+    Free (fromJust $ n' ^? name) t
 
 typeToSort :: MonadZ3 z3 => Type -> z3 Sort
 typeToSort = \case

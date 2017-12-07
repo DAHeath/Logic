@@ -44,12 +44,16 @@ computeInd g i =
   (at i <?=) =<< -- find the answer and update the memoization table
     maybe
       (return False)    -- if there is no vertex, it is trivially not inductive
-      (\(Inst loc _ f) ->
-        let descs = descendantForms g loc i in
+      (\(Inst loc _ f) -> do
+        let descs = descendantForms g loc i
+        dcs <- manyAnd descs `Z3.entails` f
+        ip <- inductiveByPred g i
+        when (dcs && f /= LBool True) $ liftIO (putStrLn $ "ind by ent: " ++ show i)
+        when (ip && f /= LBool True) $ liftIO (putStrLn $ "ind by pred: " ++ show i)
         or <$> sequence                  -- this index is inductive if:
           [ return $ f == LBool True     --  it is trivially inductive
-          , manyAnd descs `Z3.entails` f --  a descendant at the same location entails it
-          , inductiveByPred g i          --  it's predecessors are inductive
+          , return dcs -- manyAnd descs `Z3.entails` f --  a descendant at the same location entails it
+          , return ip -- inductiveByPred g i          --  it's predecessors are inductive
           ]) (g ^. at i)
 
 inductiveByPred :: (Name n, MonadIO m, MonadState (Map Idx Bool) m)
@@ -87,8 +91,8 @@ loop :: (Name n, MonadIO m)
 loop = runExceptT . loop'
   where
     loop' g = do
-      G.display "step" g
-      _ <- liftIO getLine
+      -- G.display "step" g
+      -- _ <- liftIO getLine
       itp <- interpolate g                              -- interpolate
       indS <- inductive itp                             -- check inductiveness
       if end g `elem` indS                              -- if the query is inductive...

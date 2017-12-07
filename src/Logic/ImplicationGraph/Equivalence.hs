@@ -34,8 +34,8 @@ solve e1 e2 quer g1 g2 = do
   let gr = fromGraph wQuery
   loop gr
   where
-    -- wQuery = equivProduct g1 g2 & ix (LocPair e1 e2) . instForm .~ quer
-    wQuery = prune $ equivProduct g1 g2 & ix (LocPair e1 e2) . instForm .~ quer
+    wQuery = equivProduct g1 g2 & ix (LocPair e1 e2) . instForm .~ quer
+    -- wQuery = prune $ equivProduct g1 g2 & ix (LocPair e1 e2) . instForm .~ quer
 
     equivProduct g1 g2 =
       cleanIntros (G.cartesianProductWith edgeMerge const LocPair vertMerge
