@@ -18,7 +18,6 @@ import           Logic.Type (Type)
 import qualified Logic.Type as T
 import           Logic.Formula
 import           Logic.Var
-import           Logic.Name
 import           Logic.Chc
 
 lexeme :: Stream s m Char => ParsecT s u m b -> ParsecT s u m b
@@ -198,7 +197,7 @@ quoteFormPat par s = do pos <- thPos
 lexer :: T.GenTokenParser String u Identity
 lexer = T.makeTokenParser (emptyDef { T.identStart = letter <|> char '_' <|> char '$' <|> char '#'
                                     , T.identLetter = alphaNum
-                                                  <|> char '_' <|> char '/' <|> char '$' <|> char '\'' <|> char '#' <|> char '/'
+                                    <|> char '_' <|> char '/' <|> char '$' <|> char '\'' <|> char '#' <|> char '/' <|> char '{' <|> char '}' <|> char '.'
                                     , T.reservedOpNames = [ "->" , "<-" , "<->" , "=>"
                                                           , "||"
                                                           , "&&"

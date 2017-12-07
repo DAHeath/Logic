@@ -22,7 +22,6 @@ import           Data.Text.Prettyprint.Doc
 
 import           Logic.Formula
 import           Logic.Var
-import           Logic.Name
 import qualified Logic.Solver.Z3 as Z3
 import           Logic.ImplicationGraph.LTree
 

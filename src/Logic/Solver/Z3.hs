@@ -48,7 +48,7 @@ solveChc hcs = do
       rids' <- traverse mkStringSymbol rids
       zipWithM_ fixedpointAddRule forms rids'
 
-      let quers = [Free (FreeV ["x"] 0 False) T.Bool]
+      let quers = [Free (FreeV ["x"] (Loc 0) False) T.Bool]
       quers' <- traverse funcToDecl quers
       res <- fixedpointQueryRelations quers'
       case res of

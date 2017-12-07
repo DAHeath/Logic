@@ -14,7 +14,6 @@ import           Logic.ImplicationGraph.Safety
 import qualified Logic.Type as T
 import           Logic.Formula.Parser
 import           Logic.Var
-import           Logic.Name
 
 main :: IO ()
 main = do
@@ -27,9 +26,9 @@ main = do
       print . pretty . M.toList =<< collectAnswer r
 
 i0  = Free (FreeV ["i"] 0 False) T.Int
-n0  = Free (FreeV ["i"] 0 False) T.Int
+n0  = Free (FreeV ["n"] 0 False) T.Int
 i1  = Free (FreeV ["i"] 1 False) T.Int
-n1  = Free (FreeV ["i"] 1 False) T.Int
+n1  = Free (FreeV ["n"] 1 False) T.Int
 
 example :: Graph Loc Form Inst
 example = G.fromLists

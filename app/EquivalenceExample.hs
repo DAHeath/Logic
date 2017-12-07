@@ -9,7 +9,6 @@ import qualified Data.Set as S
 import           Data.Text.Prettyprint.Doc
 
 import           Logic.Var
-import           Logic.Name
 import           Logic.Formula
 import           Logic.Formula.Parser
 import qualified Logic.Type as T
@@ -81,33 +80,33 @@ import           Logic.ImplicationGraph.Equivalence
 --   , (G.HEdge (S.singleton (Loc 1)) (Loc 2), Edge [form|j:Int > m:Int && x/1:Int = c2:Int|] (M.fromList [(x, x')]))
 --   ]
 
-r1  = Free (NoAlias (Located 1 ["r"])) T.Int
-n1  = Free (NoAlias (Located 1 ["n"])) T.Int
+r1  = Free (FreeV ["r"] (Loc 1) False) T.Int
+n1  = Free (FreeV ["n"] (Loc 1) False) T.Int
 
-m1  = Free (NoAlias (Located 1 ["m"])) T.Int
-x1  = Free (NoAlias (Located 1 ["x"])) T.Int
-m2  = Free (NoAlias (Located 2 ["m"])) T.Int
-x2  = Free (NoAlias (Located 2 ["x"])) T.Int
+m1  = Free (FreeV ["m"] (Loc 1) False) T.Int
+x1  = Free (FreeV ["x"] (Loc 1) False) T.Int
+m2  = Free (FreeV ["m"] (Loc 2) False) T.Int
+x2  = Free (FreeV ["x"] (Loc 2) False) T.Int
 
-ad0 :: Graph Loc (Form BasicName) (Inst BasicName)
+ad0 :: Graph Loc Form Inst
 ad0 = G.fromLists
   [ (Loc 0, emptyInst (Loc 0) [])
   , (Loc 1, emptyInst (Loc 1) [n1, r1]) ]
-  [ (G.HEdge (S.singleton (Loc 0)) (Loc 1), [form|#v1/r:Int = #v1/n:Int - 9 * ((#v1/n:Int - 1) / 9)|]) ]
+  [ (G.HEdge (S.singleton (Loc 0)) (Loc 1), [form|#r/1:Int = #n/1:Int - 9 * ((#n/1:Int - 1) / 9)|]) ]
 
-ad1 :: Graph Loc (Form BasicName) (Inst BasicName)
+ad1 :: Graph Loc Form Inst
 ad1 = G.fromLists
   [ (Loc 0, emptyInst (Loc 0) [])
   , (Loc 1, emptyInst (Loc 1) [m1, x1])
   , (Loc 2, emptyInst (Loc 2) [m2, x2])
   ]
-  [ (G.HEdge (S.singleton (Loc 0)) (Loc 1), [form|#v1/x:Int = #v1/m:Int|])
-  , (G.HEdge (S.singleton (Loc 1)) (Loc 1), [form| v1/x:Int > 9
-                                                && #v1/x:Int = v1/x:Int / 10 + v1/x:Int % 10
-                                                && #v1/m:Int = v1/m:Int|])
-  , (G.HEdge (S.singleton (Loc 1)) (Loc 2), [form|v1/x:Int <= 9
-                                                && #v2/x:Int = v1/x:Int
-                                                && #v2/m:Int = v1/m:Int |])
+  [ (G.HEdge (S.singleton (Loc 0)) (Loc 1), [form|#x/1:Int = #m/1:Int|])
+  , (G.HEdge (S.singleton (Loc 1)) (Loc 1), [form| x/1:Int > 9
+                                                && #x/1:Int = x/1:Int / 10 + x/1:Int % 10
+                                                && #m/1:Int = m/1:Int|])
+  , (G.HEdge (S.singleton (Loc 1)) (Loc 2), [form|x/1:Int <= 9
+                                                && #x/2:Int = x/1:Int
+                                                && #m/2:Int = m/1:Int |])
   ]
 
 -- main :: IO ()
@@ -120,7 +119,8 @@ ad1 = G.fromLists
 
 main :: IO ()
 main = do
-  sol <- solve (Loc 1) (Loc 2) [form|v1/n:Int > 0 && v1/n:Int = v2/m:Int -> v2/x:Int = v1/r:Int|] ad0 ad1
+  sol <- solve (Loc 1) (Loc 2)
+    [form|n/{1.2}:Int > 0 && n/{1.2}:Int = m/{1.2}:Int -> x/{1.2}:Int = r/{1.2}:Int|] ad0 ad1
   case sol of
     Left e -> print (pretty e)
     Right m ->

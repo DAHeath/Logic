@@ -15,7 +15,6 @@ import           Data.Maybe (mapMaybe)
 import           Logic.Formula
 import           Logic.Model
 import           Logic.Var
-import           Logic.Name
 import qualified Logic.Solver.Z3 as Z3
 import           Logic.ImplicationGraph
 import           Logic.ImplicationGraph.Chc
@@ -93,3 +92,20 @@ loop =
       then return itp                                   -- we're done
       else loop' (unwindAll (backs g) indS (end g) itp) -- otherwise unwind and repeat
     backs = concatMap (\(i, e) -> map ((,) i) (noBr e)) . G.backEdges
+
+-- instanceVars :: ImplGr -> ImplGr
+-- instanceVars g =
+--   let o = G.order g
+--   in
+--   G.imapEdge (\(G.HEdge is i) e ->
+--     let startLocs = M.fromList $ map (\i' -> (g ^?! ix i' . instLoc, i')) (S.toList is)
+--         endLoc = M.fromList [g ^?! ix i . instLoc, i]
+--     in mapVars (\case
+--         Free (FreeV n loc False) t ->
+--           let loc' = M.findWithDefault (loc+o) loc startLocs
+--           in Free (FreeV n loc' False) t
+--         Free (FreeV n loc True) t ->
+--           let loc' = M.findWithDefault (loc+o) loc endLoc
+--           in Free (FreeV n loc' False) t
+--         Bound b t -> Bound b t)) g
+--     -- mapVars (

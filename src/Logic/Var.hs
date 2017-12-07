@@ -17,6 +17,10 @@ import           Logic.Type (Type, Typed)
 import qualified Logic.Type as T
 
 import           Text.Read (readMaybe)
+import           Text.Parsec
+import           Text.ParserCombinators.Parsec.Char
+import qualified Text.Parsec.Token as T
+import           Text.Parsec.Language (emptyDef)
 
 data Loc
   = Loc Integer
@@ -34,12 +38,26 @@ instance Ord Loc where
 
 instance Pretty Loc where
   pretty (Loc i) = pretty i
-  pretty (LocPair i j) = pretty "{" <> pretty i <> pretty "," <> pretty j <> pretty "}"
+  pretty (LocPair i j) = pretty "{" <> pretty i <> pretty "." <> pretty j <> pretty "}"
   pretty Terminus = pretty "END"
+
+parseLoc :: String -> Maybe Loc
+parseLoc = either (const Nothing) Just . parse loc ""
+  where
+    loc = (do char '{'
+              l1 <- loc
+              char '.'
+              l2 <- loc
+              char '}'
+              return (LocPair l1 l2))
+        <|> Loc <$> integer
+        <|> Terminus <$ string "END"
+    lexer = T.makeTokenParser emptyDef
+    integer = T.integer lexer
 
 data FreeV = FreeV
   { freeVName :: [String]
-  , freeVId :: Integer
+  , freeVLoc :: Loc
   , freeVNew :: Bool
   } deriving (Show, Read, Eq, Ord, Data)
 makeLenses ''FreeV
@@ -70,12 +88,12 @@ parseFreeV n =
        _ -> (n, False)
       ws = splitOn "/" n'
   in
-  case readMaybe (last ws) of
+  case parseLoc (last ws) of
     Just n  -> FreeV (init ws) n b
-    Nothing -> FreeV ws 0 b
+    Nothing -> FreeV ws (Loc 0) b
 
 showFreeV :: FreeV -> String
-showFreeV (FreeV n l nw) = (if nw then "#" else "") ++ intercalate "/" (n ++ [show l])
+showFreeV (FreeV n l nw) = (if nw then "#" else "") ++ intercalate "/" (n ++ [show $ pretty l])
 
 -- | A traversal which targets all of the variables in a given expression.
 vars :: Data a => Traversal' a Var

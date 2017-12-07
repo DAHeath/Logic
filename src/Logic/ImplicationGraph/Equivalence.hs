@@ -34,13 +34,13 @@ solve e1 e2 quer g1 g2 = do
   let gr = fromGraph wQuery
   loop gr
   where
-    -- wQuery = equivProduct g1 g2 & ix (LocPair e1 e2) . instForm .~ quer
-    wQuery = prune $ equivProduct g1 g2 & ix (LocPair e1 e2) . instForm .~ quer
+    wQuery = equivProduct g1 g2 & ix (LocPair e1 e2) . instForm .~ quer
 
     equivProduct g1 g2 =
-      cleanIntros (G.cartesianProductWith edgeMerge const LocPair vertMerge
-                   (G.mapEdge (LOnly . Leaf) g1)
-                   (G.mapEdge (ROnly . Leaf) g2))
+      let g = cleanIntros (G.cartesianProductWith edgeMerge const LocPair vertMerge
+                           (G.mapEdge (LOnly . Leaf) g1)
+                           (G.mapEdge (ROnly . Leaf) g2))
+      in G.imapEdge (edgeVarLocAugment g) g
 
     cleanIntros g =
       let es = g ^@.. G.iallEdges
@@ -53,4 +53,27 @@ solve e1 e2 quer g1 g2 = do
     edgeMerge e1 _ = e1
 
     vertMerge v1 v2 = case (v1, v2) of
-      (Inst i vs1 _, Inst j vs2 _) -> emptyInst (LocPair i j) (vs1 ++ vs2)
+      (Inst i vs1 _, Inst j vs2 _) ->
+        emptyInst (LocPair i j) (vs1 ++ vs2) & vars %~ setLoc (LocPair i j)
+
+    setLoc l = mapLoc (const l)
+
+    mapLoc f = \case
+      Free (FreeV n l b) t -> Free (FreeV n (f l) b) t
+      Bound n t -> Bound n t
+
+    edgeVarLocAugment :: Graph Loc (LTree Form) Inst -> G.HEdge Loc -> LTree Form -> LTree Form
+    edgeVarLocAugment g (G.HEdge is i) e =
+      let e' = if null is
+               then e & vars %~ setLoc (g ^?! ix i . instLoc)
+               else case (S.findMin is, i) of
+                 (LocPair i j, LocPair i' j') ->
+                   if i == i'
+                   then e & vars %~ mapLoc (LocPair i)
+                   else e & vars %~ mapLoc (`LocPair` j)
+          -- the variables which are not mentioned in the edge
+          absentVars = S.fromList (g ^?! ix i . instVars) `S.difference` varSet e'
+          inInc = S.fromList $ concatMap (\i -> g ^?! ix i . instVars) (S.toList is)
+          toReassign = absentVars `S.intersection` inInc
+      in
+      e'
