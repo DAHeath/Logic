@@ -12,7 +12,7 @@ import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Graph.Extras as G
 
 import           Logic.Formula.Parser
-import           Logic.Formula hiding (If)
+import           Logic.Formula
 import           Logic.Var
 import qualified Logic.Type as T
 import           Logic.ImplicationGraph
@@ -23,7 +23,7 @@ import qualified Language.Unstructured as U
 
 data Com
   = Var := Form
-  | If Form Imp Imp
+  | Br Form Imp Imp
   | While Form Imp
   | Call ProcName [Form] [Var]
   deriving (Show, Read, Eq, Ord, Data)
@@ -37,6 +37,15 @@ data Program =
   { _entryPoint :: ProcName
   , _procedures :: Map ProcName ([Var], [Var], Imp)
   } deriving (Show, Read, Eq, Ord, Data)
+
+singleProc :: ProcName -> [Var] -> [Var] -> Imp -> Program
+singleProc pn inp out instrs = Program
+  { _entryPoint = pn
+  , _procedures = M.singleton pn (inp, out, instrs)
+  }
+
+singleNonRec :: Imp -> Program
+singleNonRec = singleProc "" [] []
 
 impGraph :: Program -> Graph Loc Edge Inst
 impGraph = U.impGraph . compile
@@ -55,7 +64,7 @@ proc cs = concat (evalState (mapM comp cs) 0) ++ [(U.Done, vs')]
       v := f -> do
         _ <- inc
         return [(v U.:= f, vs)]
-      If c cs1 cs2 -> do
+      Br c cs1 cs2 -> do
         _ <- inc
         cs2' <- compM cs2
         l1 <- inc
@@ -75,51 +84,51 @@ proc cs = concat (evalState (mapM comp cs) 0) ++ [(U.Done, vs')]
     compM = fmap concat . mapM comp
     inc = modify (+1) >> get
 
-x = Var ["x"] 0 False T.Int
-n = Var ["n"] 0 False T.Int
-r = Var ["r"] 0 False T.Int
+-- x = Var ["x"] 0 False T.Int
+-- n = Var ["n"] 0 False T.Int
+-- r = Var ["r"] 0 False T.Int
 
-prog1 :: Imp
-prog1 =
-  [
-    (If [form|x:Int >= n:Int|]
-      [ (x := [form|x:Int + 1|], [x,n]) ]
-      [ (x := [form|x:Int + 2|], [x,n]) ]
-        , [x, n])
-  ]
+-- prog1 :: Imp
+-- prog1 =
+--   [
+--     (Br [form|x:Int >= n:Int|]
+--       [ (x := [form|x:Int + 1|], [x,n]) ]
+--       [ (x := [form|x:Int + 2|], [x,n]) ]
+--         , [x, n])
+--   ]
 
-prog2 :: Imp
-prog2 =
-  [
-    (x := [form|0|], [])
-    , (While [form|x:Int < n:Int|]
-        [ (x := [form|x:Int + 2|], [x,n]) ]
-      , [x,n])
+-- prog2 :: Imp
+-- prog2 =
+--   [
+--     (x := [form|0|], [])
+--     , (While [form|x:Int < n:Int|]
+--         [ (x := [form|x:Int + 2|], [x,n]) ]
+--       , [x,n])
 
-  ]
+--   ]
 
-f :: Program
-f = Program
-  { _entryPoint = "f"
-  , _procedures =
-      M.singleton "f" ([n, x], [r],
-        [ ( If [form|n:Int <= 0|]
-               [ (r := [form|x:Int|], [r,n,x]) ]
-               [ (Call "f" [[form|n:Int - 1|], [form|x:Int + n:Int|]] [r], [r,n,x]) ]
-          , [r,n,x]) ])
-  }
+-- f :: Program
+-- f = Program
+--   { _entryPoint = "f"
+--   , _procedures =
+--       M.singleton "f" ([n, x], [r],
+--         [ ( Br [form|n:Int <= 0|]
+--                [ (r := [form|x:Int|], [r,n,x]) ]
+--                [ (Call "f" [[form|n:Int - 1|], [form|x:Int + n:Int|]] [r], [r,n,x]) ]
+--           , [r,n,x]) ])
+--   }
 
-loop :: Program
-loop = Program
-  { _entryPoint = "loop"
-  , _procedures =
-    M.singleton "loop" ([], [],
-      [ ( x := [form|0|], [x, n] )
-      , ( While [form|x:Int < n:Int|]
-          [ (x := [form|x:Int + 2|], [x, n])
-          ], [x,n])
-      ])
-  }
+-- loop :: Program
+-- loop = Program
+--   { _entryPoint = "loop"
+--   , _procedures =
+--     M.singleton "loop" ([], [],
+--       [ ( x := [form|0|], [x, n] )
+--       , ( While [form|x:Int < n:Int|]
+--           [ (x := [form|x:Int + 2|], [x, n])
+--           ], [x,n])
+--       ])
+--   }
 
 -- prog :: Imp
 -- prog =

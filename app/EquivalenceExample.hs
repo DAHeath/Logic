@@ -28,21 +28,15 @@ m1  = Var ["m"] 1 False T.Int
 x1  = Var ["x"] 1 False T.Int
 
 ad0 :: Program
-ad0 = Program
-  { _entryPoint = "f"
-  , _procedures = M.singleton "f" ([], [],
-    [ (r0 := [form|n:Int - 9 * ((n:Int - 1) / 9)|], [r0, n0]) ])
-  }
+ad0 = singleNonRec
+  [ (r0 := [form|n:Int - 9 * ((n:Int - 1) / 9)|], [r0, n0]) ]
 
 ad1 :: Program
-ad1 = Program
-  { _entryPoint = "f"
-  , _procedures = M.singleton "f" ([], [],
-    [ (x0 := [form|m:Int|], [x0, m0])
-    , (While [form|x:Int > 9|]
-        [ (x0 := [form|x:Int / 10 + x:Int % 10|], [x0, m0]) ], [x0, m0])
-    ])
-  }
+ad1 = singleNonRec
+  [ (x0 := [form|m:Int|], [x0, m0])
+  , (While [form|x:Int > 9|]
+      [ (x0 := [form|x:Int / 10 + x:Int % 10|], [x0, m0]) ], [x0, m0])
+  ]
 
 main :: IO ()
 main = do

@@ -1,83 +1,41 @@
 {-# LANGUAGE QuasiQuotes #-}
-import           Control.Lens
-
-import           Data.Optic.Directed.HyperGraph (Graph)
-import qualified Data.Optic.Directed.HyperGraph as G
 import qualified Data.Optic.Graph.Extras as G
-import qualified Data.Map as M
-import qualified Data.Set as S
 import           Data.Text.Prettyprint.Doc
 
 import           Logic.Var
-import           Logic.Formula
 import           Logic.Formula.Parser
 import qualified Logic.Type as T
-import           Logic.ImplicationGraph
 import           Logic.ImplicationGraph.Equivalence
+import           Logic.ImplicationGraph.Simplify
 
-a1 = Free (FreeV ["a"] 1 False) T.Int
-r1 = Free (FreeV ["r"] 1 False) T.Int
-a2 = Free (FreeV ["a"] 2 False) T.Int
-r2 = Free (FreeV ["r"] 2 False) T.Int
+import           Language.Structured
 
-rec :: Graph Loc Form Inst
-rec = G.fromLists
-  [ (Loc 0, emptyInst (Loc 0) [])
-  , (Loc 1, emptyInst (Loc 1) [a1, r1])
-  , (Loc 2, emptyInst (Loc 2) [a2, r2])
-  ]
-  [ (G.HEdge (S.singleton (Loc 0)) (Loc 1), [form|#a/1:Int <= 0
-                                               && #r/1:Int = 0|])
-  , (G.HEdge (S.fromList [Loc 0, Loc 1]) (Loc 1), [form|#a/1:Int > 0
-                                                     &&  a/1:Int = #a/1:Int - 1
-                                                     && #r/1:Int = #a/1:Int + r/1:Int|])
-  , (G.HEdge (S.singleton (Loc 1)) (Loc 2), [form|#a/2:Int = a/1:Int
-                                               && #r/2:Int = r/1:Int|])
-  ]
-
-x1 = Free (FreeV ["x"] 1 False) T.Int
-s1 = Free (FreeV ["s"] 1 False) T.Int
-p1 = Free (FreeV ["p"] 1 False) T.Int
-s2 = Free (FreeV ["s"] 2 False) T.Int
-p2 = Free (FreeV ["p"] 2 False) T.Int
-
-loop :: Graph Loc Form Inst
-loop = G.fromLists
-  [ (Loc 0, emptyInst (Loc 0) [])
-  , (Loc 1, emptyInst (Loc 1) [p1, x1, s1])
-  , (Loc 2, emptyInst (Loc 2) [p2, s2])
-  ]
-  [ (G.HEdge (S.singleton (Loc 0)) (Loc 1), [form|#p/1:Int = #x/1:Int
-                                               && #s/1:Int = 0|])
-  , (G.HEdge (S.singleton (Loc 1)) (Loc 1), [form| x/1:Int > 0
-                                               && #p/1:Int = p/1:Int
-                                               && #s/1:Int = s/1:Int + x/1:Int
-                                               && #x/1:Int = x/1:Int - 1 |])
-  , (G.HEdge (S.singleton (Loc 1)) (Loc 2), [form| x/1:Int <= 0
-                                               && #p/2:Int = p/1:Int
-                                               && #s/2:Int = s/1:Int |])
-  ]
-
-main :: IO ()
-main = do
-  G.display "rec" rec
-  G.display "loop" loop
-  sol <- solve (Loc 2) (Loc 2)
-    [form|a/2:Int = p/2:Int -> r/2:Int = s/2:Int|] rec loop
-  case sol of
-    Left e -> print (pretty e)
-    Right m ->
-      G.display "sol" m
-
+p, s, n, m, a, r :: Var
+p = Var ["p"] 0 False T.Int
+s = Var ["s"] 0 False T.Int
+n = Var ["n"] 0 False T.Int
+m = Var ["m"] 0 False T.Int
+a = Var ["a"] 0 False T.Int
+r = Var ["r"] 0 False T.Int
 
 -- int f(int n) {
---  sum = 0;
+--   sum = 0;
 --   while (n>0){
---      sum = sum+n
---         n --;
---           }
---           return sum
---         }
+--     sum = sum+n
+--     n --;
+--   }
+--   return sum
+-- }
+f :: Program
+f = singleNonRec
+  [ (s := [form|0|], [p,s,n])
+  , (n := [form|p:Int|], [p,s,n])
+  , ( While [form|n:Int > 0|]
+        [ (s := [form|s:Int + n:Int|], [p,s,n])
+        , (n := [form|n:Int - 1|], [p,s,n])
+        ]
+    , [p,s,n])
+  ]
 
 -- int g(int n,int acc){
 --   if (n<=0){return acc}
@@ -85,3 +43,22 @@ main = do
 --        return g(n-1,acc+n)
 --        }
 --        }
+g :: Program
+g = singleProc "g" [m, a] [r]
+  [ (Br [form|m:Int <= 0|]
+      [ (r := [form|a:Int|], [m, a, r]) ]
+      [ (Call "g" [ [form|m:Int - 1|], [form|a:Int + m:Int|] ] [r], [m, a, r]) ]
+    , [m, a, r])
+  ]
+
+main :: IO ()
+main = do
+  let fg = prune $ impGraph f
+      gg = prune $ impGraph g
+  G.display "f" fg
+  G.display "g" gg
+  sol <- solve [form|p/6:Int = m/4:Int -> (s/6:Int + a/4:Int = r/4:Int)|] fg gg
+  case sol of
+    Left e -> print (pretty e)
+    Right sol' ->
+      G.display "sol" sol'
