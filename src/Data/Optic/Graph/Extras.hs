@@ -24,8 +24,8 @@ display fn g = do
         "mingw32" -> "start"
         "linux"   -> "xdg-open"
         _         -> "open"
-  liftIO $ writeFile fn txt
-  let fn' = Turtle.fromString fn
+  liftIO $ writeFile (fn ++ ".dot") txt
+  let fn' = Turtle.fromString (fn ++ ".dot")
   _ <- Turtle.shell ("dot -Tpdf " <> fn' <> "> " <> fn' <> ".pdf") Turtle.empty
   _ <- Turtle.shell (cmdopen <> " " <> fn' <> ".pdf") Turtle.empty
   return ()

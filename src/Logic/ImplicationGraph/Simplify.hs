@@ -13,8 +13,6 @@ import           Logic.Var
 import           Logic.ImplicationGraph
 import           Logic.ImplicationGraph.LTree as L
 
-import Debug.Trace
-
 -- | Finds irreducible vertices in a given `ImplGr`.
 irreducible :: (Ord i) => Graph i e v -> [i]
 irreducible graph = queryIndex : loopHeaders where
@@ -44,8 +42,12 @@ disj = mkOr
 
 conjunction :: Edge -> Edge -> Edge
 conjunction e1 e2 =
-  let inc = foldl1 disj (toList e1)
-  in fmap (conj inc) e2
+  case e2 of
+    Leaf f -> fmap (conj f) e1 -- preserve the structure of the incoming edge if
+                               -- the outgoing edge has no structure
+    e2' ->
+      let inc = foldl1 disj (toList e1)
+      in fmap (conj inc) e2
 
 disjunction :: Edge -> Edge -> Edge
 disjunction = L.unionWith disj
@@ -62,13 +64,11 @@ prune graph =
       (G.HEdge ((s2 S.\\ S.singleton e1) `S.union` s1) e2) $ conjunction f1 f2
 
   newEdges i g =
-    trace (show i ++ concatMap (show . pretty) (g ^.. G.iedgesTo i)) $
     cartesianProduct andEdge
       ((toListOf $ G.iedgesTo   i . withIndex) g)
       ((toListOf $ G.iedgesFrom i . withIndex) g)
 
-  removeVertex i g = trace ("removing " ++ show i) $
-    foldr ($) (G.delIdx i g) $ newEdges i g
+  removeVertex i g = foldr ($) (G.delIdx i g) $ newEdges i g
 
   reducible = filter (not . flip elem (irreducible graph)) $ G.idxs graph
 

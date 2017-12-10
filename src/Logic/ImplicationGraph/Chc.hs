@@ -5,6 +5,7 @@ import           Control.Lens
 import           Control.Monad.State
 import           Control.Monad.Except
 
+import           Data.Foldable (toList)
 import           Data.Data (Data)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -27,7 +28,7 @@ import qualified Logic.Solver.Z3 as Z3
 interpolate :: (MonadError Model m, MonadIO m)
             => ImplGr -> m ImplGr
 interpolate g = do
-  let g' = G.withoutBackEdges (G.mapEdge point g)
+  let g' = G.withoutBackEdges (G.mapEdge toList g)
   sol <- interp (G.reaches (end g') g')
   let vs = sol ^@.. G.iallVerts
   return $ foldr (\(i', v') g' -> G.addVert i' v' g') g vs
@@ -37,8 +38,8 @@ interpolate g = do
       (`applyModel` g') <$> Z3.solveChc (implGrChc g')
 
 -- | Convert the forward edges of the graph into a system of Constrained Horn Clauses.
-implGrChc :: Graph Idx Form Inst -> [Chc]
-implGrChc g = map rule topConns
+implGrChc :: Graph Idx [Form] Inst -> [Chc]
+implGrChc g = concatMap rules topConns
   where
     topConns = -- to find the graph connections in topological order...
       (g & G.itopEdge                                  -- for each edge...
@@ -48,8 +49,10 @@ implGrChc g = map rule topConns
       where
         inspect i = (i, g ^?! ix i)
 
+    rules (e, fs) = map (rule e) fs
+
     -- each hypergraph connection converts to a Horn Clause.
-    rule (G.HEdge lhs (i, v), f) =
+    rule (G.HEdge lhs (i, v)) f =
       let lhs' = map buildRel (S.toList lhs)
       in case lengthOf (G.iedgesFrom i) g of
         -- If the target vertex has no successors, then it's a query
@@ -72,7 +75,7 @@ implGrChc g = map rule topConns
       mkApp ("r" ++ show i) (v ^. instVars)
 
 -- | Augment the fact at each vertex in the graph by the fact in the model.
-applyModel :: Model -> Graph Idx Form Inst -> Graph Idx Form Inst
+applyModel :: Model -> Graph Idx e Inst -> Graph Idx e Inst
 applyModel model = G.imapVert applyInst
   where
     applyInst i v =

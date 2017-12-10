@@ -23,30 +23,45 @@ import           Logic.ImplicationGraph.Simplify
 -- | Repeatedly unwind the program until a counterexample is found or inductive
 -- invariants are found.
 solve :: MonadIO m
-      => Loc
-      -> Loc
-      -> Form
+      => Form
       -> Graph Loc Form Inst
       -> Graph Loc Form Inst
       -> m (Either Model ImplGr)
-solve e1 e2 quer g1 g2 = do
-  G.display "before" wQuery
-  let gr = fromGraph wQuery
-  loop gr
+solve quer g1 g2 = loop $ fromGraph wQuery
   where
-    wQuery = prune $ equivProduct g1 g2 & ix (LocPair e1 e2) . instForm .~ quer
+    e1 = end g1
+    e2 = end g2
+    wQuery =
+      let g = equivProduct (prepare g1) (prepare g2)
+          vs' = g ^?! ix (LocPair e1 e2) . instVars
+      in
+      g & G.addVert Terminal (Inst Terminal vs' quer)
+        & G.addEdge (G.HEdge (S.singleton (LocPair e1 e2)) Terminal) (Leaf $ LBool True)
+        & prune
+
+    prepare g =
+      let new = execState (G.idfsEdge_ (\(G.HEdge st end) e ->
+            when (null st) $ modify ((G.HEdge (S.singleton Initial) end, e):)) g) []
+      in
+      g & G.ifilterEdges (\(G.HEdge st _) _ -> not $ null st)
+        & G.addVert Initial (emptyInst Initial [])
+        & flip (foldr (uncurry G.addEdge)) new
 
     equivProduct g1 g2 =
       cleanIntros (G.cartesianProductWith edgeMerge const LocPair vertMerge
-                           (G.mapEdge (LOnly . Leaf) g1)
-                           (G.mapEdge (ROnly . Leaf) g2))
+                     (G.mapEdge (LOnly . Leaf) g1)
+                     (G.mapEdge (ROnly . Leaf) g2))
 
     cleanIntros g =
       let es = g ^@.. G.iallEdges
       in G.delIdx start $ foldr (\(G.HEdge i1 i2, e) g ->
         G.addEdge (G.HEdge (S.filter (/= start) i1) i2) e (G.delEdge (G.HEdge i1 i2) g)) g es
 
-    start = LocPair (Loc 0) (Loc 0)
+    start = LocPair Initial Initial
+    isStart = \case
+      LocPair Initial _ -> True
+      LocPair _ Initial -> True
+      _ -> False
 
     edgeMerge (LOnly e1) (ROnly e2) = Br e1 e2
     edgeMerge e1 _ = e1

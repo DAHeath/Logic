@@ -21,21 +21,24 @@ import           Text.Read (readMaybe)
 data Loc
   = Loc Integer
   | LocPair Loc Loc
-  | Terminus
+  | Initial
+  | Terminal
   deriving (Show, Read, Eq, Data)
 
 instance Ord Loc where
   Loc i        <= Loc j        = i <= j
   LocPair  i j <= LocPair  k l = i < k || (i == k && j <= l)
   LocPair  i j <= Loc k        = i < Loc k && j < Loc k
-  LocPair _ _  <= a            = True
-  a            <= Terminus     = True
+  LocPair _ _  <= _            = True
+  Initial      <= _            = True
+  _            <= Terminal     = True
   a            <= b            = b >= a
 
 instance Pretty Loc where
   pretty (Loc i) = pretty i
   pretty (LocPair i j) = pretty "{" <> pretty i <> pretty "." <> pretty j <> pretty "}"
-  pretty Terminus = pretty "END"
+  pretty Initial = pretty "START"
+  pretty Terminal = pretty "END"
 
 data Var = Var
   { _varId :: [String]
