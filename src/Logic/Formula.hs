@@ -271,23 +271,22 @@ mapVar f = \case
 -- formula with one side of the equality. Variables provided in the set will
 -- not be eliminated from the formula.
 varElim :: Set Var -> Form -> Form
-varElim conserve = clean . loop
+varElim conserve = loop
   where
     loop :: Form -> Form
     loop f =
-      let (f', st) =
-            runState (
-              transformM (\f -> do
-                case f of
+      let st =
+            execState (
+              mapM_ (\case
                   Eql t :@ V v1 :@ V v2
                     | v1 `notElem` conserve -> put (Just (v1, v2))
                     | v2 `notElem` conserve -> put (Just (v2, v1))
                     | otherwise -> return ()
-                  _ -> return ()
-                return f) f) Nothing
+                  _ -> return ()) (universe f)) Nothing
       in case st of
-        Nothing -> f'
-        Just (v1, v2) -> loop (subst (M.singleton v1 v2) f')
+        Nothing -> f
+        Just (v1, v2) ->
+          loop (clean $ subst (M.singleton v1 v2) f)
 
 clean :: Form -> Form
 clean = transform (\case

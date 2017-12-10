@@ -11,6 +11,7 @@ import           Data.Text.Prettyprint.Doc
 import           Logic.Formula
 import           Logic.ImplicationGraph
 import           Logic.ImplicationGraph.Safety
+import           Logic.ImplicationGraph.LTree
 import qualified Logic.Type as T
 import           Logic.Formula.Parser
 import           Logic.Var
@@ -18,7 +19,7 @@ import           Logic.Var
 main :: IO ()
 main = do
   G.display "before.dot" example
-  sol <- solve example
+  sol <- solve (G.mapEdge Leaf example)
   case sol of
     Left m -> print (pretty m)
     Right r -> do

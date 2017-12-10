@@ -6,11 +6,14 @@ import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Directed.HyperGraph as G
 import qualified Data.Set as S
 import           Data.Foldable (toList)
+import           Data.Text.Prettyprint.Doc
 
 import           Logic.Formula
 import           Logic.Var
 import           Logic.ImplicationGraph
 import           Logic.ImplicationGraph.LTree as L
+
+import Debug.Trace
 
 -- | Finds irreducible vertices in a given `ImplGr`.
 irreducible :: (Ord i) => Graph i e v -> [i]
@@ -19,7 +22,9 @@ irreducible graph = queryIndex : loopHeaders where
   queryIndex = maximum idxs
 
   -- Find the loop headers, i.e. the destination vertices of back edges.
-  loopHeaders = map (\(G.HEdge _ s, _) -> s) $ G.backEdges graph
+  loopHeaders = map (\(G.HEdge is s, _) ->
+    if length is > 1 then maximum is
+    else s) $ G.backEdges graph
 
 
 -- | Takes the Cartesian product of two lists and with the product function.
@@ -48,21 +53,24 @@ disjunction :: Edge -> Edge -> Edge
 disjunction = L.unionWith disj
 
 -- | Remove all reducible vertices and combine edges through {dis/con}junction.
-prune :: (Ord i) => Graph i Edge Inst
+prune :: (Show i, Ord i) => Graph i Edge Inst
       -> Graph i Edge Inst
 prune graph =
-  let g = foldr removeVertex graph reducible
+  let g = foldl (flip removeVertex) graph reducible
   in G.imapEdge (cleanEdgeVars g) g
   where
   andEdge (G.HEdge s1 e1, f1) (G.HEdge s2 e2, f2) =
     G.addEdgeWith disjunction
       (G.HEdge ((s2 S.\\ S.singleton e1) `S.union` s1) e2) $ conjunction f1 f2
 
-  newEdges i g = cartesianProduct andEdge
-                 ((toListOf $ G.iedgesTo   i . withIndex) g)
-                 ((toListOf $ G.iedgesFrom i . withIndex) g)
+  newEdges i g =
+    trace (show i ++ concatMap (show . pretty) (g ^.. G.iedgesTo i)) $
+    cartesianProduct andEdge
+      ((toListOf $ G.iedgesTo   i . withIndex) g)
+      ((toListOf $ G.iedgesFrom i . withIndex) g)
 
-  removeVertex i g = foldr ($) (G.delIdx i g) $ newEdges i g
+  removeVertex i g = trace ("removing " ++ show i) $
+    foldr ($) (G.delIdx i g) $ newEdges i g
 
   reducible = filter (not . flip elem (irreducible graph)) $ G.idxs graph
 
