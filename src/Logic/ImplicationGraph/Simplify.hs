@@ -37,9 +37,7 @@ conj :: Form -> Form -> Form
 conj e1 e2 =
   mapVars unalias e1 `mkAnd` e2
     where
-      unalias = \case
-        Bound b t -> Bound b t
-        Free (FreeV n l _) t -> Free (FreeV n l False) t
+      unalias v = v & varNew .~ False
 
 disj :: Form -> Form -> Form
 disj = mkOr
@@ -82,4 +80,4 @@ prune graph =
         conserve = S.fromList (vsBef ++ vsAft)
     in fmap (varElim conserve) e
 
-  setNew v = v & _Free . _1 . freeVNew .~ True
+  setNew v = v & varNew .~ True

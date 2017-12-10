@@ -47,7 +47,7 @@ solveChc hcs = do
       rids' <- traverse mkStringSymbol rids
       zipWithM_ fixedpointAddRule forms rids'
 
-      let quers = [Free (FreeV ["x"] 0 False) T.Bool]
+      let quers = [Var ["x"] 0 False T.Bool]
       quers' <- traverse funcToDecl quers
       res <- fixedpointQueryRelations quers'
       case res of
@@ -55,7 +55,7 @@ solveChc hcs = do
         _     -> Left <$> (modelToModel =<< fixedpointGetRefutation)
 
     mkQuery q n =
-      let theQuery = F.V $ Free (parseFreeV n) T.Bool in
+      let theQuery = F.V $ varForName n T.Bool in
       F.app2 F.Impl (F.mkNot $ F.toForm q) theQuery
 
     useDuality = do
@@ -317,7 +317,7 @@ astToForm arg = do
          range <- getRange decl
          formFromApp n args range
 
-    Z3_VAR_AST -> F.V <$> (Bound <$> (toInteger <$> getIndexValue arg) <*> getType arg)
+    Z3_VAR_AST -> F.V <$> (bound <$> (toInteger <$> getIndexValue arg) <*> getType arg)
 
     Z3_QUANTIFIER_AST -> do liftIO $ putStrLn "quantifier!"
                             undefined
@@ -330,11 +330,6 @@ astToForm arg = do
 
     Z3_UNKNOWN_AST -> do liftIO $ putStrLn "unknown!"
                          undefined
-
-varForName :: String -> Type -> Var
-varForName n t = case n of
-  '!' : n' -> Bound (read n') t
-  n' -> Free (parseFreeV n) t
 
 typeToSort :: MonadZ3 z3 => Type -> z3 Sort
 typeToSort = \case

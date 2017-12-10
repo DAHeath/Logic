@@ -21,7 +21,7 @@ data App = App { appOperator :: Var, appOperands :: [Var] }
   deriving (Show, Eq, Ord, Data)
 
 mkApp :: String -> [Var] -> App
-mkApp n vs = App (Free (FreeV [n] 0 False) (T.curryType (map T.typeOf vs) T.Bool)) vs
+mkApp n vs = App (Var [n] 0 False (T.curryType (map T.typeOf vs) T.Bool)) vs
 
 instance Formulaic Chc where
   toForm (Rule lhs phi rhs) = app2 Impl (manyAnd (map toForm lhs ++ [phi])) (toForm rhs)
@@ -62,7 +62,3 @@ instance Pretty Chc where
 instance Pretty App where
   pretty a = braces (sep
     (pretty (varName (appOperator a)) : map pretty (appOperands a)))
-
-applyModelToApp :: Model -> App -> Form
-applyModelToApp (Model m) (App fun vs) =
-  instantiate vs ((\f -> M.findWithDefault (LBool False) f m) fun)

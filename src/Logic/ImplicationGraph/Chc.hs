@@ -58,14 +58,13 @@ implGrChc g = map rule topConns
         _ -> Rule  lhs' f (buildRel (i, v & vars %~ aliased f))
 
     aliased f v =
-      let aliasedSet = concatMap (\(n, _) -> case n of
-            FreeV n l True -> [n]
-            _ -> []) (f ^.. vars . _Free)
+      let aliasedSet = concatMap (\case
+            Var n _ True _ -> [n]
+            _ -> []) (f ^.. vars)
       in case v of
-           Free (FreeV n l b) t -> if n `elem` aliasedSet
-                                   then Free (FreeV n l True) t
-                                   else Free (FreeV n l False) t
-           Bound n t -> Bound n t
+           Var n l b t -> if n `elem` aliasedSet
+                          then Var n l True t
+                          else Var n l False t
            -- NoAlias n -> if n `elem` aliasedSet then Aliased n else NoAlias n
 
     -- construct an applied predicate from the instance

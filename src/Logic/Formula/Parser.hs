@@ -60,15 +60,13 @@ atom = try app <|> nonapp
       <|> (res "or"       >> manyOr                      <$> many1 nonapp)
       <|> (res "add"      >> appMany (Add T.Int)         <$> many1 nonapp)
       <|> (res "mul"      >> appMany (Mul T.Int)         <$> many1 nonapp)
-      <|> (do n <- pName
-              op ":"
-              t <- typ
+      <|> (do v <- var
               args <- many1 nonapp
               let ts = map T.typeOf args
-              return $ appMany (V $ Free n (T.curryType ts t)) args)
+              return $ appMany (V v) args)
 
-pName :: CharParser st FreeV
-pName = parseFreeV <$> ident
+pName :: CharParser st ([String], Integer, Bool)
+pName = parseName <$> ident
 
 bool :: CharParser st Form
 bool = const (LBool True)  <$> res "true"
@@ -89,10 +87,10 @@ typ = (do res "Arr"
 
 var :: CharParser st Var
 var = do
-  n <- pName
+  (i, l, nw) <- pName
   op ":"
   t <- typ
-  return $ Free n t
+  return $ Var i l nw t
 
 impop, compareop, mulop, addop :: CharParser st (Form -> Form -> Form)
 
@@ -135,10 +133,10 @@ parseChc = many parseChc'
     rhs = (Left <$> app) <|> (Right <$> parseForm)
 
     app :: CharParser st App
-    app = braces $ do n <- pName
+    app = braces $ do (i, l, nw) <- pName
                       args <- many var
                       let ts = map T.typeOf args
-                      return $ App (Free n (T.curryType ts T.Bool)) args
+                      return $ App (Var i l nw (T.curryType ts T.Bool)) args
 
 promote :: Monad m => CharParser () a -> (String, Int, Int) -> String -> m a
 promote par (file, line, col) s =
@@ -184,9 +182,9 @@ quoteFormExp par s = do pos <- thPos
                         dataToExpQ (const Nothing `extQ` metaExp) ex
 
 metaExp :: Form -> Maybe TH.ExpQ
-metaExp (V (Free n _))
-  | head (showFreeV n) == '$' = Just [| $(TH.varE (TH.mkName (tail $ showFreeV n))) |]
-  | head (showFreeV n) == '@' = Just [| V $ $(TH.varE (TH.mkName (tail $ showFreeV n))) |]
+metaExp (V v@(Var i _ _ _))
+  | (head.head) i == '$' = Just [| $(TH.varE (TH.mkName (tail $ varName v))) |]
+  | (head.head) i == '@' = Just [| V $ $(TH.varE (TH.mkName (tail $ varName v))) |]
 metaExp _ = Nothing
 
 quoteFormPat :: Data a => CharParser () a -> String -> TH.PatQ

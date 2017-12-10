@@ -37,22 +37,16 @@ instance Pretty Loc where
   pretty (LocPair i j) = pretty "{" <> pretty i <> pretty "." <> pretty j <> pretty "}"
   pretty Terminus = pretty "END"
 
-data FreeV = FreeV
-  { _freeVName :: [String]
-  , _freeVLoc :: Integer
-  , _freeVNew :: Bool
+data Var = Var
+  { _varId :: [String]
+  , _varLoc :: Integer
+  , _varNew :: Bool
+  , _varType :: Type
   } deriving (Show, Read, Eq, Ord, Data)
-makeLenses ''FreeV
-
-data Var
-  = Bound Integer Type
-  | Free FreeV Type
-  deriving (Show, Read, Eq, Ord, Data)
-makePrisms ''Var
+makeLenses ''Var
 
 instance Typed Var
-  where typeOf (Bound _ t) = t
-        typeOf (Free _ t) = t
+  where typeOf v = v ^. varType
 
 instance Pretty Var
   where pretty = pretty . varName
@@ -60,22 +54,24 @@ instance Pretty Var
 -- | A name for the variable. If the variable is bound, it is a textual
 -- representation of the index. Otherwise, it is just the variable name.
 varName :: Var -> String
-varName (Bound i _) = "!" ++ show i
-varName (Free n _) = showFreeV n
+varName (Var i l nw _) =
+  (if nw then "#" else "") ++ intercalate "/" (i ++ [show $ pretty l])
 
-parseFreeV :: String -> FreeV
-parseFreeV n =
+parseName :: String -> ([String], Integer, Bool)
+parseName n =
   let (n', b) = case n of
        '#':rest -> (rest, True)
        _ -> (n, False)
       ws = splitOn "/" n'
   in
   case readMaybe (last ws) of
-    Just n  -> FreeV (init ws) n b
-    Nothing -> FreeV ws 0 b
+    Just n  -> (init ws, n, b)
+    Nothing -> (ws, 0, b)
 
-showFreeV :: FreeV -> String
-showFreeV (FreeV n l nw) = (if nw then "#" else "") ++ intercalate "/" (n ++ [show $ pretty l])
+varForName :: String -> Type -> Var
+varForName n t =
+  let (i, l, nw) = parseName n
+  in Var i l nw t
 
 -- | A traversal which targets all of the variables in a given expression.
 vars :: Data a => Traversal' a Var
@@ -93,16 +89,13 @@ mapVars = over vars
 varSet :: Data a => a -> Set Var
 varSet x = S.fromList (x ^.. vars)
 
--- | Replace the variables in the structure by bound variables if they are in the list.
-abstract :: Data a => [Var] -> a -> a
-abstract vs f =
-  let m = foldl (\(n, m') v -> (n + 1, M.insert v (Bound n (T.typeOf v)) m')) (0, M.empty) vs
-  in subst (snd m) f
-
 -- | Replace bound variables in the structure by those in the list.
 instantiate :: Data a => [Var] -> a -> a
 instantiate vs =
   let ts = map T.typeOf vs
-      bs = zipWith Bound [0..] ts
+      bs = zipWith bound [0..] ts
       m = M.fromList (zip bs vs)
   in subst m
+
+bound :: Integer -> Type -> Var
+bound i t = Var ["!" ++ show i] 0 False t

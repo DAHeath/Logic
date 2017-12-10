@@ -80,13 +80,13 @@ import           Logic.ImplicationGraph.Equivalence
 --   , (G.HEdge (S.singleton (Loc 1)) (Loc 2), Edge [form|j:Int > m:Int && x/1:Int = c2:Int|] (M.fromList [(x, x')]))
 --   ]
 
-r1  = Free (FreeV ["r"] 1 False) T.Int
-n1  = Free (FreeV ["n"] 1 False) T.Int
+r1  = Var ["r"] 1 False T.Int
+n1  = Var ["n"] 1 False T.Int
 
-m1  = Free (FreeV ["m"] 1 False) T.Int
-x1  = Free (FreeV ["x"] 1 False) T.Int
-m2  = Free (FreeV ["m"] 2 False) T.Int
-x2  = Free (FreeV ["x"] 2 False) T.Int
+m1  = Var ["m"] 1 False T.Int
+x1  = Var ["x"] 1 False T.Int
+m2  = Var ["m"] 2 False T.Int
+x2  = Var ["x"] 2 False T.Int
 
 ad0 :: Graph Loc Form Inst
 ad0 = G.fromLists
