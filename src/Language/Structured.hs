@@ -1,4 +1,6 @@
 {-# LANGUAGE QuasiQuotes #-}
+module Language.Structured where
+
 import           Control.Lens
 import           Control.Monad.State
 
@@ -36,8 +38,8 @@ data Program =
   , _procedures :: Map ProcName ([Var], [Var], Imp)
   } deriving (Show, Read, Eq, Ord, Data)
 
-impGraph :: Form -> Program -> Graph Loc Edge Inst
-impGraph f = U.impGraph f . compile
+impGraph :: Program -> Graph Loc Edge Inst
+impGraph = U.impGraph . compile
 
 compile :: Program -> U.Program
 compile (Program ep ps) =
@@ -73,9 +75,9 @@ proc cs = concat (evalState (mapM comp cs) 0) ++ [(U.Done, vs')]
     compM = fmap concat . mapM comp
     inc = modify (+1) >> get
 
-x = Free (FreeV ["x"] 0 False) T.Int
-n = Free (FreeV ["n"] 0 False) T.Int
-r = Free (FreeV ["r"] 0 False) T.Int
+x = Var ["x"] 0 False T.Int
+n = Var ["n"] 0 False T.Int
+r = Var ["r"] 0 False T.Int
 
 prog1 :: Imp
 prog1 =

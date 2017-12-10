@@ -54,12 +54,12 @@ instance Pretty Program where
     pretty ep <+> pretty (M.toList ps)
 
 -- | Transform a program and property into a graph.
-impGraph :: Form -> Program -> Graph Loc Edge Inst
-impGraph f (Program ep ps) =
+impGraph :: Program -> Graph Loc Edge Inst
+impGraph (Program ep ps) =
   let (_, _, m) = execState (organize ep) (0, S.empty, M.empty)
       ps' = M.mapWithKey (renumber (fmap (\(c, _, _) -> c) m)) ps
   in
-  instsToGraph m f (concatMap (\(_, _, is) -> is) (M.elems ps))
+  instsToGraph m (concatMap (\(_, _, is) -> is) (M.elems ps))
   where
     renumber m pn (ret, params, is) =
       let offset = m M.! pn - toInteger (length is) in
@@ -80,15 +80,8 @@ impGraph f (Program ep ps) =
             (Call pn' _ _, []) -> organize pn'
             _ -> return ()) insts
 
-instsToGraph :: Map ProcName (Integer, [Var], [Var]) -> Form -> Imp -> Graph Loc Edge Inst
-instsToGraph callM q cs =
-  let g = G.fromLists verts edges
-      vs' = map (setLoc (end+1)) (g ^?! ix (Loc end) . instVars)
-  in
-  g & G.addVert (Loc (end+1)) (Inst (Loc (end+1))
-                                    vs'
-                                    (q & vars %~ setLoc (end + 1)))
-    & G.addEdge (G.HEdge (S.singleton (Loc end)) (Loc (end+1))) (Leaf $ varCarry end (end+1) vs')
+instsToGraph :: Map ProcName (Integer, [Var], [Var]) -> Imp -> Graph Loc Edge Inst
+instsToGraph callM cs = G.fromLists verts edges
   where
     end = toInteger $ length cs - 1
     verts = tail $
@@ -137,8 +130,8 @@ instsToGraph callM q cs =
             ]
       Done -> []
 
-    setLoc l v = v & _Free . _1 . freeVLoc .~ l
-    setNew v = v & _Free . _1 . freeVNew .~ True
+    setLoc l v = v & varLoc .~ l
+    setNew v = v & varNew .~ True
     edgeFrom l l' e =
       if l == 0
       then (G.HEdge S.empty (Loc l'), e)
@@ -151,9 +144,9 @@ instsToGraph callM q cs =
 
     groupUp as bs = manyAnd $ zipWith (\a b -> mkEql (T.typeOf a) a b) as bs
 
-x = Free (FreeV ["x"] 0 False) T.Int
-n = Free (FreeV ["n"] 0 False) T.Int
-r = Free (FreeV ["r"] 0 False) T.Int
+x = Var ["x"] 0 False T.Int
+n = Var ["n"] 0 False T.Int
+r = Var ["r"] 0 False T.Int
 
 proc :: Imp
 proc =

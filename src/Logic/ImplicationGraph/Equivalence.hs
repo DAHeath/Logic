@@ -24,8 +24,8 @@ import           Logic.ImplicationGraph.Simplify
 -- invariants are found.
 solve :: MonadIO m
       => Form
-      -> Graph Loc Form Inst
-      -> Graph Loc Form Inst
+      -> Graph Loc Edge Inst
+      -> Graph Loc Edge Inst
       -> m (Either Model ImplGr)
 solve quer g1 g2 = loop $ fromGraph wQuery
   where
@@ -49,8 +49,8 @@ solve quer g1 g2 = loop $ fromGraph wQuery
 
     equivProduct g1 g2 =
       cleanIntros (G.cartesianProductWith edgeMerge const LocPair vertMerge
-                     (G.mapEdge (LOnly . Leaf) g1)
-                     (G.mapEdge (ROnly . Leaf) g2))
+                     (G.mapEdge LOnly g1)
+                     (G.mapEdge ROnly g2))
 
     cleanIntros g =
       let es = g ^@.. G.iallEdges

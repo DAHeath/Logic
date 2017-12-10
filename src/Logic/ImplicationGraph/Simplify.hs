@@ -31,32 +31,29 @@ cartesianProduct f as bs = [ f a b | a <- as, b <- bs ]
 
 -- | Combine edges that 'execute' after one another, the first argument is
 -- the edge that runs first.
-conj :: Form -> Form -> Form
-conj e1 e2 =
-  mapVars unalias e1 `mkAnd` e2
-    where
-      unalias v = v & varNew .~ False
-
-disj :: Form -> Form -> Form
-disj = mkOr
-
 conjunction :: Edge -> Edge -> Edge
 conjunction e1 e2 =
   case e2 of
-    Leaf f -> fmap (conj f) e1 -- preserve the structure of the incoming edge if
-                               -- the outgoing edge has no structure
+    -- preserve the structure of the incoming edge if
+    -- the outgoing edge has no structure
+    Leaf f -> fmap (mkAnd f) (mapVars unalias e1)
     e2' ->
-      let inc = foldl1 disj (toList e1)
+      let inc = foldl1 mkOr (toList e1)
       in fmap (conj inc) e2
 
+  where
+    conj e1 e2 = mapVars unalias e1 `mkAnd` e2
+    unalias v = v & varNew .~ False
+
 disjunction :: Edge -> Edge -> Edge
-disjunction = L.unionWith disj
+disjunction = L.unionWith mkOr
 
 -- | Remove all reducible vertices and combine edges through {dis/con}junction.
 prune :: (Show i, Ord i) => Graph i Edge Inst
       -> Graph i Edge Inst
 prune graph =
   let g = foldl (flip removeVertex) graph reducible
+  -- in g
   in G.imapEdge (cleanEdgeVars g) g
   where
   andEdge (G.HEdge s1 e1, f1) (G.HEdge s2 e2, f2) =
@@ -75,8 +72,7 @@ prune graph =
   cleanEdgeVars :: Ord i => Graph i Edge Inst -> G.HEdge i -> Edge -> Edge
   cleanEdgeVars g (G.HEdge is i) e =
     let vsBef = concatMap (\i' -> g ^?! ix i' . instVars) is
-        vsAft = ((g ^?! ix i . instVars) & map setNew)
-                ++ (g ^?! ix i . instVars)
+        vsAft = ((g ^?! ix i . instVars) & map setNew) ++ (g ^?! ix i . instVars)
         conserve = S.fromList (vsBef ++ vsAft)
     in fmap (varElim conserve) e
 
