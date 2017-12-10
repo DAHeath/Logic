@@ -21,15 +21,18 @@ library
                      , Logic.Model
                      , Logic.Chc
                      , Logic.ImplicationGraph
-                     , Logic.ImplicationGraph.Chc
-                     , Logic.ImplicationGraph.Induction
                      , Logic.ImplicationGraph.Equivalence
                      , Logic.ImplicationGraph.Safety
-                     , Logic.ImplicationGraph.Simplify
-                     -- , Logic.ImplicationGraph.JSONParser
-                     , Logic.ImplicationGraph.LTree
                      , Logic.Solver.Z3
+                     , Language.Structured
+                     , Language.Unstructured
                      , Data.Optic.Graph.Extras
+  other-modules:       Logic.ImplicationGraph.Chc
+                     , Logic.ImplicationGraph.Induction
+                     , Logic.ImplicationGraph.Simplify
+                     , Logic.ImplicationGraph.LTree
+                     , Logic.ImplicationGraph.Types
+                     , Logic.ImplicationGraph.Accessors
 
   default-extensions:  LambdaCase
                      , DeriveDataTypeable
@@ -40,15 +43,11 @@ library
 
   build-depends:       base             >= 4.8
                      , containers       >= 0.5
-                     , tardis
                      , turtle
-                     , fixed-vector
                      , lens             >= 4.15
                      , mtl              >= 2.2
                      , monad-loops
                      , extra
-                     , random-fu
-                     , random-extras
                      , parsec           >= 3.1
                      , prettyprinter
                      , template-haskell >= 2.11
@@ -56,12 +55,9 @@ library
                      , text             >= 1.2
                      , transformers     >= 0.5
                      , z3               >= 4.1
-                     , these
                      , optic-graph
                      , split
                      , aeson
-                     , unordered-containers
-                     , vector
                      , bytestring
   default-language:    Haskell2010
 

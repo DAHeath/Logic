@@ -6,7 +6,6 @@ import           Control.Monad.State
 import           Control.Monad.Except
 
 import           Data.Foldable (toList)
-import           Data.Data (Data)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import           Data.Optic.Directed.HyperGraph (Graph)
@@ -19,8 +18,8 @@ import           Logic.Formula
 import           Logic.Model
 import           Logic.Var
 import           Logic.Chc
-import           Logic.ImplicationGraph
-import           Logic.ImplicationGraph.LTree
+import           Logic.ImplicationGraph.Types
+import           Logic.ImplicationGraph.Accessors
 import qualified Logic.Solver.Z3 as Z3
 
 -- | Interpolate the facts in the graph using CHC solving to label the vertices
@@ -31,7 +30,7 @@ interpolate g = do
   let g' = G.withoutBackEdges (G.mapEdge toList g)
   sol <- interp (G.reaches (end g') g')
   let vs = sol ^@.. G.iallVerts
-  return $ foldr (\(i', v') g' -> G.addVert i' v' g') g vs
+  return $ foldr (\(i', v') g'' -> G.addVert i' v' g'') g vs
   where
     interp g' = do
       liftIO $ print (pretty (implGrChc g'))
@@ -65,7 +64,7 @@ implGrChc g = concatMap rules topConns
             Var n _ True _ -> [n]
             _ -> []) (f ^.. vars)
       in case v of
-           Var n l b t -> if n `elem` aliasedSet
+           Var n l _ t -> if n `elem` aliasedSet
                           then Var n l True t
                           else Var n l False t
            -- NoAlias n -> if n `elem` aliasedSet then Aliased n else NoAlias n

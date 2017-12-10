@@ -6,11 +6,10 @@ import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Directed.HyperGraph as G
 import qualified Data.Set as S
 import           Data.Foldable (toList)
-import           Data.Text.Prettyprint.Doc
 
 import           Logic.Formula
 import           Logic.Var
-import           Logic.ImplicationGraph
+import           Logic.ImplicationGraph.Types
 import           Logic.ImplicationGraph.LTree as L
 
 -- | Finds irreducible vertices in a given `ImplGr`.
@@ -37,12 +36,12 @@ conjunction e1 e2 =
     -- preserve the structure of the incoming edge if
     -- the outgoing edge has no structure
     Leaf f -> fmap (mkAnd f) (mapVars unalias e1)
-    e2' ->
+    _ ->
       let inc = foldl1 mkOr (toList e1)
       in fmap (conj inc) e2
 
   where
-    conj e1 e2 = mapVars unalias e1 `mkAnd` e2
+    conj a b = mapVars unalias a `mkAnd` b
     unalias v = v & varNew .~ False
 
 disjunction :: Edge -> Edge -> Edge

@@ -1,4 +1,3 @@
-{-# LANGUAGE QuasiQuotes #-}
 module Language.Unstructured where
 
 import           Control.Lens
@@ -11,23 +10,29 @@ import           Data.Map (Map)
 import qualified Data.Map as M
 import qualified Data.Optic.Directed.HyperGraph as G
 import           Data.Optic.Directed.HyperGraph (Graph)
-import qualified Data.Optic.Graph.Extras as G
 import           Data.Text.Prettyprint.Doc
 
-import           Logic.Formula.Parser
 import qualified Logic.Type as T
 import           Logic.Formula
 import           Logic.Var
 import           Logic.ImplicationGraph
-import           Logic.ImplicationGraph.Simplify
-import           Logic.ImplicationGraph.LTree
-import           Logic.ImplicationGraph.Safety
 
+-- | An unstructured program contains no structured loops of if statements.
+-- Instead it supports only jumps (conditional and unconditional) and procedure
+-- calls as control flow elements.
 data Com
+  -- Set the variable to the value of the formula and proceed to the next instruction.
   = Var := Form
+  -- Jump unconditionally to the specified instruction.
   | Jump Integer
+  -- Jump to the specified instruction if the condition holds. Otherwise, proceed to
+  -- the next instruction.
   | Cond Form Integer
+  -- Call the named procedure with the given arguments, assigning the results to the
+  -- given variables. Then, proceed to the next instruction.
   | Call ProcName [Form] [Var]
+  -- A special marker indicating the end of the procedure. Every procedure should
+  -- have a `Done` marker as the last instruction.
   | Done
   deriving (Show, Read, Eq, Ord, Data)
 
@@ -43,6 +48,9 @@ type ProcName = String
 
 type Imp = [(Com, [Var])]
 
+-- | A program is a map of procedures, where the procedures are indexed by
+-- their name. There is also a distinuished procedure name which is the entry
+-- point of the program.
 data Program =
   Program
   { _entryPoint :: ProcName
@@ -59,11 +67,11 @@ impGraph (Program ep ps) =
   let (_, _, m) = execState (organize ep) (0, S.empty, M.empty)
       ps' = M.mapWithKey (renumber (fmap (\(c, _, _) -> c) m)) ps
   in
-  instsToGraph m (concatMap (\(_, _, is) -> is) (M.elems ps))
+  instsToGraph m (concatMap (\(_, _, is) -> is) (M.elems ps'))
   where
-    renumber m pn (ret, params, is) =
+    renumber m pn (args, params, is) =
       let offset = m M.! pn - toInteger (length is) in
-      (params, map (\case
+      (args, params, map (\case
         (Jump i, vs) -> (Jump (i + offset), vs)
         (Cond f i, vs) -> (Cond f (i + offset), vs)
         c -> c) is)
@@ -74,18 +82,18 @@ impGraph (Program ep ps) =
       else case M.lookup pn ps of
         Nothing -> return ()
         Just (inputs, outputs, insts) -> do
-          let end = c + toInteger (length insts) - 1
-          put (end, S.insert pn s, M.insert pn (end, inputs, outputs) m)
+          let endOfProc = c + toInteger (length insts) - 1
+          put (endOfProc, S.insert pn s, M.insert pn (endOfProc, inputs, outputs) m)
           mapM_ (\case
             (Call pn' _ _, []) -> organize pn'
             _ -> return ()) insts
 
 instsToGraph :: Map ProcName (Integer, [Var], [Var]) -> Imp -> Graph Loc Edge Inst
-instsToGraph callM cs = G.fromLists verts edges
+instsToGraph callM cs = prune $ G.fromLists verts edges
   where
-    end = toInteger $ length cs - 1
+    endProg = toInteger $ length cs - 1
     verts = tail $
-      zipWith vertOf [0..] (map snd cs) ++ [(Loc end, Inst (Loc end) [] (LBool True))]
+      zipWith vertOf [0..] (map snd cs) ++ [(Loc endProg, Inst (Loc endProg) [] (LBool True))]
     edges = map (second Leaf) $ concat $ zipWith edgesOf [0..] cs
 
     vertOf l vs = (Loc l, emptyInst (Loc l) (map (setLoc l) vs))
@@ -116,10 +124,10 @@ instsToGraph callM cs = G.fromLists verts edges
         case M.lookup pn callM of
           Nothing -> []
           Just (l', inps, outs) ->
-            let list = case l of
+            let prelocs = case l of
                         0 -> [Loc l']
                         n -> [Loc n, Loc l'] in
-            [ (G.HEdge (S.fromList list) (Loc (l+1))
+            [ (G.HEdge (S.fromList prelocs) (Loc (l+1))
             , manyAnd
                 [ groupUp (inputs & vars %~ setLoc l)
                           (map V inps & vars %~ setLoc l')
@@ -143,32 +151,3 @@ instsToGraph callM cs = G.fromLists verts edges
       in groupUp (map V bef) (map V aft)
 
     groupUp as bs = manyAnd $ zipWith (\a b -> mkEql (T.typeOf a) a b) as bs
-
-x = Var ["x"] 0 False T.Int
-n = Var ["n"] 0 False T.Int
-r = Var ["r"] 0 False T.Int
-
-proc :: Imp
-proc =
-  [ (x := [form|0|], [])                         -- 0
-  , (Cond [form|not (x:Int < n:Int)|] 4, [x, n]) -- 1
-  , (x := [form|x:Int + 2|], [x, n])             -- 2
-  , (Jump 1, [x, n])                             -- 3
-  , (Done, [x,n])                                -- 4
-  ]
-
--- test = impGraph [form|not (x:Int = 7)|] prog
-
-
-program :: Program
-program = Program
-  { _entryPoint = "f"
-  , _procedures =
-    M.singleton "f" ([n, x], [r],
-      [ (Cond [form|not (n:Int <= 0)|] 3, [r,n,x])
-      , (r := [form|x:Int|], [r,n,x])
-      , (Jump 4, [r,n,x])
-      , (Call "f" [[form|n:Int - 1|], [form|x:Int + n:Int|]] [r], [r,n,x])
-      , (Done, [r,n,x])
-      ])
-  }

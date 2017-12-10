@@ -278,7 +278,7 @@ varElim conserve = loop
       let st =
             execState (
               mapM_ (\case
-                  Eql t :@ V v1 :@ V v2
+                  Eql _ :@ V v1 :@ V v2
                     | v1 `notElem` conserve -> put (Just (v1, v2))
                     | v2 `notElem` conserve -> put (Just (v2, v1))
                     | (v1 ^. varId == v2 ^. varId)

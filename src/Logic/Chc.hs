@@ -1,14 +1,10 @@
 module Logic.Chc where
 
-import           Control.Lens
-
 import           Data.Data (Data)
 import           Data.Monoid ((<>))
-import qualified Data.Map as M
 import           Data.Text.Prettyprint.Doc hiding ((<>))
 
 import           Logic.Formula
-import           Logic.Model
 import           Logic.Var
 import qualified Logic.Type as T
 

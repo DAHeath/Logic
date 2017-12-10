@@ -68,7 +68,7 @@ parseName n =
       ws = splitOn "/" n'
   in
   case readMaybe (last ws) of
-    Just n  -> (init ws, n, b)
+    Just iden -> (init ws, iden, b)
     Nothing -> (ws, 0, b)
 
 varForName :: String -> Type -> Var

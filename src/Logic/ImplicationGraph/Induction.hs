@@ -16,9 +16,10 @@ import           Logic.Formula
 import           Logic.Model
 import           Logic.Var
 import qualified Logic.Solver.Z3 as Z3
-import           Logic.ImplicationGraph
-import           Logic.ImplicationGraph.Chc
+import           Logic.ImplicationGraph.Accessors
+import           Logic.ImplicationGraph.Types
 import           Logic.ImplicationGraph.LTree
+import           Logic.ImplicationGraph.Chc
 
 -- | Find the vertex labels in the graph which are inductive.
 inductive :: (MonadIO m) => ImplGr -> m (Set Idx)

@@ -1,12 +1,13 @@
 {-# LANGUAGE QuasiQuotes #-}
+import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Graph.Extras as G
 import           Data.Text.Prettyprint.Doc
 
 import           Logic.Var
 import           Logic.Formula.Parser
 import qualified Logic.Type as T
+import           Logic.ImplicationGraph
 import           Logic.ImplicationGraph.Equivalence
-import           Logic.ImplicationGraph.Simplify
 
 import           Language.Structured
 
@@ -26,7 +27,7 @@ r = Var ["r"] 0 False T.Int
 --   }
 --   return sum
 -- }
-f :: Program
+f :: Graph Loc Edge Inst
 f = singleNonRec
   [ (s := [form|0|], [p,s,n])
   , (n := [form|p:Int|], [p,s,n])
@@ -43,7 +44,7 @@ f = singleNonRec
 --        return g(n-1,acc+n)
 --        }
 --        }
-g :: Program
+g :: Graph Loc Edge Inst
 g = singleProc "g" [m, a] [r]
   [ (Br [form|m:Int <= 0|]
       [ (r := [form|a:Int|], [m, a, r]) ]
@@ -53,11 +54,7 @@ g = singleProc "g" [m, a] [r]
 
 main :: IO ()
 main = do
-  let fg = prune $ impGraph f
-      gg = prune $ impGraph g
-  G.display "f" fg
-  G.display "g" gg
-  sol <- solve [form|p/6:Int = m/4:Int -> (s/6:Int + a/4:Int = r/4:Int)|] fg gg
+  sol <- solve [form|p/6:Int = m/4:Int -> (s/6:Int + a/4:Int = r/4:Int)|] f g
   case sol of
     Left e -> print (pretty e)
     Right sol' ->

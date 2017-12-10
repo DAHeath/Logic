@@ -62,7 +62,7 @@ atom = try app <|> nonapp
       <|> (res "mul"      >> appMany (Mul T.Int)         <$> many1 nonapp)
       <|> (do v <- var
               args <- many1 nonapp
-              let ts = map T.typeOf args
+              -- let ts = map T.typeOf args
               return $ appMany (V v) args)
 
 pName :: CharParser st ([String], Integer, Bool)
