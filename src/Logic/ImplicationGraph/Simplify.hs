@@ -77,7 +77,8 @@ prune graph =
   cleanEdgeVars :: Ord i => Graph i Edge Inst -> G.HEdge i -> Edge -> Edge
   cleanEdgeVars g (G.HEdge is i) e =
     let vsBef = concatMap (\i' -> g ^?! ix i' . instVars) is
-        vsAft = (g ^?! ix i . instVars) & map setNew
+        vsAft = ((g ^?! ix i . instVars) & map setNew)
+                ++ (g ^?! ix i . instVars)
         conserve = S.fromList (vsBef ++ vsAft)
     in fmap (varElim conserve) e
 

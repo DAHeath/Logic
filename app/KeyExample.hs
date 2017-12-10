@@ -68,3 +68,20 @@ main = do
     Left e -> print (pretty e)
     Right m ->
       G.display "sol" m
+
+
+-- int f(int n) {
+--  sum = 0;
+--   while (n>0){
+--      sum = sum+n
+--         n --;
+--           }
+--           return sum
+--         }
+
+-- int g(int n,int acc){
+--   if (n<=0){return acc}
+--     else{
+--        return g(n-1,acc+n)
+--        }
+--        }
