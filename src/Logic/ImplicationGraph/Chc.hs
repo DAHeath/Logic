@@ -11,7 +11,6 @@ import qualified Data.Set as S
 import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Directed.HyperGraph as G
 import           Data.Maybe (fromJust)
-import           Data.Text.Prettyprint.Doc
 import           Data.List.Split (splitOn)
 
 import           Logic.Formula
@@ -32,9 +31,7 @@ interpolate g = do
   let vs = sol ^@.. G.iallVerts
   return $ foldr (\(i', v') g'' -> G.addVert i' v' g'') g vs
   where
-    interp g' = do
-      liftIO $ print (pretty (implGrChc g'))
-      (`applyModel` g') <$> Z3.solveChc (implGrChc g')
+    interp g' = (`applyModel` g') <$> Z3.solveChc (implGrChc g')
 
 -- | Convert the forward edges of the graph into a system of Constrained Horn Clauses.
 implGrChc :: Graph Idx [Form] Inst -> [Chc]

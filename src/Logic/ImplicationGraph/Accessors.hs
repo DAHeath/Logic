@@ -95,7 +95,9 @@ query :: Form -> Graph Loc Edge Inst -> Graph Loc Edge Inst
 query q g =
   let e = end g
       vs' = g ^?! ix e . instVars
+      m = M.fromList $ map (\v -> (v & varLoc .~ 0, v)) vs'
+      q' = subst m q
   in
-  g & G.addVert Terminal (Inst Terminal vs' q)
+  g & G.addVert Terminal (Inst Terminal vs' q')
     & G.addEdge (G.HEdge (S.singleton e) Terminal) (Leaf $ LBool True)
     & prune

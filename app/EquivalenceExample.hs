@@ -1,15 +1,9 @@
 {-# LANGUAGE QuasiQuotes #-}
-import           Control.Lens
-
 import           Data.Optic.Directed.HyperGraph (Graph)
-import qualified Data.Optic.Directed.HyperGraph as G
 import qualified Data.Optic.Graph.Extras as G
-import qualified Data.Map as M
-import qualified Data.Set as S
 import           Data.Text.Prettyprint.Doc
 
 import           Logic.Var
-import           Logic.Formula
 import           Logic.Formula.Parser
 import qualified Logic.Type as T
 import           Logic.ImplicationGraph
@@ -37,8 +31,8 @@ ad1 = singleNonRec
 main :: IO ()
 main = do
   sol <- solve
-    [form|n/1:Int > 0 && n/1:Int = m/1:Int -> x/1:Int = r/1:Int|] ad0 ad1
+    [form|n:Int > 0 && n:Int = m:Int -> x:Int = r:Int|] ad0 ad1
   case sol of
     Left e -> print (pretty e)
-    Right m ->
-      G.display "sol" m
+    Right sol' ->
+      G.display "sol" sol'

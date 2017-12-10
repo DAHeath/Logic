@@ -15,7 +15,7 @@ import           Language.Structured
 main :: IO ()
 main = do
   G.display "before.dot" example
-  sol <- solve example
+  sol <- solve [form|not (i:Int = 7)|] example
   case sol of
     Left m -> print (pretty m)
     Right r -> do
