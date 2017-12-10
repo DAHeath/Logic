@@ -98,4 +98,4 @@ instantiate vs =
   in subst m
 
 bound :: Integer -> Type -> Var
-bound i t = Var ["!" ++ show i] 0 False t
+bound i = Var ["!" ++ show i] 0 False

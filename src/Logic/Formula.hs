@@ -281,6 +281,12 @@ varElim conserve = loop
                   Eql t :@ V v1 :@ V v2
                     | v1 `notElem` conserve -> put (Just (v1, v2))
                     | v2 `notElem` conserve -> put (Just (v2, v1))
+                    | (v1 ^. varId == v2 ^. varId)
+                   && (v1 ^. varLoc == v2 ^. varLoc) ->
+                      case (v1 ^. varNew, v2 ^. varNew) of
+                        (True, False) -> put (Just (v2, v1))
+                        (False, True) -> put (Just (v1, v2))
+                        _ -> return ()
                     | otherwise -> return ()
                   _ -> return ()) (universe f)) Nothing
       in case st of
