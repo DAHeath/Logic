@@ -54,6 +54,8 @@ g = singleProc "g" [m, a] [r]
 
 main :: IO ()
 main = do
+  G.display "f" f
+  G.display "g" g
   sol <- solve [form|p/6:Int = m/4:Int -> (s/6:Int + a/4:Int = r/4:Int)|] f g
   case sol of
     Left e -> print (pretty e)

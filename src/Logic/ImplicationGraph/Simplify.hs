@@ -52,7 +52,6 @@ prune :: (Show i, Ord i) => Graph i Edge Inst
       -> Graph i Edge Inst
 prune graph =
   let g = foldl (flip removeVertex) graph reducible
-  -- in g
   in G.imapEdge (cleanEdgeVars g) g
   where
   andEdge (G.HEdge s1 e1, f1) (G.HEdge s2 e2, f2) =

@@ -17,6 +17,8 @@ import           Logic.Formula
 import           Logic.Var
 import           Logic.ImplicationGraph
 
+import Debug.Trace
+
 -- | An unstructured program contains no structured loops of if statements.
 -- Instead it supports only jumps (conditional and unconditional) and procedure
 -- calls as control flow elements.
@@ -70,7 +72,7 @@ impGraph (Program ep ps) =
   instsToGraph m (concatMap (\(_, _, is) -> is) (M.elems ps'))
   where
     renumber m pn (args, params, is) =
-      let offset = m M.! pn - toInteger (length is) in
+      let offset = m M.! pn - toInteger (length is) + 1 in
       (args, params, map (\case
         (Jump i, vs) -> (Jump (i + offset), vs)
         (Cond f i, vs) -> (Cond f (i + offset), vs)
@@ -121,6 +123,7 @@ instsToGraph callM cs = prune $ G.fromLists verts edges
               (varCarry l (l+1) vs)
         ]
       Call pn inputs outputs ->
+        traceShow callM $
         case M.lookup pn callM of
           Nothing -> []
           Just (l', inps, outs) ->

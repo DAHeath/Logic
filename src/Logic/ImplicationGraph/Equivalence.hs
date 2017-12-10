@@ -21,15 +21,7 @@ solve :: MonadIO m
       -> m (Either Model ImplGr)
 solve quer g1 g2 = loop $ fromGraph wQuery
   where
-    e1 = end g1
-    e2 = end g2
-    wQuery =
-      let g = equivProduct (prepare g1) (prepare g2)
-          vs' = g ^?! ix (LocPair e1 e2) . instVars
-      in
-      g & G.addVert Terminal (Inst Terminal vs' quer)
-        & G.addEdge (G.HEdge (S.singleton (LocPair e1 e2)) Terminal) (Leaf $ LBool True)
-        & prune
+    wQuery = query quer $ equivProduct (prepare g1) (prepare g2)
 
     prepare g =
       let new = execState (G.idfsEdge_ (\(G.HEdge st edgeEnd) e ->

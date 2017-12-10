@@ -16,6 +16,8 @@ import           Logic.Formula
 import           Logic.Var
 import qualified Logic.Solver.Z3 as Z3
 import           Logic.ImplicationGraph.Types
+import           Logic.ImplicationGraph.Simplify
+import           Logic.ImplicationGraph.LTree
 
 -- | Construct an implication graph by swapping the labels for proper instance labels.
 fromGraph :: Ord i => Graph i e Inst -> Graph Idx e Inst
@@ -89,11 +91,11 @@ end g =
   maximum $ filter
   (\i -> lengthOf (G.edgesFrom i) (G.withoutBackEdges g) == 0) (G.idxs g)
 
--- query :: Ord i =>
--- query q g =
---   let e = end g
---       vs' = g ^?! ix e . instVars
---   in
---   g & G.addVert Terminal (Inst Terminal vs' q)
---     & G.addEdge (G.HEdge (S.singleton e) Terminal) (Leaf $ LBool True)
---     & prune
+query :: Form -> Graph Loc Edge Inst -> Graph Loc Edge Inst
+query q g =
+  let e = end g
+      vs' = g ^?! ix e . instVars
+  in
+  g & G.addVert Terminal (Inst Terminal vs' q)
+    & G.addEdge (G.HEdge (S.singleton e) Terminal) (Leaf $ LBool True)
+    & prune
