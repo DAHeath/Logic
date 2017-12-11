@@ -19,19 +19,19 @@ x = Var ["x"] 0 False T.Int
 
 ad0 :: Graph Loc Edge Inst
 ad0 = singleNonRec
-  [ (r := [form|n:Int - 9 * ((n:Int - 1) / 9)|], [r, n]) ]
+  [ (r := [form|n - 9 * ((n - 1) / 9)|], [r, n]) ]
 
 ad1 :: Graph Loc Edge Inst
 ad1 = singleNonRec
-  [ (x := [form|m:Int|], [x, m])
-  , (While [form|x:Int > 9|]
-      [ (x := [form|x:Int / 10 + x:Int % 10|], [x, m]) ], [x, m])
+  [ (x := [form|m|], [x, m])
+  , (While [form|x > 9|]
+      [ (x := [form|x / 10 + x % 10|], [x, m]) ], [x, m])
   ]
 
 main :: IO ()
 main = do
   sol <- solve
-    [form|n:Int > 0 && n:Int = m:Int -> x:Int = r:Int|] ad0 ad1
+    [form|n > 0 && n = m -> x = r|] ad0 ad1
   case sol of
     Left e -> print (pretty e)
     Right sol' ->

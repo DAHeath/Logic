@@ -36,20 +36,20 @@ example :: Graph Integer Edge Inst
 example = G.fromLists
   [ (0, emptyInst 0 [i, c])
   , (1, emptyInst 1 [i, j, c])
-  , (2, Inst 2 [] [form|c:Int = 1|])
+  , (2, Inst 2 [] [form|c = 1|])
   ]
 
-  [ (G.HEdge S.empty 0, Edge [form|i:Int = 0 && c:Int = 0|] M.empty)
+  [ (G.HEdge S.empty 0, Edge [form|i = 0 && c = 0|] M.empty)
   , (G.HEdge (S.singleton 0) 1,
-    Edge [form|i:Int < 1
-            && j:Int = 0
-            && i/1:Int = i:Int+1|] (M.fromList [(i, i')]))
-  , (G.HEdge (S.singleton 0) 2, Edge [form|i:Int >= 1|] M.empty)
+    Edge [form|i < 1
+            && j = 0
+            && i/1 = i+1|] (M.fromList [(i, i')]))
+  , (G.HEdge (S.singleton 0) 2, Edge [form|i >= 1|] M.empty)
   , (G.HEdge (S.singleton 1) 1,
-    Edge [form|j:Int < 1
-            && c/1:Int = c:Int+1
-            && j/1:Int = j:Int+1 |] (M.fromList [(c, c'), (j, j')]))
-  , (G.HEdge (S.singleton 1) 0, Edge [form|j:Int >= 1|] M.empty)
+    Edge [form|j < 1
+            && c/1 = c+1
+            && j/1 = j+1 |] (M.fromList [(c, c'), (j, j')]))
+  , (G.HEdge (S.singleton 1) 0, Edge [form|j >= 1|] M.empty)
   ]
 
 -- steppy :: IO ()

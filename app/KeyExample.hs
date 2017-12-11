@@ -30,10 +30,10 @@ r = Var ["r"] 0 False T.Int
 f :: Graph Loc Edge Inst
 f = singleNonRec
   [ (s := [form|0|], [p,s,n])
-  , (n := [form|p:Int|], [p,s,n])
-  , ( While [form|n:Int > 0|]
-        [ (s := [form|s:Int + n:Int|], [p,s,n])
-        , (n := [form|n:Int - 1|], [p,s,n])
+  , (n := [form|p|], [p,s,n])
+  , ( While [form|n > 0|]
+        [ (s := [form|s + n|], [p,s,n])
+        , (n := [form|n - 1|], [p,s,n])
         ]
     , [p,s,n])
   ]
@@ -46,9 +46,9 @@ f = singleNonRec
 --        }
 g :: Graph Loc Edge Inst
 g = singleProc "g" [m, a] [r]
-  [ (Br [form|m:Int <= 0|]
-      [ (r := [form|a:Int|], [m, a, r]) ]
-      [ (Call "g" [ [form|m:Int - 1|], [form|a:Int + m:Int|] ] [r], [m, a, r]) ]
+  [ (Br [form|m <= 0|]
+      [ (r := [form|a|], [m, a, r]) ]
+      [ (Call "g" [ [form|m - 1|], [form|a + m|] ] [r], [m, a, r]) ]
     , [m, a, r])
   ]
 
@@ -56,7 +56,7 @@ main :: IO ()
 main = do
   G.display "f" f
   G.display "g" g
-  sol <- solve [form|p:Int = m:Int -> (s:Int + a:Int = r:Int)|] f g
+  sol <- solve [form|p = m -> (s + a = r)|] f g
   case sol of
     Left e -> print (pretty e)
     Right sol' ->

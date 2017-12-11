@@ -15,7 +15,7 @@ import           Language.Structured
 main :: IO ()
 main = do
   G.display "before.dot" example
-  sol <- solve [form|not (i:Int = 7)|] example
+  sol <- solve [form|not (i = 7)|] example
   case sol of
     Left m -> print (pretty m)
     Right r -> do
@@ -29,7 +29,7 @@ n  = Var ["n"] 0 False T.Int
 example :: Graph Loc Edge Inst
 example = singleNonRec
   [ (i := [form|0|], [i,n])
-  , ( While [form|i:Int < n:Int|]
-        [ (i := [form|i:Int + 2|], [i,n]) ]
+  , ( While [form|i < n|]
+        [ (i := [form|i + 2|], [i,n]) ]
     , [i, n])
   ]

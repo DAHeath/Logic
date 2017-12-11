@@ -1,0 +1,8 @@
+g
+g (m, a) (r) = {
+  cond (m <= 0) 3       (m, a, r);
+  r := a                (m, a, r);
+  jump 4                (m, a, r);
+  call g (m-1, a+m) (r) (m, a, r);
+  done                  (m, a, r)
+}

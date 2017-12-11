@@ -64,7 +64,6 @@ implGrChc g = concatMap rules topConns
            Var n l _ t -> if n `elem` aliasedSet
                           then Var n l True t
                           else Var n l False t
-           -- NoAlias n -> if n `elem` aliasedSet then Aliased n else NoAlias n
 
     -- construct an applied predicate from the instance
     buildRel (i, v) =

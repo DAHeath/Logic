@@ -50,7 +50,7 @@ exInf = atom
 atom :: CharParser st Form
 atom = try app <|> nonapp
   where
-    nonapp = parens parseForm <|> (V <$> try var) <|> bool <|> integer
+    nonapp = parens parseForm <|> (V <$> try var) <|> bool <|> (LInt <$> integer)
     app = (res "not"      >> (:@) Not                    <$> nonapp)
       <|> (res "if"       >> appMany (If T.Int)          <$> sequence [nonapp, nonapp, nonapp])
       <|> (res "store"    >> appMany (Store T.Int T.Int) <$> sequence [nonapp, nonapp, nonapp])
@@ -88,9 +88,11 @@ typ = (do res "Arr"
 var :: CharParser st Var
 var = do
   (i, l, nw) <- pName
-  op ":"
-  t <- typ
+  t <- annot
   return $ Var i l nw t
+
+annot :: CharParser st Type
+annot = (op ":" >> typ) <|> pure T.Int
 
 impop, compareop, mulop, addop :: CharParser st (Form -> Form -> Form)
 
@@ -111,8 +113,8 @@ mulop = (op "*" >> return (app2 $ Mul T.Int))
 addop = (op "+" >> return (app2 $ Add T.Int))
     <|> (op "-" >> return (app2 $ Sub T.Int))
 
-integer :: CharParser st Form
-integer = lexeme $ do { ds <- many1 digit ; return $ LInt (read ds) }
+integer :: CharParser st Integer
+integer = lexeme $ do { ds <- many1 digit ; return (read ds) }
 
 parseChc :: CharParser st [Chc]
 parseChc = many parseChc'
@@ -218,6 +220,8 @@ lexer = T.makeTokenParser (emptyDef { T.identStart = letter <|> char '_' <|> cha
                                                         , "return"
                                                         , "assert"
                                                         , "Int", "Bool", "Real", "Arr"
+                                                        , "jump"
+                                                        , "done"
                                                         ]
                                     })
 
