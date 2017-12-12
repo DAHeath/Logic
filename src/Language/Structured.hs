@@ -8,7 +8,7 @@ import qualified Data.Map as M
 import           Data.Data (Data)
 import           Data.Optic.Directed.HyperGraph (Graph)
 
-import           Logic.Formula
+import           Logic.Formula hiding (Store)
 import           Logic.Var
 import           Logic.ImplicationGraph.Types
 
@@ -30,6 +30,8 @@ data Com
   -- Call a procedure by name with the given arguments, putting the resulting
   -- values into the given variables.
   | Call ProcName [Form] [Var]
+  | Store Var Var Form Form
+  | Load Var Var Form
   deriving (Show, Read, Eq, Ord, Data)
 
 -- | An imperative instruction is a command paired with the variables which are
@@ -95,6 +97,13 @@ proc cs = concat (evalState (mapM comp cs) 0) ++ [(U.Done, vs')]
       Call pn args ret -> do
         _ <- inc
         return [(U.Call pn args ret, vs)]
+      Store objref valref obj val -> do
+        _ <- inc
+        return [(U.Store objref valref obj val, vs)]
+      Load ref tar obj -> do
+        _ <- inc
+        return [(U.Load ref tar obj, vs)]
+
 
     compM = fmap concat . mapM comp
     inc = modify (+1) >> get

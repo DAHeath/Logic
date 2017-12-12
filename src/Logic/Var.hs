@@ -18,27 +18,28 @@ import qualified Logic.Type as T
 
 import           Text.Read (readMaybe)
 
-data Loc
-  = Loc Integer
-  | LocPair Loc Loc
+data Loc' i
+  = Loc i
+  | LocPair (Loc' i) (Loc' i)
   | Initial
   | Terminal
   deriving (Show, Read, Eq, Data)
 
-instance Ord Loc where
+instance Ord i => Ord (Loc' i) where
   Loc i        <= Loc j        = i <= j
   LocPair  i j <= LocPair  k l = i < k || (i == k && j <= l)
   LocPair  i j <= Loc k        = i < Loc k && j < Loc k
-  LocPair _ _  <= _            = True
   Initial      <= _            = True
   _            <= Terminal     = True
   a            <= b            = b >= a
 
-instance Pretty Loc where
+instance Pretty i => Pretty (Loc' i) where
   pretty (Loc i) = pretty i
   pretty (LocPair i j) = pretty "{" <> pretty i <> pretty "." <> pretty j <> pretty "}"
   pretty Initial = pretty "START"
   pretty Terminal = pretty "END"
+
+type Loc = Loc' Integer
 
 data Var = Var
   { _varId :: [String]

@@ -284,8 +284,8 @@ varElim conserve = loop
                     | (v1 ^. varId == v2 ^. varId)
                    && (v1 ^. varLoc == v2 ^. varLoc) ->
                       case (v1 ^. varNew, v2 ^. varNew) of
-                        (True, False) -> put (Just (v2, v1))
-                        (False, True) -> put (Just (v1, v2))
+                        (True, False) -> put (Just (v1, v2))
+                        (False, True) -> put (Just (v2, v1))
                         _ -> return ()
                     | otherwise -> return ()
                   _ -> return ()) (universe f)) Nothing

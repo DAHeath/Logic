@@ -87,9 +87,8 @@ loop =
     loop' g = do
       G.display "step" g
       _ <- liftIO getLine
-      itp <- interpolate g                              -- interpolate
-      indS <- inductive itp                             -- check inductiveness
-      if end g `elem` indS                              -- if the query is inductive...
-      then return itp                                   -- we're done
-      else loop' (unwindAll (backs g) indS (end g) itp) -- otherwise unwind and repeat
-    backs = concatMap (\(i, e) -> map ((,) i) (noBr e)) . G.backEdges
+      itp <- interpolate g            -- interpolate
+      indS <- inductive itp           -- check inductiveness
+      if end g `elem` indS            -- if the query is inductive...
+      then return itp                 -- we're done
+      else loop' (unwindAll indS itp) -- otherwise unwind and repeat

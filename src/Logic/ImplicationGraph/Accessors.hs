@@ -1,3 +1,4 @@
+{-# LANGUAGE NoMonomorphismRestriction #-}
 module Logic.ImplicationGraph.Accessors where
 
 import           Control.Lens
@@ -34,8 +35,8 @@ collectAnswer g = traverse Z3.superSimplify $ execState (G.itravVert (\_ (Inst l
 
 -- | Unwind all backedges which do not reach an inductive vertex, then compress
 -- the graph to only those vertices which reach the end.
-unwindAll :: [(G.HEdge Idx, Edge)] -> Set Idx -> Idx -> ImplGr -> ImplGr
-unwindAll bes ind edgeEnd g =
+unwindAll :: Integral i => Set i -> Graph i (LTree a) v -> Graph Idx (LTree a) v
+unwindAll ind g =
   let relevantBes = bes & filter (\be ->        -- a backedge is relevant if...
         be & fst & G.start                      -- we consider the start of the backedge and...
            & any (\i' -> g & G.withoutBackEdges -- when there are no backedges...
@@ -50,16 +51,17 @@ unwindAll bes ind edgeEnd g =
     reachEndWithoutBackedge g' =
       let compressed = g'        -- find the subgraph which...
             & G.withoutBackEdges -- has no backedges...
-            & G.reaches edgeEnd  -- and reaches the query
+            & G.reaches (end g)  -- and reaches the query
       in G.filterIdxs (`elem` G.idxs compressed) g'
+    bes = concatMap (\(i, e) -> map ((,) i) (noBr e)) $ G.backEdges g
 
 -- | Unwind the graph on the given backedge and update all instances in the unwinding.
-unwind :: (G.HEdge Idx, Edge) -> ImplGr -> ImplGr
+unwind :: Integral i => (G.HEdge i, e) -> Graph i e v -> Graph i e v
 unwind (G.HEdge i1 i2, e) g =
   let (m, g') = g                                       -- in order to calculate the unwound subgraph:
         & G.reaches i2                                  -- find the subgraph which reaches the end of backedge
         & G.union (foldMap (\i -> G.between i2 i g) i1) -- attach the subgraph between the ends of the backedge
-        & relabel (Idx $ G.order g)                     -- relabel all the instances
+        & relabel (G.order g)                           -- relabel all the instances
   in
   g & G.union g'                                  -- attach the unwound subgraph
     & G.delEdge (G.HEdge i1 i2)                   -- delete the old backedge
@@ -67,7 +69,7 @@ unwind (G.HEdge i1 i2, e) g =
 
 -- | Relabel the vertices in the graph in reverse topological order. The new index
 -- values are obtained from the state. The map used to relabel is also returned.
-relabel :: Ord i => Idx -> Graph i e v -> (Map i Idx, Graph Idx e v)
+relabel :: (Num i, Ord i, Ord k) => i -> Graph k e v -> (Map k i, Graph i e v)
 relabel idx g = evalState (do
   m <- execStateT (buildMapping g) M.empty
   return (m, G.mapIdx (m M.!) g)) idx

@@ -13,7 +13,7 @@ import           Data.Optic.Directed.HyperGraph (Graph)
 import           Data.Text.Prettyprint.Doc
 
 import qualified Logic.Type as T
-import           Logic.Formula
+import           Logic.Formula hiding (Store)
 import           Logic.Var
 import           Logic.ImplicationGraph
 
@@ -34,6 +34,9 @@ data Com
   -- A special marker indicating the end of the procedure. Every procedure should
   -- have a `Done` marker as the last instruction.
   | Done
+
+  | Store Var Var Form Form
+  | Load Var Var Form
   deriving (Show, Read, Eq, Ord, Data)
 
 instance Pretty Com where
@@ -43,6 +46,10 @@ instance Pretty Com where
     Cond f i      -> pretty "COND" <+> pretty f <+> pretty i
     Call pn as rs -> pretty "CALL" <+> pretty pn <+> pretty as <+> pretty rs
     Done          -> pretty "DONE"
+
+    Store objref valref obj val ->
+      pretty "STORE" <+> pretty objref <+> pretty valref <+> pretty obj <+> pretty val
+    Load  ref val obj -> pretty "LOAD"  <+> pretty ref <+> pretty val <+> pretty obj
 
 type ProcName = String
 
@@ -94,7 +101,7 @@ instsToGraph callM cs = prune $ G.fromLists verts edges
     endProg = toInteger $ length cs - 1
     verts = tail $
       zipWith vertOf [0..] (map snd cs) ++ [(Loc endProg, Inst (Loc endProg) [] (LBool True))]
-    edges = map (second Leaf) $ concat $ zipWith edgesOf [0..] cs
+    edges = concat $ zipWith edgesOf [0..] cs
 
     vertOf l vs = (Loc l, emptyInst (Loc l) (map (setLoc l) vs))
 
@@ -128,7 +135,7 @@ instsToGraph callM cs = prune $ G.fromLists verts edges
                         0 -> [Loc l']
                         n -> [Loc n, Loc l'] in
             [ (G.HEdge (S.fromList prelocs) (Loc (l+1))
-            , manyAnd
+            , Leaf $ manyAnd
                 [ groupUp (inputs & vars %~ setLoc l)
                           (map V inps & vars %~ setLoc l')
                 , groupUp (map V outputs & vars %~ setNew & vars %~ setLoc (l+1))
@@ -138,12 +145,30 @@ instsToGraph callM cs = prune $ G.fromLists verts edges
             ]
       Done -> []
 
+      Store objref valref obj val ->
+        let obj' = (obj & vars %~ setLoc l)
+            val' = (val & vars %~ setLoc l)
+            vs' = filter (\v -> v /= objref && v /= valref) vs
+        in
+        [ second LOnly $ edgeFrom l (l+1)
+          ( manyAnd
+            [ varCarry l (l+1) vs'
+            , mkEql (T.typeOf objref) (V $ setNew $ setLoc (l+1) objref) obj'
+            , mkEql (T.typeOf valref) (V $ setNew $ setLoc (l+1) valref) val'
+            ]) ]
+      Load ref _ obj ->
+        let obj' = (obj & vars %~ setLoc l)
+            vs' = filter (/= ref) vs
+        in
+        [ second ROnly $ edgeFrom l (l+1) (varCarry l (l+1) vs' `mkAnd`
+              mkEql (T.typeOf ref) (V $ setNew $ setLoc (l+1) ref) obj') ]
+
     setLoc l v = v & varLoc .~ l
     setNew v = v & varNew .~ True
     edgeFrom l l' e =
       if l == 0
-      then (G.HEdge S.empty (Loc l'), e)
-      else (G.HEdge (S.singleton (Loc l)) (Loc l'), e)
+      then (G.HEdge S.empty (Loc l'), Leaf e)
+      else (G.HEdge (S.singleton (Loc l)) (Loc l'), Leaf e)
 
     varCarry l l' vs =
       let bef = vs & map (setLoc l)

@@ -19,7 +19,7 @@ import           Logic.ImplicationGraph.LTree
 -- | Inst indexes are arranged backwards -- newer instances which occur
 -- closer to the beginning of the graph have higher value.
 newtype Idx = Idx { getIdx :: Integer }
-  deriving (Eq, Data, Num, Pretty)
+  deriving (Eq, Data, Num, Pretty, Integral, Real, Enum)
 instance Ord Idx where Idx a <= Idx b = b <= a
 instance Show Idx where show (Idx a) = show a
 instance Read Idx where readsPrec i = map (first Idx) . readsPrec i
