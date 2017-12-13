@@ -1,4 +1,4 @@
-module Logic.Formula.Loc where
+module Data.Loc where
 
 import           Data.Data
 import           Data.Text.Prettyprint.Doc
@@ -14,7 +14,6 @@ instance Ord Loc where
   Loc i        <= Loc j        = i <= j
   LocPair  i j <= LocPair  k l = i < k || (i == k && j <= l)
   LocPair  i j <= Loc k        = i < Loc k && j < Loc k
-  LocPair _ _  <= _            = True
   Initial      <= _            = True
   _            <= Terminal     = True
   a            <= b            = b >= a

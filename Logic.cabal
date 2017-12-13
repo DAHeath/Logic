@@ -22,13 +22,13 @@ library
                      , Language.Structured
                      , Language.Unstructured
                      , Data.Optic.Graph.Extras
+                     , Data.Loc
   other-modules:       Logic.Formula.Var
                      , Logic.Formula.Type
                      , Logic.Formula.Model
                      , Logic.Formula.Chc
                      , Logic.Formula.Parser
                      , Logic.Formula.Form
-                     , Logic.Formula.Loc
                      , Logic.ImplicationGraph.Chc
                      , Logic.ImplicationGraph.Induction
                      , Logic.ImplicationGraph.Simplify
@@ -85,6 +85,17 @@ executable Examples
                      , Logic
                      , optic-graph
                      , bytestring
+  default-language:    Haskell2010
+
+test-suite logic-test
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Data/LocTest.hs
+  build-depends:       base
+                     , Logic
+                     , hspec
+                     , QuickCheck
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
 
 source-repository head

@@ -1,10 +1,11 @@
 {-# LANGUAGE QuasiQuotes #-}
 module KeyExample where
 
-import           Data.Optic.Directed.HyperGraph (Graph)
-import qualified Data.Optic.Graph.Extras as G
 import           Data.Text.Prettyprint.Doc
 import           Data.Functor.Identity
+import           Data.Loc
+import           Data.Optic.Directed.HyperGraph (Graph)
+import qualified Data.Optic.Graph.Extras as G
 
 import           Logic.Formula as F
 import           Logic.ImplicationGraph

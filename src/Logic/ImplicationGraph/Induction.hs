@@ -4,14 +4,15 @@ module Logic.ImplicationGraph.Induction where
 import           Control.Lens
 import           Control.Monad.State
 import           Control.Monad.Except
-import qualified Data.Optic.Directed.HyperGraph as G
-import qualified Data.Optic.Graph.Extras as G
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Maybe (mapMaybe)
 import           Data.Text.Prettyprint.Doc
+import           Data.Loc
+import qualified Data.Optic.Directed.HyperGraph as G
+import qualified Data.Optic.Graph.Extras as G
 
 import           Logic.Formula
 import qualified Logic.Solver.Z3 as Z3

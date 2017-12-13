@@ -2,10 +2,11 @@
 module SafetyExample where
 
 import           Data.Functor.Identity
-import           Data.Optic.Directed.HyperGraph (Graph)
-import qualified Data.Optic.Graph.Extras as G
 import qualified Data.Map as M
 import           Data.Text.Prettyprint.Doc
+import           Data.Loc
+import           Data.Optic.Directed.HyperGraph (Graph)
+import qualified Data.Optic.Graph.Extras as G
 
 import           Logic.ImplicationGraph
 import           Logic.Formula as F

@@ -5,13 +5,14 @@ import           Control.Applicative.Backwards
 import           Control.Monad.State
 
 import           Data.Pointed
-import           Data.Optic.Directed.HyperGraph (Graph)
-import qualified Data.Optic.Directed.HyperGraph as G
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Maybe (fromJust)
+import           Data.Loc
+import           Data.Optic.Directed.HyperGraph (Graph)
+import qualified Data.Optic.Directed.HyperGraph as G
 
 import           Logic.Formula
 import qualified Logic.Solver.Z3 as Z3

@@ -9,9 +9,10 @@ import           Data.Data (Data)
 import qualified Data.Set as S
 import           Data.Map (Map)
 import qualified Data.Map as M
+import           Data.Text.Prettyprint.Doc
+import           Data.Loc
 import qualified Data.Optic.Directed.HyperGraph as G
 import           Data.Optic.Directed.HyperGraph (Graph)
-import           Data.Text.Prettyprint.Doc
 
 import           Logic.Formula
 import           Logic.ImplicationGraph

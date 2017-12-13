@@ -7,6 +7,7 @@ import           Data.Data
 import           Data.Pointed
 import           Data.Copointed
 import           Data.Text.Prettyprint.Doc
+import           Data.Loc
 import           Data.Optic.Directed.HyperGraph (Graph)
 
 import           Logic.Formula

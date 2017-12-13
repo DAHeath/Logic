@@ -4,6 +4,7 @@ import           Control.Monad.State
 
 import           Data.Functor.Identity
 import           Data.Copointed
+import           Data.Loc
 import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Directed.HyperGraph as G
 

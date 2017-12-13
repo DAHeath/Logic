@@ -6,6 +6,7 @@ import           Control.Monad.State
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Data (Data)
+import           Data.Loc
 import           Data.Optic.Directed.HyperGraph (Graph)
 
 import           Logic.Formula

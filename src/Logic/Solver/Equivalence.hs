@@ -5,6 +5,7 @@ import           Control.Monad.State
 
 import           Data.Copointed
 import qualified Data.Set as S
+import           Data.Loc
 import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Directed.HyperGraph as G
 
