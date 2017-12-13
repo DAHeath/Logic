@@ -1,6 +1,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 module EquivalenceExample where
 
+import           Data.Functor.Identity
 import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Graph.Extras as G
 import           Data.Text.Prettyprint.Doc
@@ -17,11 +18,11 @@ n = Var ["n"] 0 False F.Int
 m = Var ["m"] 0 False F.Int
 x = Var ["x"] 0 False F.Int
 
-ad0 :: Graph Loc Edge Inst
+ad0 :: Graph Loc (Identity Form) Inst
 ad0 = singleNonRec
   [ (r := [form|n - 9 * ((n - 1) / 9)|], [r, n]) ]
 
-ad1 :: Graph Loc Edge Inst
+ad1 :: Graph Loc (Identity Form) Inst
 ad1 = singleNonRec
   [ (x := [form|m|], [x, m])
   , (While [form|x > 9|]

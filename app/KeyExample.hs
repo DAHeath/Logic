@@ -4,6 +4,7 @@ module KeyExample where
 import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Graph.Extras as G
 import           Data.Text.Prettyprint.Doc
+import           Data.Functor.Identity
 
 import           Logic.Formula as F
 import           Logic.ImplicationGraph
@@ -32,7 +33,7 @@ z = Var ["z"] 0 False F.Int
 --   }
 --   return sum
 -- }
-f :: Graph Loc Edge Inst
+f :: Graph Loc (Identity Form) Inst
 f = singleNonRec
   [ (s := [form|0|], [p,s,n])
   , (n := [form|p|], [p,s,n])
@@ -49,7 +50,7 @@ f = singleNonRec
 --        return g(n-1,acc+n)
 --        }
 --        }
-g :: Graph Loc Edge Inst
+g :: Graph Loc (Identity Form) Inst
 g = singleProc "g" [m, a] [r]
   [ (Br [form|m <= 0|]
       [ (r := [form|a|], [m, a, r]) ]
@@ -57,7 +58,7 @@ g = singleProc "g" [m, a] [r]
     , [m, a, r])
   ]
 
-h :: Graph Loc Edge Inst
+h :: Graph Loc (Identity Form) Inst
 h = singleProc "h" [x] [y]
   [ (Br [form|x <= 0|]
       [ (y := [form|0|], [x, y]) ]
@@ -67,7 +68,7 @@ h = singleProc "h" [x] [y]
     , [x, y])
   ]
 
-h' :: Graph Loc Edge Inst
+h' :: Graph Loc (Identity Form) Inst
 h' = singleProc "h" [x'] [y']
   [ (Br [form|x' <= 0|]
       [ (y' := [form|0|], [x', y']) ]

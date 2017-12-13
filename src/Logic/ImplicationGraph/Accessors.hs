@@ -4,6 +4,7 @@ import           Control.Lens
 import           Control.Applicative.Backwards
 import           Control.Monad.State
 
+import           Data.Pointed
 import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Directed.HyperGraph as G
 import           Data.Map (Map)
@@ -27,13 +28,13 @@ emptyInst :: Loc -> [Var] -> Inst
 emptyInst l vs = Inst l vs (LBool False)
 
 -- | Gather all facts known about each instance of the same index together by disjunction.
-collectAnswer :: MonadIO m => ImplGr -> m (Map Loc Form)
+collectAnswer :: MonadIO m => ImplGr f -> m (Map Loc Form)
 collectAnswer g = traverse Z3.superSimplify $ execState (G.itravVert (\_ (Inst loc _ f) ->
   when (f /= LBool True) $ modify (M.insertWith mkOr loc f)) g) M.empty
 
 -- | Unwind all backedges which do not reach an inductive vertex, then compress
 -- the graph to only those vertices which reach the end.
-unwindAll :: [(G.HEdge Idx, Edge)] -> Set Idx -> Idx -> ImplGr -> ImplGr
+unwindAll :: [(G.HEdge Idx, f Form)] -> Set Idx -> Idx -> ImplGr f -> ImplGr f
 unwindAll bes ind edgeEnd g =
   let relevantBes = bes & filter (\be ->        -- a backedge is relevant if...
         be & fst & G.start                      -- we consider the start of the backedge and...
@@ -53,7 +54,7 @@ unwindAll bes ind edgeEnd g =
       in G.filterIdxs (`elem` G.idxs compressed) g'
 
 -- | Unwind the graph on the given backedge and update all instances in the unwinding.
-unwind :: (G.HEdge Idx, Edge) -> ImplGr -> ImplGr
+unwind :: (G.HEdge Idx, f Form) -> ImplGr f -> ImplGr f
 unwind (G.HEdge i1 i2, e) g =
   let (m, g') = g                                       -- in order to calculate the unwound subgraph:
         & G.reaches i2                                  -- find the subgraph which reaches the end of backedge
@@ -90,7 +91,7 @@ end g =
   maximum $ filter
   (\i -> lengthOf (G.edgesFrom i) (G.withoutBackEdges g) == 0) (G.idxs g)
 
-query :: Form -> Graph Loc Edge Inst -> Graph Loc Edge Inst
+query :: Edge f => Form -> Graph Loc (f Form) Inst -> Graph Loc (f Form) Inst
 query q g =
   let e = end g
       vs' = g ^?! ix e . instVars
@@ -98,5 +99,5 @@ query q g =
       q' = subst m q
   in
   g & G.addVert Terminal (Inst Terminal vs' q')
-    & G.addEdge (G.HEdge (S.singleton e) Terminal) (Leaf $ LBool True)
+    & G.addEdge (G.HEdge (S.singleton e) Terminal) (point $ LBool True)
     & prune

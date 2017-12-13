@@ -54,6 +54,7 @@ library
                      , lens             >= 4.15
                      , mtl              >= 2.2
                      , monad-loops
+                     , pointed
                      , extra
                      , parsec           >= 3.1
                      , prettyprinter

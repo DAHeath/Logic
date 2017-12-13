@@ -1,6 +1,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 module SafetyExample where
 
+import           Data.Functor.Identity
 import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Graph.Extras as G
 import qualified Data.Map as M
@@ -26,7 +27,7 @@ i, n :: Var
 i  = Var ["i"] 0 False F.Int
 n  = Var ["n"] 0 False F.Int
 
-g :: Graph Loc Edge Inst
+g :: Graph Loc (Identity Form) Inst
 g = singleNonRec
   [ (i := [form|0|], [i,n])
   , ( While [form|i < n|]

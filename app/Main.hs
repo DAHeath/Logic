@@ -12,3 +12,4 @@ main = do
     "safety" -> SafetyExample.example
     "key" -> KeyExample.example
     _ -> putStrLn "please provide a valid argument"
+  main

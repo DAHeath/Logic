@@ -3,6 +3,7 @@ module Logic.Solver.Equivalence where
 import           Control.Lens
 import           Control.Monad.State
 
+import           Data.Copointed
 import qualified Data.Set as S
 import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Directed.HyperGraph as G
@@ -12,11 +13,11 @@ import           Logic.ImplicationGraph
 
 -- | Repeatedly unwind the program until a counterexample is found or inductive
 -- invariants are found.
-solve :: MonadIO m
+solve :: (MonadIO m, Copointed e1)
       => Form
-      -> Graph Loc Edge Inst
-      -> Graph Loc Edge Inst
-      -> m (Either Model ImplGr)
+      -> Graph Loc (e1 Form) Inst
+      -> Graph Loc (e1 Form) Inst
+      -> m (Either Model (ImplGr LTree))
 solve quer g1 g2 = loop $ fromGraph wQuery
   where
     wQuery = query quer $ equivProduct (prepare g1) (prepare g2)
@@ -31,8 +32,8 @@ solve quer g1 g2 = loop $ fromGraph wQuery
 
     equivProduct g1' g2' =
       cleanIntros (G.cartesianProductWith edgeMerge const LocPair vertMerge
-                     (G.mapEdge LOnly g1')
-                     (G.mapEdge ROnly g2'))
+                     (G.mapEdge (LOnly . Leaf . copoint) g1')
+                     (G.mapEdge (ROnly . Leaf . copoint) g2'))
 
     cleanIntros g' =
       let es = g' ^@.. G.iallEdges

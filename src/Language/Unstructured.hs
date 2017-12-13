@@ -4,6 +4,7 @@ import           Control.Lens
 import           Control.Arrow (second)
 import           Control.Monad.State
 
+import           Data.Pointed
 import           Data.Data (Data)
 import qualified Data.Set as S
 import           Data.Map (Map)
@@ -60,7 +61,7 @@ instance Pretty Program where
     pretty ep <+> pretty (M.toList ps)
 
 -- | Transform a program and property into a graph.
-impGraph :: Program -> Graph Loc Edge Inst
+impGraph :: Edge f => Program -> Graph Loc (f Form) Inst
 impGraph (Program ep ps) =
   let (_, _, m) = execState (organize ep) (0, S.empty, M.empty)
       ps' = M.mapWithKey (renumber (fmap (\(c, _, _) -> c) m)) ps
@@ -86,13 +87,15 @@ impGraph (Program ep ps) =
             (Call pn' _ _, []) -> organize pn'
             _ -> return ()) insts
 
-instsToGraph :: Map ProcName (Integer, [Var], [Var]) -> Imp -> Graph Loc Edge Inst
+instsToGraph :: Edge f
+             => Map ProcName (Integer, [Var], [Var])
+             -> Imp -> Graph Loc (f Form) Inst
 instsToGraph callM cs = prune $ G.fromLists verts edges
   where
     endProg = toInteger $ length cs - 1
     verts = tail $
       zipWith vertOf [0..] (map snd cs) ++ [(Loc endProg, Inst (Loc endProg) [] (LBool True))]
-    edges = map (second Leaf) $ concat $ zipWith edgesOf [0..] cs
+    edges = map (second point) $ concat $ zipWith edgesOf [0..] cs
 
     vertOf l vs = (Loc l, emptyInst (Loc l) (map (setLoc l) vs))
 

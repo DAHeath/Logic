@@ -6,9 +6,10 @@ import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Directed.HyperGraph as G
 import qualified Data.Set as S
 import           Data.Foldable (toList)
+import           Data.Copointed
 
 import           Logic.Formula
-import           Logic.ImplicationGraph.Types
+import           Logic.ImplicationGraph.Types as T
 import           Logic.ImplicationGraph.LTree as L
 
 -- | Finds irreducible vertices in a given `ImplGr`.
@@ -29,26 +30,24 @@ cartesianProduct f as bs = [ f a b | a <- as, b <- bs ]
 
 -- | Combine edges that 'execute' after one another, the first argument is
 -- the edge that runs first.
-conjunction :: Edge -> Edge -> Edge
+conjunction :: Edge f => f Form -> f Form -> f Form
 conjunction e1 e2 =
-  case e2 of
-    -- preserve the structure of the incoming edge if
-    -- the outgoing edge has no structure
-    Leaf f -> fmap (mkAnd f) (mapVars unalias e1)
-    _ ->
-      let inc = foldl1 mkOr (toList e1)
-      in fmap (conj inc) e2
+  if unlabelled e2
+  -- preserve the structure of the incoming edge if
+  -- the outgoing edge has no structure
+  then fmap (mkAnd (copoint e2)) (e1 & traverse . vars %~ unalias)
+  else fmap (conj (manyOr e1)) e2
 
   where
     conj a b = mapVars unalias a `mkAnd` b
     unalias v = v & varNew .~ False
 
-disjunction :: Edge -> Edge -> Edge
-disjunction = L.unionWith mkOr
+disjunction :: Edge f => f Form -> f Form -> f Form
+disjunction = T.unionWith mkOr
 
 -- | Remove all reducible vertices and combine edges through {dis/con}junction.
-prune :: (Show i, Ord i) => Graph i Edge Inst
-      -> Graph i Edge Inst
+prune :: (Show i, Ord i, Edge f) => Graph i (f Form) Inst
+      -> Graph i (f Form) Inst
 prune graph =
   let g = foldl (flip removeVertex) graph reducible
   in G.imapEdge (cleanEdgeVars g) g
@@ -66,7 +65,7 @@ prune graph =
 
   reducible = filter (not . flip elem (irreducible graph)) $ G.idxs graph
 
-  cleanEdgeVars :: Ord i => Graph i Edge Inst -> G.HEdge i -> Edge -> Edge
+  cleanEdgeVars :: (Edge f, Ord i) => Graph i (f Form) Inst -> G.HEdge i -> f Form -> f Form
   cleanEdgeVars g (G.HEdge is i) e =
     let vsBef = concatMap (\i' -> g ^?! ix i' . instVars) is
         vsAft = ((g ^?! ix i . instVars) & map setNew) ++ (g ^?! ix i . instVars)

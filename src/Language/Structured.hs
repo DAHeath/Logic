@@ -48,18 +48,18 @@ data Program =
 
 -- | Create a program graph consisting of one procedure which is allowed to
 -- call itself.
-singleProc :: ProcName -> [Var] -> [Var] -> Imp -> Graph Loc Edge Inst
+singleProc :: Edge f => ProcName -> [Var] -> [Var] -> Imp -> Graph Loc (f Form) Inst
 singleProc pn inp out instrs = impGraph Program
   { _entryPoint = pn
   , _procedures = M.singleton pn (inp, out, instrs)
   }
 
 -- | Create a program graph consisting of one procedure with no recursion.
-singleNonRec :: Imp -> Graph Loc Edge Inst
+singleNonRec :: Edge f => Imp -> Graph Loc (f Form) Inst
 singleNonRec = singleProc "" [] []
 
 -- | Create a program graph.
-impGraph :: Program -> Graph Loc Edge Inst
+impGraph :: Edge f => Program -> Graph Loc (f Form) Inst
 impGraph = U.impGraph . compile
 
 -- | Convert a structured program into an unstructured program.

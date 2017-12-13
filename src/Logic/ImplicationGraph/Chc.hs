@@ -20,8 +20,8 @@ import qualified Logic.Solver.Z3 as Z3
 
 -- | Interpolate the facts in the graph using CHC solving to label the vertices
 -- with fresh definitions.
-interpolate :: (MonadError Model m, MonadIO m)
-            => ImplGr -> m ImplGr
+interpolate :: (MonadError Model m, MonadIO m, Foldable f)
+            => ImplGr f -> m (ImplGr f)
 interpolate g = do
   let g' = G.withoutBackEdges (G.mapEdge toList g)
   sol <- interp (G.reaches (end g') g')
