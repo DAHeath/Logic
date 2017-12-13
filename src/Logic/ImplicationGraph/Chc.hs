@@ -14,9 +14,6 @@ import           Data.Maybe (fromJust)
 import           Data.List.Split (splitOn)
 
 import           Logic.Formula
-import           Logic.Model
-import           Logic.Var
-import           Logic.Chc
 import           Logic.ImplicationGraph.Types
 import           Logic.ImplicationGraph.Accessors
 import qualified Logic.Solver.Z3 as Z3

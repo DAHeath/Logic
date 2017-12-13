@@ -14,11 +14,11 @@ import           Text.Parsec.Language (emptyDef)
 import qualified Language.Haskell.TH as TH
 import           Language.Haskell.TH.Quote
 
-import           Logic.Type (Type)
-import qualified Logic.Type as T
-import           Logic.Formula
-import           Logic.Var
-import           Logic.Chc
+import           Logic.Formula.Type (Type)
+import qualified Logic.Formula.Type as T
+import           Logic.Formula.Form
+import           Logic.Formula.Var
+import           Logic.Formula.Chc
 
 lexeme :: Stream s m Char => ParsecT s u m b -> ParsecT s u m b
 lexeme p = do { x <- p; spaces; return x  }

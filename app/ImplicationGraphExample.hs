@@ -5,10 +5,8 @@ import qualified Data.Map as M
 import           Data.Text.Prettyprint.Doc
 
 import           Logic.ImplicationGraph
-import           Logic.ImplicationGraph.Safety
-import qualified Logic.Type as T
-import           Logic.Formula.Parser
-import           Logic.Var
+import           Logic.Formula as F
+import           Logic.Solver.Safety
 
 import           Language.Structured
 
@@ -23,8 +21,8 @@ main = do
       print . pretty . M.toList =<< collectAnswer r
 
 i, n :: Var
-i  = Var ["i"] 0 False T.Int
-n  = Var ["n"] 0 False T.Int
+i  = Var ["i"] 0 False F.Int
+n  = Var ["n"] 0 False F.Int
 
 example :: Graph Loc Edge Inst
 example = singleNonRec

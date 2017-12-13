@@ -12,9 +12,7 @@ import qualified Data.Optic.Directed.HyperGraph as G
 import           Data.Optic.Directed.HyperGraph (Graph)
 import           Data.Text.Prettyprint.Doc
 
-import qualified Logic.Type as T
 import           Logic.Formula
-import           Logic.Var
 import           Logic.ImplicationGraph
 
 -- | An unstructured program contains no structured loops of if statements.
@@ -105,7 +103,7 @@ instsToGraph callM cs = prune $ G.fromLists verts edges
         in
         [ edgeFrom l (l+1)
           $ mkAnd
-              (mkEql (T.typeOf v) (V $ setNew $ setLoc (l+1) v) f')
+              (mkEql (typeOf v) (V $ setNew $ setLoc (l+1) v) f')
               (varCarry l (l+1) vs')
         ]
       Jump l' ->
@@ -150,4 +148,4 @@ instsToGraph callM cs = prune $ G.fromLists verts edges
           aft = vs & map (setLoc l') & map setNew
       in groupUp (map V bef) (map V aft)
 
-    groupUp as bs = manyAnd $ zipWith (\a b -> mkEql (T.typeOf a) a b) as bs
+    groupUp as bs = manyAnd $ zipWith (\a b -> mkEql (typeOf a) a b) as bs

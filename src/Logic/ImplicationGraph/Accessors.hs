@@ -13,7 +13,6 @@ import qualified Data.Set as S
 import           Data.Maybe (fromJust)
 
 import           Logic.Formula
-import           Logic.Var
 import qualified Logic.Solver.Z3 as Z3
 import           Logic.ImplicationGraph.Types
 import           Logic.ImplicationGraph.Simplify

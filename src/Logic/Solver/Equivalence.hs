@@ -1,4 +1,4 @@
-module Logic.ImplicationGraph.Equivalence where
+module Logic.Solver.Equivalence where
 
 import           Control.Lens
 import           Control.Monad.State
@@ -8,8 +8,6 @@ import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Directed.HyperGraph as G
 
 import           Logic.Formula
-import           Logic.Model
-import           Logic.Var
 import           Logic.ImplicationGraph
 
 -- | Repeatedly unwind the program until a counterexample is found or inductive

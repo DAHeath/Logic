@@ -12,7 +12,6 @@ import           Data.Data
 import           Data.Text.Prettyprint.Doc
 import           Data.Optic.Directed.HyperGraph (Graph)
 
-import           Logic.Var
 import           Logic.Formula
 import           Logic.ImplicationGraph.LTree
 

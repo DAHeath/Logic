@@ -13,8 +13,6 @@ import qualified Data.Set as S
 import           Data.Maybe (mapMaybe)
 
 import           Logic.Formula
-import           Logic.Model
-import           Logic.Var
 import qualified Logic.Solver.Z3 as Z3
 import           Logic.ImplicationGraph.Accessors
 import           Logic.ImplicationGraph.Types

@@ -9,7 +9,6 @@ import           Data.Data (Data)
 import           Data.Optic.Directed.HyperGraph (Graph)
 
 import           Logic.Formula
-import           Logic.Var
 import           Logic.ImplicationGraph.Types
 
 import qualified Language.Unstructured as U

@@ -3,19 +3,17 @@ import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Graph.Extras as G
 import           Data.Text.Prettyprint.Doc
 
-import           Logic.Var
-import           Logic.Formula.Parser
-import qualified Logic.Type as T
+import           Logic.Formula as F
 import           Logic.ImplicationGraph
-import           Logic.ImplicationGraph.Equivalence
+import           Logic.Solver.Equivalence
 
 import           Language.Structured
 
 r, n, m, x :: Var
-r = Var ["r"] 0 False T.Int
-n = Var ["n"] 0 False T.Int
-m = Var ["m"] 0 False T.Int
-x = Var ["x"] 0 False T.Int
+r = Var ["r"] 0 False F.Int
+n = Var ["n"] 0 False F.Int
+m = Var ["m"] 0 False F.Int
+x = Var ["x"] 0 False F.Int
 
 ad0 :: Graph Loc Edge Inst
 ad0 = singleNonRec

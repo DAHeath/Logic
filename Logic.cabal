@@ -3,10 +3,10 @@ version:             0.1.0.0
 homepage:            https://github.com/githubuser/Logic#readme
 license:             BSD3
 license-file:        LICENSE
-author:              Author name here
-maintainer:          example@example.com
-copyright:           2017 Author name here
-category:            Web
+author:              David Heath
+maintainer:          heath.davidanthony@gmail.com
+copyright:           2017 David Heath
+category:            Compilers
 build-type:          Simple
 extra-source-files:  README.md
 cabal-version:       >=1.10
@@ -15,19 +15,21 @@ library
   hs-source-dirs:      src
   ghc-options: -Wall
   exposed-modules:     Logic.Formula
-                     , Logic.Formula.Parser
-                     , Logic.Var
-                     , Logic.Type
-                     , Logic.Model
-                     , Logic.Chc
                      , Logic.ImplicationGraph
-                     , Logic.ImplicationGraph.Equivalence
-                     , Logic.ImplicationGraph.Safety
+                     , Logic.Solver.Equivalence
+                     , Logic.Solver.Safety
                      , Logic.Solver.Z3
                      , Language.Structured
                      , Language.Unstructured
                      , Data.Optic.Graph.Extras
-  other-modules:       Logic.ImplicationGraph.Chc
+  other-modules:       Logic.Formula.Var
+                     , Logic.Formula.Type
+                     , Logic.Formula.Model
+                     , Logic.Formula.Chc
+                     , Logic.Formula.Parser
+                     , Logic.Formula.Form
+                     , Logic.Formula.Loc
+                     , Logic.ImplicationGraph.Chc
                      , Logic.ImplicationGraph.Induction
                      , Logic.ImplicationGraph.Simplify
                      , Logic.ImplicationGraph.LTree

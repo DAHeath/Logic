@@ -8,7 +8,6 @@ import qualified Data.Set as S
 import           Data.Foldable (toList)
 
 import           Logic.Formula
-import           Logic.Var
 import           Logic.ImplicationGraph.Types
 import           Logic.ImplicationGraph.LTree as L
 

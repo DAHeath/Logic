@@ -29,14 +29,15 @@ com = (do
     return (Call n args vals))
   <|> (const Done <$> res "done")
 
-com' :: CharParser st (Com, [Var])
-com' = do
-  c <- com
-  vs <- parens (commaSep var)
-  return (c, vs)
-
 imp :: CharParser st Imp
 imp = com' `sepBy` op ";"
+  where
+    com' :: CharParser st (Com, [Var])
+    com' = do
+      c <- com
+      vs <- parens (commaSep var)
+      return (c, vs)
+
 
 proc :: CharParser st (ProcName, ([Var], [Var], Imp))
 proc = do

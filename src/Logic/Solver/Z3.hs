@@ -11,14 +11,8 @@ import           Data.Maybe
 import qualified Data.Map as M
 import           Data.Map (Map)
 
-import           Logic.Chc (Chc)
-import qualified Logic.Chc as C
-import           Logic.Formula (Form((:@)))
+import           Logic.Formula (Form((:@)), Chc, Type((:=>)), Var(..))
 import qualified Logic.Formula as F
-import           Logic.Var
-import           Logic.Type (Type((:=>)))
-import qualified Logic.Type as T
-import qualified Logic.Model as M
 
 import           Z3.Monad hiding (local)
 data Env = Env { _envVars :: Map Var AST
@@ -29,7 +23,7 @@ makeLenses ''Env
 type SMT n m = (MonadState Env m, MonadZ3 m)
 
 -- | Invoke `duality` to solve the relational post fixed-point problem.
-solveChc :: (MonadError M.Model m, MonadIO m) => [Chc] -> m M.Model
+solveChc :: (MonadError F.Model m, MonadIO m) => [Chc] -> m F.Model
 solveChc hcs = do
   res <- runEnvZ3 sc
   case res of
@@ -37,7 +31,7 @@ solveChc hcs = do
     Right m -> return m
   where
     sc = do
-      let (queries, rules) = partition C.isQuery hcs
+      let (queries, rules) = partition F.isQuery hcs
       let qids = map (const "x0/q") queries
       let qs = zipWith mkQuery queries qids
       let satForms = map F.toForm rules ++ qs
@@ -47,7 +41,7 @@ solveChc hcs = do
       rids' <- traverse mkStringSymbol rids
       zipWithM_ fixedpointAddRule forms rids'
 
-      let quers = [Var ["x"] 0 False T.Bool]
+      let quers = [Var ["x"] 0 False F.Bool]
       quers' <- traverse funcToDecl quers
       res <- fixedpointQueryRelations quers'
       case res of
@@ -55,7 +49,7 @@ solveChc hcs = do
         _     -> Left <$> (modelToModel =<< fixedpointGetRefutation)
 
     mkQuery q n =
-      let theQuery = F.V $ varForName n T.Bool in
+      let theQuery = F.V $ F.varForName n F.Bool in
       F.app2 F.Impl (F.mkNot $ F.toForm q) theQuery
 
     useDuality = do
@@ -64,7 +58,7 @@ solveChc hcs = do
       fixedpointSetParams pars
 
 -- | Find a satisfying model of an input formula (if one exists).
-satisfy :: MonadIO m => Form -> m (Maybe M.Model)
+satisfy :: MonadIO m => Form -> m (Maybe F.Model)
 satisfy f = runEnvZ3 $ do
   assert =<< formToAst f
   (_, m) <- solverCheckAndGetModel
@@ -209,14 +203,14 @@ appToZ3 f args =
 
 funcToDecl :: (MonadState Env z3, MonadZ3 z3) => Var -> z3 FuncDecl
 funcToDecl r = do
-  let t = T.typeOf r
-  let n = varName r
+  let t = F.typeOf r
+  let n = F.varName r
   env <- use envFuns
   case M.lookup r env of
     Nothing -> do
-      sorts <- traverse typeToSort (T.domain t)
+      sorts <- traverse typeToSort (F.domain t)
       sym <- mkStringSymbol n
-      r' <- mkFuncDecl sym sorts =<< typeToSort (T.range t)
+      r' <- mkFuncDecl sym sorts =<< typeToSort (F.range t)
       fixedpointRegisterRelation r'
       envFuns %= M.insert r r'
       return r'
@@ -229,39 +223,39 @@ formFromApp n args range
   -- The 'app' is just a variable
   | null args = do
     typ <- sortToType range
-    return $ F.V $ varForName n typ
+    return $ F.V $ F.varForName n typ
   | n == "ite" || n == "if" = do
     c <- astToForm (head args)
     e1 <- astToForm (args !! 1)
     e2 <- astToForm (args !! 2)
-    return $ F.appMany (F.If (T.typeOf e1)) [c, e1, e2]
+    return $ F.appMany (F.If (F.typeOf e1)) [c, e1, e2]
   | n == "and"      = F.manyAnd  <$> traverse astToForm args
   | n == "or"       = F.manyOr   <$> traverse astToForm args
   | n == "+"        = F.manyIAdd <$> traverse astToForm args
   | n == "*"        = F.manyIMul <$> traverse astToForm args
-  | n == "mod"      = liftMany (F.Mod T.Int)
-  | n == "distinct" = liftMany (F.Distinct T.Int)
-  | n == "div"      = lift2 (F.Div T.Int)
+  | n == "mod"      = liftMany (F.Mod F.Int)
+  | n == "distinct" = liftMany (F.Distinct F.Int)
+  | n == "div"      = lift2 (F.Div F.Int)
   | n == "iff"      = lift2 F.Iff
   | n == "=>"       = lift2 F.Impl
-  | n == "<"        = lift2 (F.Lt T.Int)
-  | n == "<="       = lift2 (F.Le T.Int)
-  | n == ">"        = lift2 (F.Gt T.Int)
-  | n == ">="       = lift2 (F.Ge T.Int)
-  | n == "="        = F.mkEql T.Int <$> astToForm (head args) <*> astToForm (args !! 1)
+  | n == "<"        = lift2 (F.Lt F.Int)
+  | n == "<="       = lift2 (F.Le F.Int)
+  | n == ">"        = lift2 (F.Gt F.Int)
+  | n == ">="       = lift2 (F.Ge F.Int)
+  | n == "="        = F.mkEql F.Int <$> astToForm (head args) <*> astToForm (args !! 1)
   | n == "not"      = F.mkNot <$> astToForm (head args)
   | n == "-"        = if length args == 1
-                         then F.app2 (F.Sub T.Int) (F.LInt 0) <$> astToForm (head args)
-                         else lift2 (F.Sub T.Int)
-  | n == "select"   = lift2 (F.Select T.Int T.Int)
-  | n == "store"    = lift3 (F.Store T.Int T.Int)
+                         then F.app2 (F.Sub F.Int) (F.LInt 0) <$> astToForm (head args)
+                         else lift2 (F.Sub F.Int)
+  | n == "select"   = lift2 (F.Select F.Int F.Int)
+  | n == "store"    = lift3 (F.Store F.Int F.Int)
   | otherwise = do
     -- Found a function that is as of yet unknown.
     liftIO $ putStrLn ("applying: " ++ n)
     args' <- traverse astToForm args
     domain <- traverse getType args
     range' <- sortToType range
-    let f = varForName n (T.curryType domain range')
+    let f = F.varForName n (F.curryType domain range')
     return $ F.appMany (F.V f) args'
   where lift2 f = F.app2 f <$> astToForm (head args) <*> astToForm (args !! 1)
         lift3 f = F.app3 f <$> astToForm (head args)
@@ -271,8 +265,8 @@ formFromApp n args range
 
 -- | Convert a Z3 model to the AST-based formula model.
 modelToModel :: (MonadState Env z3, MonadZ3 z3)
-             => Model -> z3 M.Model
-modelToModel m = M.Model <$> (traverse superSimplify =<< M.union <$> functions <*> constants)
+             => Model -> z3 F.Model
+modelToModel m = F.Model <$> (traverse superSimplify =<< M.union <$> functions <*> constants)
   where
     functions = do
       fds <- modelGetFuncDecls m
@@ -293,8 +287,8 @@ modelToModel m = M.Model <$> (traverse superSimplify =<< M.union <$> functions <
       domain <- traverse sortToType =<< getDomain fd
       range  <- sortToType =<< getRange fd
       if n == "@Fail!0"
-      then return $ varForName "x0/Fail" (T.curryType domain range)
-      else return $ varForName n (T.curryType domain range)
+      then return $ F.varForName "x0/Fail" (F.curryType domain range)
+      else return $ F.varForName n (F.curryType domain range)
 
 -- | Convert the Z3 internal representation of a formula to the AST representation.
 astToForm :: MonadZ3 z3 => AST -> z3 Form
@@ -305,8 +299,8 @@ astToForm arg = do
       do t <- getType arg
          rep <- getNumeralString arg
          case t of
-           T.Int  -> return $ F.LInt  $ read rep
-           T.Real -> return $ F.LReal $ read rep
+           F.Int  -> return $ F.LInt  $ read rep
+           F.Real -> return $ F.LReal $ read rep
            _       -> error "unknown numeric type"
 
     Z3_APP_AST ->
@@ -317,7 +311,7 @@ astToForm arg = do
          range <- getRange decl
          formFromApp n args range
 
-    Z3_VAR_AST -> F.V <$> (bound <$> (toInteger <$> getIndexValue arg) <*> getType arg)
+    Z3_VAR_AST -> F.V <$> (F.bound <$> (toInteger <$> getIndexValue arg) <*> getType arg)
 
     Z3_QUANTIFIER_AST -> do liftIO $ putStrLn "quantifier!"
                             undefined
@@ -333,27 +327,27 @@ astToForm arg = do
 
 typeToSort :: MonadZ3 z3 => Type -> z3 Sort
 typeToSort = \case
-  T.Unit       -> mkIntSort
-  T.Bool       -> mkBoolSort
-  T.Int        -> mkIntSort
-  T.Real       -> mkRealSort
-  T.Array t t' -> join $ mkArraySort <$> typeToSort t <*> typeToSort t'
+  F.Unit       -> mkIntSort
+  F.Bool       -> mkBoolSort
+  F.Int        -> mkIntSort
+  F.Real       -> mkRealSort
+  F.Array t t' -> join $ mkArraySort <$> typeToSort t <*> typeToSort t'
   _ :=> _      -> undefined
-  T.List _     -> undefined
+  F.List _     -> undefined
 
 sortToType :: MonadZ3 z3 => Sort -> z3 Type
 sortToType s = do
   sk <- getSortKind s
   case sk of
     Z3_UNINTERPRETED_SORT  -> error "unsupported sort kind"
-    Z3_BOOL_SORT           -> return T.Bool
-    Z3_INT_SORT            -> return T.Int
-    Z3_REAL_SORT           -> return T.Real
+    Z3_BOOL_SORT           -> return F.Bool
+    Z3_INT_SORT            -> return F.Int
+    Z3_REAL_SORT           -> return F.Real
     Z3_BV_SORT             -> error "unsupported sort kind"
     Z3_ARRAY_SORT          -> do
       d <- sortToType =<< getArraySortDomain s
       r <- sortToType =<< getArraySortRange s
-      return (T.Array d r)
+      return (F.Array d r)
     Z3_DATATYPE_SORT       -> error "unsupported sort kind"
     Z3_RELATION_SORT       -> error "unsupported sort kind"
     Z3_FINITE_DOMAIN_SORT  -> error "unsupported sort kind"
@@ -369,7 +363,7 @@ declName = getDeclName >=> getSymbolString
 
 varDec :: MonadZ3 z3 => Var -> z3 FuncDecl
 varDec v = do
-  let t = T.typeOf v
-  let n = varName v
+  let t = F.typeOf v
+  let n = F.varName v
   sym <- mkStringSymbol n
   mkFuncDecl sym [] =<< typeToSort t

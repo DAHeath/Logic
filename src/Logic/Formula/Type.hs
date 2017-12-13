@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Logic.Type where
+module Logic.Formula.Type where
 
 import           Control.Lens hiding (List)
 import           Data.Data (Data)
