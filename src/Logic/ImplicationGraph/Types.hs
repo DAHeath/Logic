@@ -1,8 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable
-           , TypeFamilies
-           , TemplateHaskell
-           , ConstraintKinds
-           , FlexibleInstances #-}
 module Logic.ImplicationGraph.Types where
 
 import           Control.Lens

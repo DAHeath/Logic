@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 module Logic.ImplicationGraph.LTree where
 
 import Data.Data (Data)

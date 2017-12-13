@@ -1,5 +1,4 @@
-{-# LANGUAGE TemplateHaskell, ConstraintKinds #-}
-
+{-# LANGUAGE ConstraintKinds #-}
 module Logic.Solver.Z3 where
 
 import           Control.Lens

@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 module Logic.Formula.Type where
 
 import           Control.Lens hiding (List)

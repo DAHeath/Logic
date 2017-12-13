@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 module Logic.Formula.Parser where
 
 import           Control.Lens hiding (op)

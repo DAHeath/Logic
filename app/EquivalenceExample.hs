@@ -1,4 +1,6 @@
 {-# LANGUAGE QuasiQuotes #-}
+module EquivalenceExample where
+
 import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Graph.Extras as G
 import           Data.Text.Prettyprint.Doc
@@ -26,8 +28,8 @@ ad1 = singleNonRec
       [ (x := [form|x / 10 + x % 10|], [x, m]) ], [x, m])
   ]
 
-main :: IO ()
-main = do
+example :: IO ()
+example = do
   sol <- solve
     [form|n > 0 && n = m -> x = r|] ad0 ad1
   case sol of

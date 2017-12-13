@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 module Logic.Formula.Generalizer where
 
 import Control.Monad.State

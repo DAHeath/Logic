@@ -1,4 +1,6 @@
 {-# LANGUAGE QuasiQuotes #-}
+module KeyExample where
+
 import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Graph.Extras as G
 import           Data.Text.Prettyprint.Doc
@@ -78,8 +80,8 @@ h' = singleProc "h" [x'] [y']
     , [x', y'])
   ]
 
-main :: IO ()
-main = do
+example :: IO ()
+example = do
   -- G.display "f" f
   G.display "h" h
   G.display "h2" h'

@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 module Logic.Formula.Var where
 
 import           Control.Lens

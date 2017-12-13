@@ -1,4 +1,6 @@
 {-# LANGUAGE QuasiQuotes #-}
+module SafetyExample where
+
 import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Graph.Extras as G
 import qualified Data.Map as M
@@ -10,10 +12,10 @@ import           Logic.Solver.Safety
 
 import           Language.Structured
 
-main :: IO ()
-main = do
-  G.display "before.dot" example
-  sol <- solve [form|not (i = 7)|] example
+example :: IO ()
+example = do
+  G.display "before.dot" g
+  sol <- solve [form|not (i = 7)|] g
   case sol of
     Left m -> print (pretty m)
     Right r -> do
@@ -24,8 +26,8 @@ i, n :: Var
 i  = Var ["i"] 0 False F.Int
 n  = Var ["n"] 0 False F.Int
 
-example :: Graph Loc Edge Inst
-example = singleNonRec
+g :: Graph Loc Edge Inst
+g = singleNonRec
   [ (i := [form|0|], [i,n])
   , ( While [form|i < n|]
         [ (i := [form|i + 2|], [i,n]) ]
