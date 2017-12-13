@@ -41,7 +41,7 @@ instance Pretty (LTree Form) where
                       <+> pretty "R:" <> pretty t2
 
 instance Pretty Inst where
-  pretty (Inst l vs f) = pretty l <+> pretty vs <+> pretty f
+  pretty (Inst l vs f) = vsep [pretty l, pretty vs, pretty f]
 
 type ImplGr = Graph Idx Edge Inst
 
