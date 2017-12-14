@@ -1,5 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
-module Logic.Var where
+module Logic.Formula.Var where
 
 import           Control.Lens
 
@@ -13,33 +12,10 @@ import           Data.Text.Prettyprint.Doc
 import           Data.List (intercalate)
 import           Data.List.Split (splitOn)
 
-import           Logic.Type (Type, Typed)
-import qualified Logic.Type as T
+import           Logic.Formula.Type (Type, Typed)
+import qualified Logic.Formula.Type as T
 
 import           Text.Read (readMaybe)
-
-data Loc' i
-  = Loc i
-  | LocPair (Loc' i) (Loc' i)
-  | Initial
-  | Terminal
-  deriving (Show, Read, Eq, Data)
-
-instance Ord i => Ord (Loc' i) where
-  Loc i        <= Loc j        = i <= j
-  LocPair  i j <= LocPair  k l = i < k || (i == k && j <= l)
-  LocPair  i j <= Loc k        = i < Loc k && j < Loc k
-  Initial      <= _            = True
-  _            <= Terminal     = True
-  a            <= b            = b >= a
-
-instance Pretty i => Pretty (Loc' i) where
-  pretty (Loc i) = pretty i
-  pretty (LocPair i j) = pretty "{" <> pretty i <> pretty "." <> pretty j <> pretty "}"
-  pretty Initial = pretty "START"
-  pretty Terminal = pretty "END"
-
-type Loc = Loc' Integer
 
 data Var = Var
   { _varId :: [String]

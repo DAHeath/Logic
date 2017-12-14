@@ -5,16 +5,17 @@ import           Control.Lens
 import           Control.Applicative.Backwards
 import           Control.Monad.State
 
-import           Data.Optic.Directed.HyperGraph (Graph)
-import qualified Data.Optic.Directed.HyperGraph as G
+import           Data.Pointed
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Maybe (fromJust)
+import           Data.Loc
+import           Data.Optic.Directed.HyperGraph (Graph)
+import qualified Data.Optic.Directed.HyperGraph as G
 
 import           Logic.Formula
-import           Logic.Var
 import qualified Logic.Solver.Z3 as Z3
 import           Logic.ImplicationGraph.Types
 import           Logic.ImplicationGraph.Simplify
@@ -29,15 +30,15 @@ emptyInst :: Loc -> [Var] -> Inst
 emptyInst l vs = Inst l vs (LBool False)
 
 -- | Gather all facts known about each instance of the same index together by disjunction.
-collectAnswer :: MonadIO m => ImplGr -> m (Map Loc Form)
+collectAnswer :: MonadIO m => ImplGr f -> m (Map Loc Form)
 collectAnswer g = traverse Z3.superSimplify $ execState (G.itravVert (\_ (Inst loc _ f) ->
   when (f /= LBool True) $ modify (M.insertWith mkOr loc f)) g) M.empty
 
 -- | Unwind all backedges which do not reach an inductive vertex, then compress
 -- the graph to only those vertices which reach the end.
-unwindAll :: Integral i => Set i -> Graph i (LTree a) v -> Graph Idx (LTree a) v
+unwindAll :: Edge f => Integral i => Set i -> Graph i (f a) v -> Graph Idx (f a) v
 unwindAll ind g =
-  let relevantBes = bes & filter (\be ->        -- a backedge is relevant if...
+  let relevantBes = backs & filter (\be ->      -- a backedge is relevant if...
         be & fst & G.start                      -- we consider the start of the backedge and...
            & any (\i' -> g & G.withoutBackEdges -- when there are no backedges...
                            & G.reached i'       -- the subgraph reached by the start of the backedge...
@@ -53,7 +54,7 @@ unwindAll ind g =
             & G.withoutBackEdges -- has no backedges...
             & G.reaches (end g)  -- and reaches the query
       in G.filterIdxs (`elem` G.idxs compressed) g'
-    bes = concatMap (\(i, e) -> map ((,) i) (noBr e)) $ G.backEdges g
+    backs = concatMap (\(i, e) -> map ((,) i) (split e)) $ G.backEdges g
 
 -- | Unwind the graph on the given backedge and update all instances in the unwinding.
 unwind :: Integral i => (G.HEdge i, e) -> Graph i e v -> Graph i e v
@@ -93,7 +94,7 @@ end g =
   maximum $ filter
   (\i -> lengthOf (G.edgesFrom i) (G.withoutBackEdges g) == 0) (G.idxs g)
 
-query :: Form -> Graph Loc Edge Inst -> Graph Loc Edge Inst
+query :: Edge f => Form -> Graph Loc (f Form) Inst -> Graph Loc (f Form) Inst
 query q g =
   let e = end g
       vs' = g ^?! ix e . instVars
@@ -101,5 +102,5 @@ query q g =
       q' = subst m q
   in
   g & G.addVert Terminal (Inst Terminal vs' q')
-    & G.addEdge (G.HEdge (S.singleton e) Terminal) (Leaf $ LBool True)
+    & G.addEdge (G.HEdge (S.singleton e) Terminal) (point $ LBool True)
     & prune

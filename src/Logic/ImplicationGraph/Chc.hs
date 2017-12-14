@@ -14,17 +14,14 @@ import           Data.Maybe (fromJust)
 import           Data.List.Split (splitOn)
 
 import           Logic.Formula
-import           Logic.Model
-import           Logic.Var
-import           Logic.Chc
 import           Logic.ImplicationGraph.Types
 import           Logic.ImplicationGraph.Accessors
 import qualified Logic.Solver.Z3 as Z3
 
 -- | Interpolate the facts in the graph using CHC solving to label the vertices
 -- with fresh definitions.
-interpolate :: (MonadError Model m, MonadIO m)
-            => ImplGr -> m ImplGr
+interpolate :: (MonadError Model m, MonadIO m, Foldable f)
+            => ImplGr f -> m (ImplGr f)
 interpolate g = do
   let g' = G.withoutBackEdges (G.mapEdge toList g)
   sol <- interp (G.reaches (end g') g')
@@ -78,6 +75,6 @@ applyModel model = G.imapVert applyInst
           M.findWithDefault f i instMap -- replace the formula by the value in the map
         & instantiate (v ^. instVars))  -- replace the bound variables by the instance variables
 
-    instMap = getModel model
+    instMap = _getModel model
       & M.filterWithKey (\k _ -> head (varName k) == 'r') -- only consider the instance predicates
       & M.mapKeys (read . head . splitOn "/" . tail . varName)                 -- convert the keys of the map to indexes

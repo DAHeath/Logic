@@ -3,10 +3,10 @@ version:             0.1.0.0
 homepage:            https://github.com/githubuser/Logic#readme
 license:             BSD3
 license-file:        LICENSE
-author:              Author name here
-maintainer:          example@example.com
-copyright:           2017 Author name here
-category:            Web
+author:              David Heath
+maintainer:          heath.davidanthony@gmail.com
+copyright:           2017 David Heath
+category:            Compilers
 build-type:          Simple
 extra-source-files:  README.md
 cabal-version:       >=1.10
@@ -15,19 +15,21 @@ library
   hs-source-dirs:      src
   ghc-options: -Wall
   exposed-modules:     Logic.Formula
-                     , Logic.Formula.Parser
-                     , Logic.Var
-                     , Logic.Type
-                     , Logic.Model
-                     , Logic.Chc
                      , Logic.ImplicationGraph
-                     , Logic.ImplicationGraph.Equivalence
-                     , Logic.ImplicationGraph.Safety
+                     , Logic.Solver.Equivalence
+                     , Logic.Solver.Safety
                      , Logic.Solver.Z3
                      , Language.Structured
                      , Language.Unstructured
                      , Data.Optic.Graph.Extras
-  other-modules:       Logic.ImplicationGraph.Chc
+                     , Data.Loc
+  other-modules:       Logic.Formula.Var
+                     , Logic.Formula.Type
+                     , Logic.Formula.Model
+                     , Logic.Formula.Chc
+                     , Logic.Formula.Parser
+                     , Logic.Formula.Form
+                     , Logic.ImplicationGraph.Chc
                      , Logic.ImplicationGraph.Induction
                      , Logic.ImplicationGraph.Simplify
                      , Logic.ImplicationGraph.LTree
@@ -36,10 +38,15 @@ library
 
   default-extensions:  LambdaCase
                      , DeriveDataTypeable
+                     , DeriveFunctor
+                     , DeriveFoldable
+                     , DeriveTraversable
                      , GeneralizedNewtypeDeriving
                      , RankNTypes
                      , FlexibleContexts
-  other-extensions:    TemplateHaskell
+                     , FlexibleInstances
+                     , TemplateHaskell
+  other-extensions:
 
   build-depends:       base             >= 4.8
                      , containers       >= 0.5
@@ -47,6 +54,7 @@ library
                      , lens             >= 4.15
                      , mtl              >= 2.2
                      , monad-loops
+                     , pointed
                      , extra
                      , parsec           >= 3.1
                      , prettyprinter
@@ -61,54 +69,13 @@ library
                      , bytestring
   default-language:    Haskell2010
 
--- executable DualityExample
---   hs-source-dirs:      app
---   main-is:             DualityExample.hs
---   ghc-options:
---   build-depends:       base
---                      , text             >= 1.2
---                      , prettyprinter
---                      , mtl
---                      , containers
---                      , optic-graph
---                      , Logic
---                      , bytestring
---   default-language:    Haskell2010
-
-executable ImplicationGraphExample
+executable Examples
   hs-source-dirs:      app
-  main-is:             ImplicationGraphExample.hs
+  main-is:             Main.hs
   ghc-options:
-  build-depends:       base
-                     , text             >= 1.2
-                     , mtl
-                     , lens
-                     , prettyprinter
-                     , containers
-                     , Logic
-                     , optic-graph
-                     , bytestring
-  default-language:    Haskell2010
-
--- executable SimplifyExample
---   hs-source-dirs:      app
---   main-is:             SimplifyExample.hs
---   ghc-options:
---   build-depends:       base
---                      , text             >= 1.2
---                      , mtl
---                      , prettyprinter
---                      , containers
---                      , Logic
---                      , optic-graph
---                      , bytestring
---                      , lens             >= 4.15
---   default-language:    Haskell2010
-
-executable EquivalenceExample
-  hs-source-dirs:      app
-  main-is:             EquivalenceExample.hs
-  ghc-options:
+  other-modules:       KeyExample
+                     , EquivalenceExample
+                     , SafetyExample
   build-depends:       base
                      , text             >= 1.2
                      , lens
@@ -120,19 +87,15 @@ executable EquivalenceExample
                      , bytestring
   default-language:    Haskell2010
 
-executable KeyExample
-  hs-source-dirs:      app
-  main-is:             KeyExample.hs
-  ghc-options:
+test-suite logic-test
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Data/LocTest.hs
   build-depends:       base
-                     , text             >= 1.2
-                     , lens
-                     , mtl
-                     , prettyprinter
-                     , containers
                      , Logic
-                     , optic-graph
-                     , bytestring
+                     , hspec
+                     , QuickCheck
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
 
 source-repository head

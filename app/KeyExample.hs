@@ -1,28 +1,30 @@
 {-# LANGUAGE QuasiQuotes #-}
+module KeyExample where
+
+import           Data.Text.Prettyprint.Doc
+import           Data.Functor.Identity
+import           Data.Loc
 import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Graph.Extras as G
-import           Data.Text.Prettyprint.Doc
 
-import           Logic.Var
-import           Logic.Formula.Parser
-import qualified Logic.Type as T
+import           Logic.Formula as F
 import           Logic.ImplicationGraph
-import           Logic.ImplicationGraph.Equivalence
+import           Logic.Solver.Equivalence
 
 import           Language.Structured
 
-p, s, n, m, a, r, x, y :: Var
-p = Var ["p"] 0 False T.Int
-s = Var ["s"] 0 False T.Int
-n = Var ["n"] 0 False T.Int
-m = Var ["m"] 0 False T.Int
-a = Var ["a"] 0 False T.Int
-r = Var ["r"] 0 False T.Int
-x = Var ["x"] 0 False T.Int
-y = Var ["y"] 0 False T.Int
-x' = Var ["x'"] 0 False T.Int
-y' = Var ["y'"] 0 False T.Int
-z = Var ["z"] 0 False T.Int
+p, s, n, m, a, r, x, y, x', y', z :: Var
+p = Var ["p"] 0 False F.Int
+s = Var ["s"] 0 False F.Int
+n = Var ["n"] 0 False F.Int
+m = Var ["m"] 0 False F.Int
+a = Var ["a"] 0 False F.Int
+r = Var ["r"] 0 False F.Int
+x = Var ["x"] 0 False F.Int
+y = Var ["y"] 0 False F.Int
+x' = Var ["x'"] 0 False F.Int
+y' = Var ["y'"] 0 False F.Int
+z = Var ["z"] 0 False F.Int
 
 -- int f(int n) {
 --   sum = 0;
@@ -32,7 +34,7 @@ z = Var ["z"] 0 False T.Int
 --   }
 --   return sum
 -- }
-f :: Graph Loc Edge Inst
+f :: Graph Loc (Identity Form) Inst
 f = singleNonRec
   [ (s := [form|0|], [p,s,n])
   , (n := [form|p|], [p,s,n])
@@ -49,7 +51,7 @@ f = singleNonRec
 --        return g(n-1,acc+n)
 --        }
 --        }
-g :: Graph Loc Edge Inst
+g :: Graph Loc (Identity Form) Inst
 g = singleProc "g" [m, a] [r]
   [ (Br [form|m <= 0|]
       [ (r := [form|a|], [m, a, r]) ]
@@ -57,7 +59,7 @@ g = singleProc "g" [m, a] [r]
     , [m, a, r])
   ]
 
-h :: Graph Loc Edge Inst
+h :: Graph Loc (Identity Form) Inst
 h = singleProc "h" [x] [y]
   [ (Br [form|x <= 0|]
       [ (y := [form|0|], [x, y]) ]
@@ -67,7 +69,7 @@ h = singleProc "h" [x] [y]
     , [x, y])
   ]
 
-h' :: Graph Loc Edge Inst
+h' :: Graph Loc (Identity Form) Inst
 h' = singleProc "h" [x'] [y']
   [ (Br [form|x' <= 0|]
       [ (y' := [form|0|], [x', y']) ]
@@ -80,8 +82,8 @@ h' = singleProc "h" [x'] [y']
     , [x', y'])
   ]
 
-main :: IO ()
-main = do
+example :: IO ()
+example = do
   -- G.display "f" f
   G.display "h" h
   G.display "h2" h'

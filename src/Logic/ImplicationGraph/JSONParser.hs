@@ -1,5 +1,4 @@
-{-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
-
+{-# LANGUAGE OverloadedStrings #-}
 module Logic.ImplicationGraph.JSONParser where
 
 import           Control.Monad
