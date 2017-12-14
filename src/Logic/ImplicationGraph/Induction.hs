@@ -18,7 +18,6 @@ import           Logic.Formula
 import qualified Logic.Solver.Z3 as Z3
 import           Logic.ImplicationGraph.Accessors
 import           Logic.ImplicationGraph.Types
-import           Logic.ImplicationGraph.LTree
 import           Logic.ImplicationGraph.Chc
 
 -- | Find the vertex labels in the graph which are inductive.
@@ -61,8 +60,8 @@ inductiveByPred g i = do
   let ies = g ^@.. G.iedgesTo i
   let cats = collect (
         concatMap (\(is, e) ->
-          map (\i ->
-            fmap (const i) e) (S.toList (G.start is))) ies)
+          map (\i' ->
+            fmap (const i') e) (S.toList (G.start is))) ies)
   or <$> traverse (fmap and . traverse (indPred g i)) cats
 
 -- | Are all predecessors inductive?

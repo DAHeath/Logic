@@ -75,6 +75,6 @@ applyModel model = G.imapVert applyInst
           M.findWithDefault f i instMap -- replace the formula by the value in the map
         & instantiate (v ^. instVars))  -- replace the bound variables by the instance variables
 
-    instMap = getModel model
+    instMap = _getModel model
       & M.filterWithKey (\k _ -> head (varName k) == 'r') -- only consider the instance predicates
       & M.mapKeys (read . head . splitOn "/" . tail . varName)                 -- convert the keys of the map to indexes
