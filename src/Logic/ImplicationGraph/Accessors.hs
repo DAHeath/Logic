@@ -19,7 +19,6 @@ import           Logic.Formula
 import qualified Logic.Solver.Z3 as Z3
 import           Logic.ImplicationGraph.Types
 import           Logic.ImplicationGraph.Simplify
-import           Logic.ImplicationGraph.LTree
 
 -- | Construct an implication graph by swapping the labels for proper instance labels.
 fromGraph :: Ord i => Graph i e Inst -> Graph Idx e Inst

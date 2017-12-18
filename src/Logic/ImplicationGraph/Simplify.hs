@@ -5,12 +5,10 @@ import           Control.Lens
 import           Data.Optic.Directed.HyperGraph (Graph)
 import qualified Data.Optic.Directed.HyperGraph as G
 import qualified Data.Set as S
-import           Data.Foldable (toList)
 import           Data.Copointed
 
 import           Logic.Formula
 import           Logic.ImplicationGraph.Types as T
-import           Logic.ImplicationGraph.LTree as L
 
 -- | Finds irreducible vertices in a given `ImplGr`.
 irreducible :: (Ord i) => Graph i e v -> [i]
