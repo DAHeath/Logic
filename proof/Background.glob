@@ -1,0 +1,146 @@
+DIGEST cb35bb804dd9220a78e5cac829866978
+FBackground
+R15:18 Maps <> <> lib
+R44:47 Coq.Init.Datatypes <> cons constr
+not 31:31 <> ::x_'::'_x
+R129:131 Coq.Init.Datatypes <> nil constr
+not 120:120 <> ::'['_']'
+R164:167 Coq.Init.Datatypes <> cons constr
+R175:178 Coq.Init.Datatypes <> cons constr
+R182:184 Coq.Init.Datatypes <> nil constr
+not 143:143 <> ::'['_x_';'_'..'_';'_x_']'
+ind 203:206 <> aexp
+constr 222:225 <> ANum
+constr 245:247 <> AId
+constr 266:270 <> APlus
+constr 299:304 <> AMinus
+constr 333:337 <> AMult
+R232:235 Coq.Init.Logic <> :type_scope:x_'->'_x not
+R236:239 Background <> aexp ind
+R229:231 Coq.Init.Datatypes <> nat ind
+R253:256 Coq.Init.Logic <> :type_scope:x_'->'_x not
+R257:260 Background <> aexp ind
+R251:252 Maps <> id ind
+R278:281 Coq.Init.Logic <> :type_scope:x_'->'_x not
+R286:289 Coq.Init.Logic <> :type_scope:x_'->'_x not
+R290:293 Background <> aexp ind
+R282:285 Background <> aexp ind
+R274:277 Background <> aexp ind
+R312:315 Coq.Init.Logic <> :type_scope:x_'->'_x not
+R320:323 Coq.Init.Logic <> :type_scope:x_'->'_x not
+R324:327 Background <> aexp ind
+R316:319 Background <> aexp ind
+R308:311 Background <> aexp ind
+R345:348 Coq.Init.Logic <> :type_scope:x_'->'_x not
+R353:356 Coq.Init.Logic <> :type_scope:x_'->'_x not
+R357:360 Background <> aexp ind
+R349:352 Background <> aexp ind
+R341:344 Background <> aexp ind
+def 375:375 <> W
+R379:380 Maps <> id ind
+R385:386 Maps <> Id constr
+def 404:404 <> X
+R408:409 Maps <> id ind
+R414:415 Maps <> Id constr
+def 433:433 <> Y
+R437:438 Maps <> id ind
+R443:444 Maps <> Id constr
+def 462:462 <> Z
+R466:467 Maps <> id ind
+R472:473 Maps <> Id constr
+ind 491:494 <> bexp
+constr 510:514 <> BTrue
+constr 527:532 <> BFalse
+constr 545:547 <> BEq
+constr 576:578 <> BLe
+constr 607:610 <> BNot
+constr 631:634 <> BAnd
+R518:521 Background <> bexp ind
+R536:539 Background <> bexp ind
+R555:558 Coq.Init.Logic <> :type_scope:x_'->'_x not
+R563:566 Coq.Init.Logic <> :type_scope:x_'->'_x not
+R567:570 Background <> bexp ind
+R559:562 Background <> aexp ind
+R551:554 Background <> aexp ind
+R586:589 Coq.Init.Logic <> :type_scope:x_'->'_x not
+R594:597 Coq.Init.Logic <> :type_scope:x_'->'_x not
+R598:601 Background <> bexp ind
+R590:593 Background <> aexp ind
+R582:585 Background <> aexp ind
+R618:621 Coq.Init.Logic <> :type_scope:x_'->'_x not
+R622:625 Background <> bexp ind
+R614:617 Background <> bexp ind
+R642:645 Coq.Init.Logic <> :type_scope:x_'->'_x not
+R650:653 Coq.Init.Logic <> :type_scope:x_'->'_x not
+R654:657 Background <> bexp ind
+R646:649 Background <> bexp ind
+R638:641 Background <> bexp ind
+def 672:676 <> state
+R681:689 Maps <> total_map def
+R691:693 Coq.Init.Datatypes <> nat ind
+def 708:718 <> empty_state
+R722:726 Background <> state def
+R733:739 Maps <> t_empty def
+def 754:758 <> aeval
+R766:770 Background <> state def
+R778:781 Background <> aexp ind
+R786:788 Coq.Init.Datatypes <> nat ind
+R801:801 Background <> a var
+R812:815 Background <> ANum constr
+R828:830 Background <> AId constr
+R837:838 Background <> st var
+R846:850 Background <> APlus constr
+R861:861 Coq.Init.Peano <> :nat_scope:x_'+'_x not
+R873:877 Coq.Init.Peano <> :nat_scope:x_'+'_x not
+R889:889 Coq.Init.Peano <> :nat_scope:x_'+'_x not
+R862:866 Background <> aeval def
+R868:869 Background <> st var
+R878:882 Background <> aeval def
+R884:885 Background <> st var
+R895:900 Background <> AMinus constr
+R912:912 Coq.Init.Peano <> :nat_scope:x_'-'_x not
+R924:928 Coq.Init.Peano <> :nat_scope:x_'-'_x not
+R940:940 Coq.Init.Peano <> :nat_scope:x_'-'_x not
+R913:917 Background <> aeval def
+R919:920 Background <> st var
+R929:933 Background <> aeval def
+R935:936 Background <> st var
+R946:950 Background <> AMult constr
+R961:961 Coq.Init.Peano <> :nat_scope:x_'*'_x not
+R973:977 Coq.Init.Peano <> :nat_scope:x_'*'_x not
+R989:989 Coq.Init.Peano <> :nat_scope:x_'*'_x not
+R962:966 Background <> aeval def
+R968:969 Background <> st var
+R978:982 Background <> aeval def
+R984:985 Background <> st var
+def 1008:1012 <> beval
+R1020:1024 Background <> state def
+R1032:1035 Background <> bexp ind
+R1040:1043 Coq.Init.Datatypes <> bool ind
+R1056:1056 Background <> b var
+R1067:1071 Background <> BTrue constr
+R1082:1085 Coq.Init.Datatypes <> true constr
+R1091:1096 Background <> BFalse constr
+R1106:1110 Coq.Init.Datatypes <> false constr
+R1116:1118 Background <> BEq constr
+R1131:1137 Coq.Init.Nat <> eqb def
+R1154:1158 Background <> aeval def
+R1160:1161 Background <> st var
+R1140:1144 Background <> aeval def
+R1146:1147 Background <> st var
+R1171:1173 Background <> BLe constr
+R1186:1192 Coq.Init.Nat <> leb def
+R1209:1213 Background <> aeval def
+R1215:1216 Background <> st var
+R1195:1199 Background <> aeval def
+R1201:1202 Background <> st var
+R1226:1229 Background <> BNot constr
+R1241:1244 Coq.Init.Datatypes <> negb def
+R1247:1251 Background <> beval def
+R1253:1254 Background <> st var
+R1264:1267 Background <> BAnd constr
+R1279:1282 Coq.Init.Datatypes <> andb def
+R1299:1303 Background <> beval def
+R1305:1306 Background <> st var
+R1285:1289 Background <> beval def
+R1291:1292 Background <> st var

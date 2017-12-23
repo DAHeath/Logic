@@ -15,6 +15,7 @@ import           Data.Optic.Directed.HyperGraph (Graph)
 
 import           Logic.Formula
 import           Logic.ImplicationGraph
+import Debug.Trace
 
 -- | An unstructured program contains no structured loops of if statements.
 -- Instead it supports only jumps (conditional and unconditional) and procedure
@@ -63,10 +64,10 @@ instance Pretty Program where
 -- | Transform a program and property into a graph.
 impGraph :: Edge f => Program -> Graph Loc (f Form) Inst
 impGraph (Program ep ps) =
-  let (_, _, m) = execState (organize ep) (0, S.empty, M.empty)
-      ps' = M.mapWithKey (renumber (fmap (\(c, _, _) -> c) m)) ps
-  in
-  instsToGraph m (concatMap (\(_, _, is) -> is) (M.elems ps'))
+  let (_, _, m, ord) = execState (organize ep) (0, S.empty, M.empty, [])
+      ps' = traceShow m $ M.mapWithKey (renumber (fmap (\(c, _, _) -> c) m)) ps
+      allIs = foldr (\pn -> (((ps' M.! pn) ^. _3) ++)) [] ord
+  in instsToGraph m allIs
   where
     renumber m pn (args, params, is) =
       let offset = m M.! pn - toInteger (length is) + 1 in
@@ -76,21 +77,26 @@ impGraph (Program ep ps) =
         c -> c) is)
 
     organize pn = do
-      (c, s, m) <- get
-      if pn `elem` s then return ()
-      else case M.lookup pn ps of
-        Nothing -> return ()
-        Just (inputs, outputs, insts) -> do
-          let endOfProc = c + toInteger (length insts) - 1
-          put (endOfProc, S.insert pn s, M.insert pn (endOfProc, inputs, outputs) m)
-          mapM_ (\case
-            (Call pn' _ _, []) -> organize pn'
-            _ -> return ()) insts
+      s <- use _2
+      when (pn `notElem` s) $
+        case M.lookup pn ps of
+          Nothing -> return ()
+          Just (inputs, outputs, insts) -> do
+            _2 %= S.insert pn
+            mapM_ (\case
+              (Call pn' _ _, _) -> organize pn'
+              _ -> return ()) insts
+            c <- use _1
+            m <- use _3
+            let endOfProc = c + toInteger (length insts) - 1
+            _1 .= endOfProc
+            _3 %= M.insert pn (endOfProc, inputs, outputs)
+            _4 %= (++ [pn])
 
 instsToGraph :: Edge f
              => Map ProcName (Integer, [Var], [Var])
              -> Imp -> Graph Loc (f Form) Inst
-instsToGraph callM cs = prune $ G.fromLists verts edges
+instsToGraph callM cs = G.fromLists verts edges
   where
     endProg = toInteger $ length cs - 1
     verts = tail $

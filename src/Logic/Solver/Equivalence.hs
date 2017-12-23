@@ -24,7 +24,7 @@ solve quer g1 g2 = loop $ fromGraph wQuery
     wQuery = query quer $ equivProduct (prepare g1) (prepare g2)
 
     prepare g =
-      let new = execState (G.idfsEdge_ (\(G.HEdge st edgeEnd) e ->
+      let new = execState (G.idfsEdges_ (\(G.HEdge st edgeEnd) e ->
             when (null st) $ modify ((G.HEdge (S.singleton Initial) edgeEnd, e):)) g) []
       in
       g & G.ifilterEdges (\(G.HEdge st _) _ -> not $ null st)
@@ -33,14 +33,10 @@ solve quer g1 g2 = loop $ fromGraph wQuery
 
     equivProduct g1' g2' =
       cleanIntros (G.cartesianProductWith edgeMerge const LocPair vertMerge
-                     (G.mapEdge (LOnly . Leaf . copoint) g1')
-                     (G.mapEdge (ROnly . Leaf . copoint) g2'))
+                     (G.mapEdges (LOnly . Leaf . copoint) g1')
+                     (G.mapEdges (ROnly . Leaf . copoint) g2'))
 
-    cleanIntros g' =
-      let es = g' ^@.. G.iallEdges
-      in G.delIdx start $ foldr (\(G.HEdge i1 i2, e) g'' ->
-        G.addEdge (G.HEdge (S.filter (/= start) i1) i2) e (G.delEdge (G.HEdge i1 i2) g'')) g' es
-
+    cleanIntros = G.delIdxSaveEdges (\_ _ -> True) start
     start = LocPair Initial Initial
 
     edgeMerge (LOnly e1') (ROnly e2') = Branch e1' e2'

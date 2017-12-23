@@ -30,7 +30,7 @@ emptyInst l vs = Inst l vs (LBool False)
 
 -- | Gather all facts known about each instance of the same index together by disjunction.
 collectAnswer :: MonadIO m => ImplGr f -> m (Map Loc Form)
-collectAnswer g = traverse Z3.superSimplify $ execState (G.itravVert (\_ (Inst loc _ f) ->
+collectAnswer g = traverse Z3.superSimplify $ execState (G.itravVerts (\_ (Inst loc _ f) ->
   when (f /= LBool True) $ modify (M.insertWith mkOr loc f)) g) M.empty
 
 -- | Unwind all backedges which do not reach an inductive vertex, then compress
@@ -72,11 +72,11 @@ unwind (G.HEdge i1 i2, e) g =
 relabel :: (Num i, Ord i, Ord k) => i -> Graph k e v -> (Map k i, Graph i e v)
 relabel idx g = evalState (do
   m <- execStateT (buildMapping g) M.empty
-  return (m, G.mapIdx (m M.!) g)) idx
+  return (m, G.mapIdxs (m M.!) g)) idx
   where
     buildMapping g' =         -- To construct the relabelling map
       g' & G.withoutBackEdges -- consider the graph without backedges
-         & G.itopVert_ update -- update the map in topological order
+         & G.itopVerts_ update -- update the map in topological order
          & fromJust           -- we know there are no backedges since we removed them
          & forwards           -- run the updates forwards
 

@@ -15,4 +15,4 @@ import           Logic.ImplicationGraph
 -- invariants are found.
 solve :: (MonadIO m, Copointed e1)
       => Form -> Graph Loc (e1 Form) Inst -> m (Either Model (ImplGr Identity))
-solve q = loop . fromGraph . query q . G.mapEdge (Identity . copoint)
+solve q = loop . fromGraph . query q . G.mapEdges (Identity . copoint)

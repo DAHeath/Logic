@@ -23,7 +23,7 @@ import qualified Logic.Solver.Z3 as Z3
 interpolate :: (MonadError Model m, MonadIO m, Foldable f)
             => ImplGr f -> m (ImplGr f)
 interpolate g = do
-  let g' = G.withoutBackEdges (G.mapEdge toList g)
+  let g' = G.withoutBackEdges (G.mapEdges toList g)
   sol <- interp (G.reaches (end g') g')
   let vs = sol ^@.. G.iallVerts
   return $ foldr (\(i', v') g'' -> G.addVert i' v' g'') g vs
@@ -35,7 +35,7 @@ implGrChc :: Graph Idx [Form] Inst -> [Chc]
 implGrChc g = concatMap rules topConns
   where
     topConns = -- to find the graph connections in topological order...
-      (g & G.itopEdge                                  -- for each edge...
+      (g & G.itopEdges                                  -- for each edge...
             (\is e -> Identity (G.omap inspect is, e)) -- lookup the edge indexes
          & fromJust                                    -- we know the graph has no backedges
          & runIdentity) ^.. G.iallEdges                -- collect all the connections
@@ -68,7 +68,7 @@ implGrChc g = concatMap rules topConns
 
 -- | Augment the fact at each vertex in the graph by the fact in the model.
 applyModel :: Model -> Graph Idx e Inst -> Graph Idx e Inst
-applyModel model = G.imapVert applyInst
+applyModel model = G.imapVerts applyInst
   where
     applyInst i v =
       v & instForm %~ (\f ->
