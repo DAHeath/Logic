@@ -79,6 +79,9 @@ descendantForms g loc i =
     & filter (\v -> v ^. instLoc == loc) -- only consider those at the location in question
     & map _instForm                      -- fetch the formula
 
+instance Pretty i => Pretty (G.HEdge i) where
+  pretty (G.HEdge is i) = pretty (S.toList is) <+> pretty i
+
 -- | Unwind the graph until a either a counterxample or an inductive
 -- solution is found.  Perform a step of the unwinding by
 -- 1. interpolating over the current graph

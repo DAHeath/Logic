@@ -15,7 +15,6 @@ import           Data.Optic.Directed.HyperGraph (Graph)
 
 import           Logic.Formula
 import           Logic.ImplicationGraph
-import Debug.Trace
 
 -- | An unstructured program contains no structured loops of if statements.
 -- Instead it supports only jumps (conditional and unconditional) and procedure
@@ -64,8 +63,8 @@ instance Pretty Program where
 -- | Transform a program and property into a graph.
 impGraph :: Edge f => Program -> Graph Loc (f Form) Inst
 impGraph (Program ep ps) =
-  let (_, _, m, ord) = execState (organize ep) (0, S.empty, M.empty, [])
-      ps' = traceShow m $ M.mapWithKey (renumber (fmap (\(c, _, _) -> c) m)) ps
+  let (_, _, m, ord) = execState (organize ep) (-1, S.empty, M.empty, [])
+      ps' = M.mapWithKey (renumber (fmap (\(c, _, _) -> c) m)) ps
       allIs = foldr (\pn -> (((ps' M.! pn) ^. _3) ++)) [] ord
   in instsToGraph m allIs
   where
@@ -88,7 +87,7 @@ impGraph (Program ep ps) =
               _ -> return ()) insts
             c <- use _1
             m <- use _3
-            let endOfProc = c + toInteger (length insts) - 1
+            let endOfProc = c + toInteger (length insts)
             _1 .= endOfProc
             _3 %= M.insert pn (endOfProc, inputs, outputs)
             _4 %= (++ [pn])
@@ -96,9 +95,10 @@ impGraph (Program ep ps) =
 instsToGraph :: Edge f
              => Map ProcName (Integer, [Var], [Var])
              -> Imp -> Graph Loc (f Form) Inst
-instsToGraph callM cs = G.fromLists verts edges
+instsToGraph callM cs = prune $ G.fromLists verts edges
   where
     endProg = toInteger $ length cs - 1
+    procEnds = 0 : map ((+1) . view _1) (M.elems callM)
     verts = tail $
       zipWith vertOf [0..] (map snd cs) ++ [(Loc endProg, Inst (Loc endProg) [] (LBool True))]
     edges = concat $ zipWith edgesOf [0..] cs
@@ -131,16 +131,17 @@ instsToGraph callM cs = G.fromLists verts edges
         case M.lookup pn callM of
           Nothing -> []
           Just (l', inps, outs) ->
-            let prelocs = case l of
-                        0 -> [Loc l']
-                        n -> [Loc n, Loc l'] in
+            let prelocs =
+                  if l `elem` procEnds
+                  then [Loc l']
+                  else [Loc l, Loc l'] in
             [ (G.HEdge (S.fromList prelocs) (Loc (l+1))
             , point $ manyAnd
                 [ groupUp (inputs & vars %~ setLoc l)
                           (map V inps & vars %~ setLoc l')
                 , groupUp (map V outputs & vars %~ setNew & vars %~ setLoc (l+1))
                           (map V outs & vars %~ setLoc l')
-                , varCarry l (l+1) (filter (`notElem` outs) vs)
+                , varCarry l (l+1) (filter (`notElem` outputs) vs)
                 ])
             ]
       Done -> []
@@ -148,7 +149,7 @@ instsToGraph callM cs = G.fromLists verts edges
     setLoc l v = v & varLoc .~ l
     setNew v = v & varNew .~ True
     edgeFrom l l' e =
-      if l == 0
+      if l `elem` procEnds
       then (G.HEdge S.empty (Loc l'), point e)
       else (G.HEdge (S.singleton (Loc l)) (Loc l'), point e)
 

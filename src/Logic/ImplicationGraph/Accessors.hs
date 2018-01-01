@@ -42,7 +42,7 @@ unwindAll ind g =
            & any (\i' -> g & G.withoutBackEdges -- when there are no backedges...
                            & G.reached i'       -- the subgraph reached by the start of the backedge...
                            & G.idxs             -- contains no inductive indices
-                           & none (`elem` ind)))
+                           & any (`notElem` ind)))
   in g & flip (foldr unwind) relevantBes                          -- unwind all the relevant backedges
        & G.ifilterEdges (\i _ -> i `notElem` map fst relevantBes) -- filter out the old backedges
        & reachEndWithoutBackedge                                  -- select the portion which reaches the query
