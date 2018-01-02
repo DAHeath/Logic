@@ -59,6 +59,14 @@ atom = try app <|> nonapp
       <|> (res "or"       >> manyOr                      <$> many1 nonapp)
       <|> (res "add"      >> appMany (Add T.Int)         <$> many1 nonapp)
       <|> (res "mul"      >> appMany (Mul T.Int)         <$> many1 nonapp)
+      <|> (res "sub"      >> appMany (Sub T.Int)         <$> sequence [nonapp, nonapp])
+      <|> (res "div"      >> appMany (Div T.Int)         <$> sequence [nonapp, nonapp])
+      <|> (res "mod"      >> appMany (Mod T.Int)         <$> sequence [nonapp, nonapp])
+      <|> (res "eql"      >> appMany (Eql T.Int)         <$> sequence [nonapp, nonapp])
+      <|> (res "lt"       >> appMany (Lt T.Int)          <$> sequence [nonapp, nonapp])
+      <|> (res "le"       >> appMany (Le T.Int)          <$> sequence [nonapp, nonapp])
+      <|> (res "gt"       >> appMany (Gt T.Int)          <$> sequence [nonapp, nonapp])
+      <|> (res "ge"       >> appMany (Ge T.Int)          <$> sequence [nonapp, nonapp])
       <|> (do v <- var
               args <- many1 nonapp
               -- let ts = map T.typeOf args

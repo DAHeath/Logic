@@ -59,10 +59,10 @@ let built_in_list =
   ; "copyOf"
   ]
 
-let call_built_in_method cn ms v args =
-  let mname = JBasics.ms_name ms in
-  let cname = JBasics.cn_name cn in
-
-  match (cname, mname, args) with
-  | ("Wunderhorn", "ensure", [(q, _)]) -> Some (Ir.LBool true, Ir.Query q)
-  | _ -> Printf.sprintf "Method %s.%s not supported." cname mname |> failwith
+(* let call_built_in_method cn ms v args = *)
+(* let mname = JBasics.ms_name ms in *)
+(* let cname = JBasics.cn_name cn in *)
+(* *)
+(* match (cname, mname, args) with *)
+(* | ("Wunderhorn", "ensure", [(q, _)]) -> Some (Ir.LBool true, Ir.Query q) *)
+(* | _ -> Printf.sprintf "Method %s.%s not supported." cname mname |> failwith *)
