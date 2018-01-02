@@ -7,9 +7,7 @@ module JBir = Sawja_pack.JBir
 
 open Core
 
-
 let char_list_to_string cl = String.concat ~sep:"" (List.map cl (String.make 1))
-
 
 let parse_method_sig text =
   let primitive_type = function

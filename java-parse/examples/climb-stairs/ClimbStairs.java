@@ -1,37 +1,37 @@
 public class ClimbStairs {
 
     public static int climbStairs0(int n) {
-        int result = 0;
+        int r;
         if (n <= 1) {
-            result = 1;
+            r = 1;
         } else {
-            int sum = 2;
-            int prev = 1, cur = 0;
+            int s = 2;
+            int p = 1, c = 0;
             for (int i = 2; i < n; i++) {
-                cur = sum;
-                sum += prev;
-                prev = cur;
+                c = s;
+                s += p;
+                p = c;
             }
-            result = sum;
+            r = s;
         }
-        return result;
+        return r;
     }
 
     public static int climbStairs1(int n) {
-        int result = 0;
+        int r;
         if (n <= 1) {
-            result = 1;
+            r = 1;
         } else {
-            int count1 = 1;
-            int count2 = 1;
+            int c1 = 1;
+            int c2 = 1;
             for (int i = 2; i <= n; i++) {
-                int temp = count2;
-                count2 = temp + count1;
-                count1 = temp;
+                int t = c2;
+                c2 = t + c1;
+                c1 = t;
             }
-            result = count2;
+            r = c2;
         }
-        return result;
+        return r;
     }
 
     public static void main(String... args) {

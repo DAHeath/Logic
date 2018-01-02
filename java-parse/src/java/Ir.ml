@@ -1,10 +1,6 @@
-module QID = QualifiedIdentity
+type id = string
 
-open Core
-
-type id = QID.t
-
-let show_id = QID.as_path
+let show_id x = x
 
 type kind
   = Unit
@@ -24,7 +20,7 @@ let rec show_kind = function
 
 type var = Var of id * kind
 
-let show_var (Var (id, k)) = show_id id ^ show_kind k
+let show_var (Var (id, k)) = show_id id ^ ":" ^ show_kind k
 
 type form
   = V of var
@@ -113,7 +109,7 @@ type com
   | Skip
   | Done
 
-let comma_list f xs = "(" ^ String.concat ?sep:(Some ", ") (List.map xs f) ^ ")"
+let comma_list f xs = "(" ^ String.concat ", " (List.map f xs) ^ ")"
 
 let show_com = function
   | Assign (v, e)        -> show_var v ^ " := " ^ show_form e
@@ -126,11 +122,11 @@ let show_com = function
   | Skip                 -> "skip"
   | Done                 -> "done"
 
-type imp = (com * var list) list
+type imp = (com * string list) list
 
 let show_imp is =
-  let show_instr (c, vs) = show_com c ^ comma_list show_var vs in
-  String.concat ?sep:(Some ";\n") (List.map is show_instr)
+  let show_instr (c, vs) = show_com c ^ "  " ^ comma_list show_id vs in
+  String.concat ";\n" (List.map show_instr is)
 
 type proc = Proc of id * var list * var list * imp
 
@@ -148,4 +144,4 @@ let show_proc (Proc (f, ins, outs, instrs)) =
 let show_program (Program (entry, ps)) =
   show_id entry
   ^ "\n"
-  ^ String.concat ?sep:(Some "\n\n") (List.map ps show_proc)
+  ^ String.concat "\n\n" (List.map show_proc ps)

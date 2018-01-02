@@ -5,18 +5,10 @@ Synopsis:    Equivalence analysis.
 Authors:     David Heath, Michael Eden
 License:     BSD-3-clause
 
-Library util
-  Path:         src/util
-  BuildTools:   ocamlbuild
-  BuildDepends: core, ppx_hash, ppx_compare, ppx_sexp_conv, ppx_deriving
-  ByteOpt:      -thread
-  NativeOpt:    -thread
-  Modules:      QualifiedIdentity, Algorithm
-
-Library java 
+Library java
   Path:         src/java
   BuildTools:   ocamlbuild
-  BuildDepends: core, sawja, ocamlgraph, util, ppx_hash, ppx_compare, ppx_sexp_conv, ppx_deriving
+  BuildDepends: core, sawja, ocamlgraph, ppx_hash, ppx_compare, ppx_sexp_conv, ppx_deriving
   ByteOpt:      -thread
   NativeOpt:    -thread
   Modules:      ParseJava, ToIr, Ir, BuiltIn
@@ -28,4 +20,3 @@ Executable equivalencecheck
   BuildDepends: sawja, core, java
   ByteOpt:      -thread
   NativeOpt:    -thread
-
