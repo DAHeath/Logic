@@ -92,31 +92,50 @@ let java_to_condition cond a b =
   let b' = (java_to_expr b) in
   op (Ir.form_kind a') $:: a' $:: b'
 
-let instr = function
+(**
+ * Convert a single JBir instruction to the unstructured IR.
+ * There are three entries which are maintained: The list of instructions themselves
+ * (annotated with live variable names) an offset list, and a called procedure list.
+ *
+ * The offset list allows jump instructions to be renumbered to
+ * account for when more unstructured ir instructions are generated than there were
+ * JBir instructions originally.
+ * The offset list is an ordered list of instructions which generate an additional
+ * instruction. To convert a jump, add 1 to the jump target for each entry in the
+ * offset list which is less than the jump target.
+ *)
+let instr (is, offs, called) (instruction, loc, live) = match instruction with
   | JBir.AffectVar (var, expr) ->
-     let var' = java_to_var (JBir.type_of_expr expr) var in
-     let expr' = java_to_expr expr in
-     Ir.Assign (var', expr')
+      let var' = java_to_var (JBir.type_of_expr expr) var in
+      let expr' = java_to_expr expr in
+      (is @ [Ir.Assign (var', expr'), live], offs, called)
 
   | JBir.Ifd ((comp, a, b), i) ->
-      Ir.Cond (java_to_condition comp a b, i)
-
-  | JBir.Nop ->
-      Ir.Skip
+      (is @ [Ir.Cond (java_to_condition comp a b, i), live], offs, called)
 
   | JBir.Goto i ->
-      Ir.Cond (Ir.LBool true, i)
+      (is @ [Ir.Cond (Ir.LBool true, i), live], offs, called)
 
   | JBir.InvokeStatic (v, cn, ms, args) ->
-    let args = List.map java_to_expr args in
-    let outs = match (v, JBasics.ms_rtype ms) with
-    | (Some v', Some t) -> [java_to_var t v']
-    | _ -> [] in
-    Ir.Call (JBasics.cn_name cn, args, outs)
+      let args = List.map java_to_expr args in
+      let outs = match (v, JBasics.ms_rtype ms) with
+      | (Some v', Some t) -> [java_to_var t v']
+      | _ -> [] in
+      (is @ [Ir.Call (JBasics.ms_name ms, args, outs), live], offs, JBasics.make_cms cn ms :: called)
 
+  | JBir.Return e ->
+      (match e with
+        | None -> (is @ [Ir.Done, live], offs, called)
+        | Some e ->
+            let e' = java_to_expr e in
+            (is @
+              [ Ir.Assign (Ir.Var ("__RESULT__", Ir.form_kind e'), e'), live
+              ; Ir.Done, ("__RESULT__" :: live)
+              ], offs @ [loc], called))
+
+  | JBir.Nop
   | JBir.InvokeNonVirtual _
   | JBir.InvokeVirtual _
-  | JBir.Return _
   | JBir.Throw _
   | JBir.New _
   | JBir.NewArray _
@@ -127,23 +146,52 @@ let instr = function
   | JBir.Formula _
   | JBir.AffectArray _
   | JBir.AffectField _
-  | JBir.AffectStaticField _ -> Ir.Skip
+  | JBir.AffectStaticField _ -> (is @ [Ir.Skip, live], offs, called)
 
-let proc
-  (p: JBir.t JProgram.program)
-  (cms: JBasics.class_method_signature) =
+(**
+ * Calculate the adjustment required to convert the jump instruction target.
+ *)
+let rec adjust off i = match off with
+  | [] -> 0
+  | (j::rest) -> if i > j then 1 + adjust rest i else 0
 
+(**
+ * Renumber all jump instructions in the instruction list using the offset list.
+ *)
+let renumber off = function
+  | Ir.Jump i -> Ir.Jump (i + adjust off i)
+  | Ir.Cond (f, i) -> Ir.Cond (f, i + adjust off i)
+  | ir -> ir
+
+let completed = ref []
+
+let rec proc (p: JBir.t JProgram.program) (cms: JBasics.class_method_signature) =
   let open JProgram in
   let open Javalib_pack.Javalib in
 
-  let (entry_class, entry_method) =
+  completed := cms :: !completed;
+
+  let (_, meth) =
     JBasics.ClassMethodMap.find cms p.parsed_methods in
 
-  let (is, code) =
-    match entry_method.cm_implementation with
+  let (is, jbir) =
+    match meth.cm_implementation with
     | Native -> failwith "Cannot analyze native methods!"
-    | Java java -> let code = Lazy.force java in (JBir.code code, code) in
+    | Java java -> let jbir = Lazy.force java in (JBir.code jbir, jbir) in
 
-  Array.mapi (fun i ins ->
-    (instr ins, List.map var_name (Live.Env.elements (Live.run code i)))) is
-  |> Array.to_list
+  let annotated_insts =
+    Array.mapi (fun i ins -> (ins, i, List.map var_name (Live.Env.elements (Live.run jbir i)))) is in
+  let (unst, off, called) = Array.fold_left instr ([], [], []) annotated_insts in
+
+  let insts = List.map (fun (i, vs) -> (renumber off i, vs)) unst in
+  let (_, ms) = JBasics.cms_split cms in
+  let ps = List.map (fun (t, v) -> java_to_var t v) (JBir.params jbir) in
+  let this_proc = Ir.Proc (JBasics.ms_name ms, ps, [Ir.Var ("__RESULT__", Ir.Int)], insts) in
+
+  let to_produce = List.sort_uniq JBasics.cms_compare
+    (List.filter (fun pname -> not (List.mem pname !completed)) called) in
+  this_proc :: List.concat (List.map (proc p) to_produce)
+
+let rec program (p: JBir.t JProgram.program) (cms: JBasics.class_method_signature) =
+  let (_, ms) = JBasics.cms_split cms in
+  Ir.Program (JBasics.ms_name ms, proc p cms)

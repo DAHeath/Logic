@@ -8,7 +8,7 @@ License:     BSD-3-clause
 Library java
   Path:         src/java
   BuildTools:   ocamlbuild
-  BuildDepends: core, sawja, ocamlgraph, ppx_hash, ppx_compare, ppx_sexp_conv, ppx_deriving
+  BuildDepends: core, sawja, ocamlgraph
   ByteOpt:      -thread
   NativeOpt:    -thread
   Modules:      ParseJava, ToIr, Ir, BuiltIn

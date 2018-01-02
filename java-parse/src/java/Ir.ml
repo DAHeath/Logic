@@ -125,7 +125,7 @@ let show_com = function
 type imp = (com * string list) list
 
 let show_imp is =
-  let show_instr (c, vs) = show_com c ^ "  " ^ comma_list show_id vs in
+  let show_instr (c, vs) = "  " ^ show_com c ^ "  " ^ comma_list show_id vs in
   String.concat ";\n" (List.map show_instr is)
 
 type proc = Proc of id * var list * var list * imp

@@ -28,8 +28,8 @@ let class_file =
 
 let print_ir class_file method_sig () =
   let (program, m, _) = ParseJava.parse (classpath class_file) class_file method_sig in
-  let insts = ToIr.proc program m in
-  Printf.printf "%s" (Ir.show_imp insts)
+  let program' = ToIr.program program m in
+  Printf.printf "%s" (Ir.show_program program')
 
 let print_ir_command =
   Command.basic
