@@ -175,7 +175,7 @@ appToZ3 f args =
     F.Impl       -> two mkImplies
     F.Iff        -> two mkIff
     F.Div _      -> two mkDiv
-    F.Mod _      -> two mkMod
+    F.Mod _      -> two mkRem
     F.If _       -> three mkIte
 
     F.Eql _      -> two mkEq
@@ -234,6 +234,7 @@ formFromApp n args range
   | n == "+"        = F.manyIAdd <$> traverse astToForm args
   | n == "*"        = F.manyIMul <$> traverse astToForm args
   | n == "mod"      = liftMany (F.Mod F.Int)
+  | n == "rem"      = liftMany (F.Mod F.Int)
   | n == "distinct" = liftMany (F.Distinct F.Int)
   | n == "div"      = lift2 (F.Div F.Int)
   | n == "iff"      = lift2 F.Iff
