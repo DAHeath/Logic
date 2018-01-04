@@ -76,30 +76,35 @@ let rec form_kind = function
   | LReal r        -> Real
   | Apply (f1, f2) -> tail_kind (form_kind f1)
 
-let rec show_form = function
-  | V v          -> show_var v
-  | If k           -> "if"
-  | Not            -> "not"
-  | And            -> "and"
-  | Or             -> "or"
-  | Add k          -> "add"
-  | Mul k          -> "mul"
-  | Sub k          -> "sub"
-  | Div k          -> "div"
-  | Mod k          -> "mod"
-  | Eql k          -> "eql"
-  | Nql k          -> "neql"
-  | Lt k           -> "lt"
-  | Le k           -> "le"
-  | Gt k           -> "gt"
-  | Ge k           -> "ge"
-  | Store (k, v)   -> "store"
-  | Select (k, v)  -> "select"
-  | LUnit          -> "unit"
-  | LBool b        -> if b then "true" else "false"
-  | LInt i         -> string_of_int i
-  | LReal r        -> string_of_float r
-  | Apply (f1, f2) -> "(" ^ show_form f1 ^ " " ^ show_form f2 ^ ")"
+let rec show_form f =
+  let rec show_inner = function
+    | V v          -> show_var v
+    | If k           -> "if"
+    | Not            -> "not"
+    | And            -> "and"
+    | Or             -> "or"
+    | Add k          -> "add"
+    | Mul k          -> "mul"
+    | Sub k          -> "sub"
+    | Div k          -> "div"
+    | Mod k          -> "mod"
+    | Eql k          -> "eql"
+    | Nql k          -> "neql"
+    | Lt k           -> "lt"
+    | Le k           -> "le"
+    | Gt k           -> "gt"
+    | Ge k           -> "ge"
+    | Store (k, v)   -> "store"
+    | Select (k, v)  -> "select"
+    | LUnit          -> "unit"
+    | LBool b        -> if b then "true" else "false"
+    | LInt i         -> string_of_int i
+    | LReal r        -> string_of_float r
+    | Apply (f1, f2) -> show_form f1 ^ " " ^ show_form f2
+  in
+  match f with
+  | Apply (f1, f2) -> "(" ^ show_inner f1 ^ " " ^ show_form f2 ^ ")"
+  | _ -> show_inner f
 
 type com
   = Assign of var * form
@@ -125,7 +130,7 @@ let show_com = function
 type imp = (com * string list) list
 
 let show_imp is =
-  let show_instr (c, vs) = "  " ^ show_com c ^ "  " ^ comma_list show_id vs in
+  let show_instr (c, vs) = "  " ^ show_com c ^ " ~ " ^ comma_list show_id vs in
   String.concat ";\n" (List.map show_instr is)
 
 type proc = Proc of id * var list * var list * imp

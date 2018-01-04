@@ -179,6 +179,7 @@ appToZ3 f args =
     F.If _       -> three mkIte
 
     F.Eql _      -> two mkEq
+    F.Nql t      -> mkNot =<< appToZ3 (F.Eql t) args
     F.Lt _       -> two mkLt
     F.Le _       -> two mkLe
     F.Gt _       -> two mkGt

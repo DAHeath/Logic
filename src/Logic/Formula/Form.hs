@@ -35,6 +35,7 @@ data Form
 
   | Distinct Type
   | Eql Type
+  | Nql Type
   | Lt  Type
   | Le  Type
   | Gt  Type
@@ -82,6 +83,7 @@ instance Typed Form where
 
     Distinct t  -> T.List t :=> T.Bool
     Eql t       -> t :=> t :=> T.Bool
+    Nql t       -> t :=> t :=> T.Bool
     Lt t        -> t :=> t :=> T.Bool
     Le t        -> t :=> t :=> T.Bool
     Gt t        -> t :=> t :=> T.Bool
@@ -121,6 +123,7 @@ instance Pretty Form where
     Mod _        -> pretty "%"
 
     Eql _        -> pretty "="
+    Nql _        -> pretty "!="
     Lt _         -> pretty "<"
     Le _         -> pretty "<="
     Gt _         -> pretty ">"

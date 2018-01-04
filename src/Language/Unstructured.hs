@@ -8,6 +8,7 @@ import           Data.Data (Data)
 import qualified Data.Set as S
 import           Data.Map (Map)
 import qualified Data.Map as M
+import           Data.List (nub)
 import           Data.Text.Prettyprint.Doc
 import           Data.Loc
 import qualified Data.Optic.Directed.HyperGraph as G
@@ -15,6 +16,8 @@ import           Data.Optic.Directed.HyperGraph (Graph)
 
 import           Logic.Formula
 import           Logic.ImplicationGraph
+
+import Debug.Trace
 
 -- | An unstructured program contains no structured loops of if statements.
 -- Instead it supports only jumps (conditional and unconditional) and procedure
@@ -32,16 +35,18 @@ data Com
   | Call ProcName [Form] [Var]
   -- A special marker indicating the end of the procedure. Every procedure should
   -- have a `Done` marker as the last instruction.
+  | Skip
   | Done
   deriving (Show, Read, Eq, Ord, Data)
 
 instance Pretty Com where
   pretty = \case
     v := f        -> pretty v <+> pretty ":=" <+> pretty f
-    Jump i        -> pretty "JUMP" <+> pretty i
-    Cond f i      -> pretty "COND" <+> pretty f <+> pretty i
-    Call pn as rs -> pretty "CALL" <+> pretty pn <+> pretty as <+> pretty rs
-    Done          -> pretty "DONE"
+    Jump i        -> pretty "jump" <+> pretty i
+    Cond f i      -> pretty "cond" <+> pretty f <+> pretty i
+    Call pn as rs -> pretty "call" <+> pretty pn <+> pretty as <+> pretty rs
+    Skip          -> pretty "skip"
+    Done          -> pretty "done"
 
 type ProcName = String
 
@@ -71,9 +76,9 @@ impGraph (Program ep ps) =
     renumber m pn (args, params, is) =
       let offset = m M.! pn - toInteger (length is) + 1 in
       (args, params, map (\case
-        (Jump i, vs) -> (Jump (i + offset), vs)
-        (Cond f i, vs) -> (Cond f (i + offset), vs)
-        c -> c) is)
+        (Jump i, vs) -> (pn, Jump (i + offset), nub $ args ++ vs)
+        (Cond f i, vs) -> (pn, Cond f (i + offset), nub $ args ++ vs)
+        (i, vs) -> (pn, i, nub $ args ++ vs)) is)
 
     organize pn = do
       s <- use _2
@@ -86,7 +91,6 @@ impGraph (Program ep ps) =
               (Call pn' _ _, _) -> organize pn'
               _ -> return ()) insts
             c <- use _1
-            m <- use _3
             let endOfProc = c + toInteger (length insts)
             _1 .= endOfProc
             _3 %= M.insert pn (endOfProc, inputs, outputs)
@@ -94,18 +98,19 @@ impGraph (Program ep ps) =
 
 instsToGraph :: Edge f
              => Map ProcName (Integer, [Var], [Var])
-             -> Imp -> Graph Loc (f Form) Inst
+             -> [(ProcName, Com, [Var])] -> Graph Loc (f Form) Inst
 instsToGraph callM cs = prune $ G.fromLists verts edges
+-- instsToGraph callM cs = G.fromLists verts edges
   where
     endProg = toInteger $ length cs - 1
     procEnds = 0 : map ((+1) . view _1) (M.elems callM)
     verts = tail $
-      zipWith vertOf [0..] (map snd cs) ++ [(Loc endProg, Inst (Loc endProg) [] (LBool True))]
+      zipWith vertOf [0..] (map (view _3) cs) ++ [(Loc endProg, Inst (Loc endProg) [] (LBool True))]
     edges = concat $ zipWith edgesOf [0..] cs
 
     vertOf l vs = (Loc l, emptyInst (Loc l) (map (setLoc l) vs))
 
-    edgesOf l (c, vs) = case c of
+    edgesOf l (pn, c, vs) = case c of
       v := f ->
         let f' = (f & vars %~ setLoc l)
             vs' = filter (/= v) vs
@@ -117,6 +122,8 @@ instsToGraph callM cs = prune $ G.fromLists verts edges
         ]
       Jump l' ->
         [ edgeFrom l l' $ varCarry l l' vs ]
+      Skip ->
+        [ edgeFrom l (l+1) $ varCarry l (l+1) vs ]
       Cond f l' ->
         [ edgeFrom l l'
           $ mkAnd
@@ -127,8 +134,8 @@ instsToGraph callM cs = prune $ G.fromLists verts edges
               (mkNot f & vars %~ setLoc l)
               (varCarry l (l+1) vs)
         ]
-      Call pn inputs outputs ->
-        case M.lookup pn callM of
+      Call pn' inputs outputs ->
+        case M.lookup pn' callM of
           Nothing -> []
           Just (l', inps, outs) ->
             let prelocs =
@@ -144,7 +151,11 @@ instsToGraph callM cs = prune $ G.fromLists verts edges
                 , varCarry l (l+1) (filter (`notElem` outputs) vs)
                 ])
             ]
-      Done -> []
+      Done ->
+        case M.lookup pn callM of
+          Nothing -> []
+          Just (l', _, _) ->
+            if l == l' then [] else [ edgeFrom l l' $ varCarry l l' vs ]
 
     setLoc l v = v & varLoc .~ l
     setNew v = v & varNew .~ True

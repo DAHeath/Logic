@@ -1,9 +1,10 @@
+module Language.Unstructured.Parser where
+
 import qualified Data.Map as M
 import           Text.Parsec
 import           Text.ParserCombinators.Parsec.Char
 
-import           Logic.Var
-import           Logic.Formula.Parser
+import           Logic.Formula
 import           Language.Unstructured
 
 com :: CharParser st Com
@@ -16,6 +17,7 @@ com = (do
     res "jump"
     i <- integer
     return (Jump i))
+  <|> pure Skip <* res "skip"
   <|> (do
     res "cond"
     f <- parens parseForm
@@ -35,9 +37,9 @@ imp = com' `sepBy` op ";"
     com' :: CharParser st (Com, [Var])
     com' = do
       c <- com
+      _ <- symbol "~"
       vs <- parens (commaSep var)
       return (c, vs)
-
 
 proc :: CharParser st (ProcName, ([Var], [Var], Imp))
 proc = do

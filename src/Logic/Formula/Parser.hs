@@ -62,6 +62,7 @@ atom = try app <|> nonapp
       <|> (res "sub"      >> appMany (Sub T.Int)         <$> sequence [nonapp, nonapp])
       <|> (res "div"      >> appMany (Div T.Int)         <$> sequence [nonapp, nonapp])
       <|> (res "mod"      >> appMany (Mod T.Int)         <$> sequence [nonapp, nonapp])
+      <|> (res "neql"     >> appMany (Nql T.Int)         <$> sequence [nonapp, nonapp])
       <|> (res "eql"      >> appMany (Eql T.Int)         <$> sequence [nonapp, nonapp])
       <|> (res "lt"       >> appMany (Lt T.Int)          <$> sequence [nonapp, nonapp])
       <|> (res "le"       >> appMany (Le T.Int)          <$> sequence [nonapp, nonapp])
@@ -69,7 +70,6 @@ atom = try app <|> nonapp
       <|> (res "ge"       >> appMany (Ge T.Int)          <$> sequence [nonapp, nonapp])
       <|> (do v <- var
               args <- many1 nonapp
-              -- let ts = map T.typeOf args
               return $ appMany (V v) args)
 
 pName :: CharParser st ([String], Integer, Bool)
@@ -215,6 +215,7 @@ lexer = T.makeTokenParser (emptyDef { T.identStart = letter <|> char '_' <|> cha
                                                           , ":"
                                                           , ":="
                                                           , ";"
+                                                          , "~"
                                                           ]
                                     , T.reservedNames = [ "not", "distinct"
                                                         , "and", "or"
@@ -229,6 +230,7 @@ lexer = T.makeTokenParser (emptyDef { T.identStart = letter <|> char '_' <|> cha
                                                         , "Int", "Bool", "Real", "Arr"
                                                         , "jump"
                                                         , "done"
+                                                        , "skip"
                                                         ]
                                     })
 

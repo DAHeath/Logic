@@ -130,7 +130,7 @@ let instr (is, offs, called) (instruction, loc, live) = match instruction with
             let e' = java_to_expr e in
             (is @
               [ Ir.Assign (Ir.Var ("__RESULT__", Ir.form_kind e'), e'), live
-              ; Ir.Done, ("__RESULT__" :: live)
+              ; Ir.Done, (["__RESULT__"])
               ], offs @ [loc], called))
 
   | JBir.Nop
