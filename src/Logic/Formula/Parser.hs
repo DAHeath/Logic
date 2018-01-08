@@ -72,9 +72,6 @@ atom = try app <|> nonapp
               args <- many1 nonapp
               return $ appMany (V v) args)
 
-pName :: CharParser st ([String], Integer, Bool)
-pName = parseName <$> ident
-
 bool :: CharParser st Form
 bool = const (LBool True)  <$> res "true"
    <|> const (LBool False) <$> res "false"
@@ -94,9 +91,9 @@ typ = (do res "Arr"
 
 var :: CharParser st Var
 var = do
-  (i, l, nw) <- pName
+  i <- ident
   t <- annot
-  return $ Var i l nw t
+  return $ Var i t
 
 annot :: CharParser st Type
 annot = (op ":" >> typ) <|> pure T.Int
@@ -120,7 +117,7 @@ mulop = (op "*" >> return (app2 $ Mul T.Int))
 addop = (op "+" >> return (app2 $ Add T.Int))
     <|> (op "-" >> return (app2 $ Sub T.Int))
 
-integer :: CharParser st Integer
+integer :: (Read i, Integral i) => CharParser st i
 integer = lexeme $ do { ds <- many1 digit ; return (read ds) }
 
 parseChc :: CharParser st [Chc]
@@ -142,10 +139,10 @@ parseChc = many parseChc'
     rhs = (Left <$> app) <|> (Right <$> parseForm)
 
     app :: CharParser st App
-    app = braces $ do (i, l, nw) <- pName
+    app = braces $ do i <- ident
                       args <- many var
                       let ts = map T.typeOf args
-                      return $ App (Var i l nw (T.curryType ts T.Bool)) args
+                      return $ App (Var i (T.curryType ts T.Bool)) args
 
 promote :: Monad m => CharParser () a -> (String, Int, Int) -> String -> m a
 promote par (file, line, col) s =
@@ -191,9 +188,9 @@ quoteFormExp par s = do pos <- thPos
                         dataToExpQ (const Nothing `extQ` metaExp) ex
 
 metaExp :: Form -> Maybe TH.ExpQ
-metaExp (V v@(Var i _ _ _))
-  | (head.head) i == '$' = Just [| $(TH.varE (TH.mkName (tail $ varName v))) |]
-  | (head.head) i == '@' = Just [| V $ $(TH.varE (TH.mkName (tail $ varName v))) |]
+metaExp (V v@(Var i _))
+  | head i == '$' = Just [| $(TH.varE (TH.mkName (tail i))) |]
+  | head i == '@' = Just [| V $ $(TH.varE (TH.mkName (tail i))) |]
 metaExp _ = Nothing
 
 quoteFormPat :: Data a => CharParser () a -> String -> TH.PatQ

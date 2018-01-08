@@ -40,7 +40,7 @@ solveChc hcs = do
       rids' <- traverse mkStringSymbol rids
       zipWithM_ fixedpointAddRule forms rids'
 
-      let quers = [Var ["x"] 0 False F.Bool]
+      let quers = [Var "x" F.Bool]
       quers' <- traverse funcToDecl quers
       res <- fixedpointQueryRelations quers'
       case res of
@@ -48,7 +48,7 @@ solveChc hcs = do
         _     -> Left <$> (modelToModel =<< fixedpointGetRefutation)
 
     mkQuery q n =
-      let theQuery = F.V $ F.varForName n F.Bool in
+      let theQuery = F.V $ F.Var n F.Bool in
       F.app2 F.Impl (F.mkNot $ F.toForm q) theQuery
 
     useDuality = do
@@ -204,7 +204,7 @@ appToZ3 f args =
 funcToDecl :: (MonadState Env z3, MonadZ3 z3) => Var -> z3 FuncDecl
 funcToDecl r = do
   let t = F.typeOf r
-  let n = F.varName r
+  let n = F._varName r
   env <- use envFuns
   case M.lookup r env of
     Nothing -> do
@@ -223,7 +223,7 @@ formFromApp n args range
   -- The 'app' is just a variable
   | null args = do
     typ <- sortToType range
-    return $ F.V $ F.varForName n typ
+    return $ F.V $ F.Var n typ
   | n == "ite" || n == "if" = do
     c <- astToForm (head args)
     e1 <- astToForm (args !! 1)
@@ -256,7 +256,7 @@ formFromApp n args range
     args' <- traverse astToForm args
     domain <- traverse getType args
     range' <- sortToType range
-    let f = F.varForName n (F.curryType domain range')
+    let f = F.Var n (F.curryType domain range')
     return $ F.appMany (F.V f) args'
   where lift2 f = F.app2 f <$> astToForm (head args) <*> astToForm (args !! 1)
         lift3 f = F.app3 f <$> astToForm (head args)
@@ -288,8 +288,8 @@ modelToModel m = F.Model <$> (traverse superSimplify =<< M.union <$> functions <
       domain <- traverse sortToType =<< getDomain fd
       range  <- sortToType =<< getRange fd
       if n == "@Fail!0"
-      then return $ F.varForName "x0/Fail" (F.curryType domain range)
-      else return $ F.varForName n (F.curryType domain range)
+      then return $ F.Var "x0/Fail" (F.curryType domain range)
+      else return $ F.Var n (F.curryType domain range)
 
 -- | Convert the Z3 internal representation of a formula to the AST representation.
 astToForm :: MonadZ3 z3 => AST -> z3 Form
@@ -365,6 +365,6 @@ declName = getDeclName >=> getSymbolString
 varDec :: MonadZ3 z3 => Var -> z3 FuncDecl
 varDec v = do
   let t = F.typeOf v
-  let n = F.varName v
+  let n = F._varName v
   sym <- mkStringSymbol n
   mkFuncDecl sym [] =<< typeToSort t

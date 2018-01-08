@@ -5,7 +5,7 @@ import           Text.Parsec
 import           Text.ParserCombinators.Parsec.Char
 
 import           Logic.Formula
-import           Language.Unstructured
+import           Language.Unstructured.Unstructured
 
 com :: CharParser st Com
 com = (do
@@ -16,8 +16,8 @@ com = (do
   <|> (do
     res "jump"
     i <- integer
-    return (Jump i))
-  <|> pure Skip <* res "skip"
+    return (Cond (LBool True) i))
+  <|> pure (Cond (LBool False) 0) <* res "skip"
   <|> (do
     res "cond"
     f <- parens parseForm

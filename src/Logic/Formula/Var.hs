@@ -1,7 +1,9 @@
 module Logic.Formula.Var where
 
 import           Control.Lens
+import           Control.Monad.State
 
+import           Data.Foldable (foldrM)
 import           Data.Data (Data)
 import           Data.Data.Lens (biplate)
 import           Data.Map (Map)
@@ -18,9 +20,7 @@ import qualified Logic.Formula.Type as T
 import           Text.Read (readMaybe)
 
 data Var = Var
-  { _varId :: [String]
-  , _varLoc :: Integer
-  , _varNew :: Bool
+  { _varName :: String
   , _varType :: Type
   } deriving (Show, Read, Eq, Ord, Data)
 makeLenses ''Var
@@ -29,13 +29,7 @@ instance Typed Var
   where typeOf v = v ^. varType
 
 instance Pretty Var
-  where pretty = pretty . varName
-
--- | A name for the variable. If the variable is bound, it is a textual
--- representation of the index. Otherwise, it is just the variable name.
-varName :: Var -> String
-varName (Var i l nw _) =
-  (if nw then "#" else "") ++ intercalate "/" (i ++ [show $ pretty l])
+  where pretty = pretty . _varName
 
 parseName :: String -> ([String], Integer, Bool)
 parseName n =
@@ -47,11 +41,6 @@ parseName n =
   case readMaybe (last ws) of
     Just iden -> (init ws, iden, b)
     Nothing -> (ws, 0, b)
-
-varForName :: String -> Type -> Var
-varForName n t =
-  let (i, l, nw) = parseName n
-  in Var i l nw t
 
 -- | A traversal which targets all of the variables in a given expression.
 vars :: Data a => Traversal' a Var
@@ -78,4 +67,4 @@ instantiate vs =
   in subst m
 
 bound :: Integer -> Type -> Var
-bound i = Var ["!" ++ show i] 0 False
+bound i = Var ("!" ++ show i)

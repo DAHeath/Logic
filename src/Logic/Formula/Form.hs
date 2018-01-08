@@ -190,6 +190,9 @@ mkOr x y
   | otherwise        = app2 Or x y
 
 mkNot :: Form -> Form
+mkNot (LBool True) = LBool False
+mkNot (LBool False) = LBool True
+mkNot (Nql t :@ x :@ y) = Eql t :@ x :@ y
 mkNot (Not :@ y) = y
 mkNot x = Not :@ x
 
@@ -248,6 +251,7 @@ isBinaryInfix = \case
     Div _ -> True
     Mod _ -> True
     Eql _ -> True
+    Nql _ -> True
     Lt _  -> True
     Le _  -> True
     Gt _  -> True
@@ -283,12 +287,6 @@ varElim conserve = loop
                   Eql _ :@ V v1 :@ V v2
                     | v1 `notElem` conserve -> put (Just (v1, v2))
                     | v2 `notElem` conserve -> put (Just (v2, v1))
-                    | (v1 ^. varId == v2 ^. varId)
-                   && (v1 ^. varLoc == v2 ^. varLoc) ->
-                      case (v1 ^. varNew, v2 ^. varNew) of
-                        (True, False) -> put (Just (v1, v2))
-                        (False, True) -> put (Just (v2, v1))
-                        _ -> return ()
                     | otherwise -> return ()
                   _ -> return ()) (universe f)) Nothing
       in case st of
@@ -298,9 +296,7 @@ varElim conserve = loop
 
 clean :: Form -> Form
 clean = transform (\case
-  Eql t :@ f1 :@ f2
-    | f1 == f2 -> LBool True
-    | otherwise -> Eql t :@ f1 :@ f2
-  And :@ LBool True :@ f -> f
-  And :@ f :@ LBool True -> f
-  f ->  f)
+  Eql t :@ f1 :@ f2 -> mkEql t (clean f1) (clean f2)
+  And :@ x :@ y -> mkAnd (clean x) (clean y)
+  Or :@ x :@ y -> mkOr (clean x) (clean y)
+  f -> f)

@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Language.Unstructured.Java where
 
-import Language.Unstructured
+import Language.Unstructured.Unstructured
 import Language.Unstructured.Parser
 
 import Text.Parsec
