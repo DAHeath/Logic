@@ -1,8 +1,10 @@
-import           Logic.Formula
+import           Control.Lens
+
 import           Data.Text.Prettyprint.Doc
 
-import           Grammar
+import           Logic.Formula
 import           Language.Unstructured
+import           Grammar
 
 
 test :: (String, String) -> IO ()
@@ -11,11 +13,8 @@ test (f1, m1) = do
   case f' of
     Left _ -> putStrLn "oops"
     Right p -> do
-      let (start, g) = runVocab (do
-            (start, rs) <- mkGrammar p
-            (,) start <$> simplify start rs)
-      -- mapM_ (print . pretty) g
-      mapM_ (print . pretty) (nonrecursive start $ unwind start g)
+      let g = runVocab (simplify =<< mkGrammar p)
+      mapM_ (print . pretty) (view grammarRules (unwind g))
 
 main :: IO ()
 main =

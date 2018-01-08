@@ -1,5 +1,7 @@
 module Grammar.Simplify where
 
+import           Control.Lens
+
 import           Data.Foldable
 import           Data.Set (Set)
 import qualified Data.Set as S
@@ -15,55 +17,54 @@ import Grammar.Grammar
 -- If there is a nonterminal with multiple rules that share the same nonterminals in the body,
 -- disjoin them into a single rule.
 -- Repeat the rules into no more reductions are possible.
-simplify :: MonadVocab m => Symbol -> Grammar -> m Grammar
-simplify start = fmap (map cleanUp) . loop
+simplify :: MonadVocab m => Grammar -> m Grammar
+simplify = fmap (over grammarRules (map cleanUp)) . loop
   where
     loop g = do
-      g' <- disjoin <$> inline start g
+      g' <- disjoin <$> inline g
       if g' == g then pure g' else loop g'
 
-    cleanUp (Rule lhs (RHS f ps)) =
-      Rule lhs (RHS (varElim (varSet lhs `S.union` varSet ps) f) ps)
+    cleanUp (Rule lhs f ps) =
+      Rule lhs (varElim (varSet lhs `S.union` varSet ps) f) ps
 
-inline :: MonadVocab m => Symbol -> Grammar -> m Grammar
-inline start g = do
-  let toInline = S.filter (\inst -> inst /= start && cardinality inst g == 1) (instances g)
-  foldrM (\inst g' -> inlineRule (head $ rulesFor inst g') g') g toInline
+inline :: MonadVocab m => Grammar -> m Grammar
+inline (Grammar start rs) = do
+  let toInline = S.filter (\inst -> inst /= start && cardinality inst rs == 1) (instances rs)
+  rs' <- foldrM (\inst rs' -> inlineRule (head $ rulesFor inst rs') rs') rs toInline
+  pure (Grammar start rs')
 
 -- | Substitute occurrences of the rule left hand side instance with the body of the rule.
-inlineRule :: MonadVocab m => Rule -> Grammar -> m Grammar
-inlineRule (Rule lhs rhs) g =
-  delete cinst <$> mapM (\(Rule lhs' rhs') -> Rule lhs' <$> repRHS rhs') g
+inlineRule :: MonadVocab m => Rule -> [Rule] -> m [Rule]
+inlineRule (Rule lhs body rhs) g =
+  delete sym <$> mapM (\(Rule lhs' f rhs') -> uncurry (Rule lhs') <$> repRHS (f, rhs')) g
   where
-    cinst = controlID lhs
-    repRHS (RHS f ps) = repRHS' ([], f, ps)
+    sym = _productionSymbol lhs
+    repRHS (f, ps) = repRHS' ([], f, ps)
     repRHS' (acc, f, p:ps) =
-      if controlSymbol p == cinst
+      if _productionSymbol p == sym
       then do
-        RHS f' ps' <- freshen (M.fromList $ zip (controlVars lhs) (controlVars p)) rhs
+        (f', ps') <- freshen (M.fromList $ zip (_productionVars lhs) (_productionVars p)) (body, rhs)
         repRHS' (ps' ++ acc, mkAnd f f', ps)
       else repRHS' (p : acc, f, ps)
-    repRHS' (acc, f, []) = pure $ RHS f acc
+    repRHS' (acc, f, []) = pure (f, acc)
 
 disjoin :: Grammar -> Grammar
-disjoin g = foldr disjoinCandidate g candidates
+disjoin (Grammar start rs)  = Grammar start $ foldr disjoinCandidate rs candidates
   where
     disjoinCandidate rs g' = disjoinRules rs : filter (`notElem` rs) g'
     candidates = M.elems (M.filter (\rs -> length rs > 1) instMap)
     -- a map from all instances in a rule to corresponding rules
-    instMap = foldr addInstEntry M.empty g
-    addInstEntry r@(Rule lhs rhs) =
-      M.insertWith (++) (controlSymbol lhs : map controlSymbol (rhsProductions rhs)) [r]
+    instMap = foldr addInstEntry M.empty rs
+    addInstEntry r@(Rule lhs _ rhs) =
+      M.insertWith (++) (_productionSymbol lhs : map _productionSymbol rhs) [r]
 
 disjoinRules :: [Rule] -> Rule
 disjoinRules rules =
   let rs = map rename rules in
-  Rule (ruleLHS first) (RHS (manyOr (bodies rs)) (rhsProductions $ ruleRHS first))
+  Rule (_ruleLHS first) (manyOr (map _ruleBody rs)) (_ruleRHS first)
   where
-    bodies = map (rhsConstraint . ruleRHS)
-    prodVars r = concatMap controlVars (ruleLHS r : productions r)
+    prodVars r = concatMap _productionVars (_ruleLHS r : _ruleRHS r)
     first = head rules
     rename r =
       let m = M.fromList (zip (prodVars r) (prodVars first))
       in subst m r
-

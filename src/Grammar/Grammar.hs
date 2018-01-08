@@ -1,5 +1,7 @@
 module Grammar.Grammar where
 
+import           Control.Lens
+
 import           Data.Data (Data)
 import           Data.Set (Set)
 import qualified Data.Set as S
@@ -10,54 +12,48 @@ import Logic.Formula hiding (Rule)
 -- An identifier which should be completely unique per location.
 type Symbol = Int
 
--- An identifier which groups different instances of the same control location.
+data Production = Production
+  { _productionSymbol :: Symbol
+  , _productionVars :: [Var]
+  } deriving (Show, Read, Eq, Ord, Data)
+makeLenses ''Production
+
+-- It is crucial that every variable in a production location over a rule is unique.
+data Rule = Rule
+  { _ruleLHS :: Production
+  , _ruleBody :: Form
+  , _ruleRHS :: [Production]
+  } deriving (Show, Read, Eq, Ord, Data)
+makeLenses ''Rule
+
+data Grammar = Grammar
+  { _grammarStart :: Symbol
+  , _grammarRules :: [Rule]
+  } deriving (Show, Read, Eq, Ord, Data)
+makeLenses ''Grammar
+
+instance Pretty Grammar where
+  pretty (Grammar start rs) = pretty start <> pretty "\n" <> vsep (map pretty rs)
+
+-- An identifier which groups different instances of the same production location.
 type ControlID = Int
 
-data ControlLocation = ControlLocation
-  { controlSymbol :: Symbol
-  , controlID :: ControlID
-  , controlVars :: [Var]
-  } deriving (Show, Read, Eq, Ord, Data)
-
-instance Pretty ControlLocation where
-  pretty (ControlLocation inst iden vs) =
-    pretty iden <> pretty "(" <> pretty inst <> pretty ")" <> pretty vs
-
--- It is crucial that every variable in a control location over a rule is unique.
-data Rule = Rule
-  { ruleLHS :: ControlLocation
-  , ruleRHS :: RHS
-  } deriving (Show, Read, Eq, Ord, Data)
+instance Pretty Production where
+  pretty (Production sym vs) = pretty sym <> pretty vs
 
 instance Pretty Rule where
-  pretty (Rule lhs rhs) = pretty lhs <> pretty ": " <> pretty rhs
+  pretty (Rule lhs body rhs) = pretty lhs <> pretty ": " <> pretty body <> pretty " | " <> pretty rhs
 
-data RHS = RHS
-  { rhsConstraint :: Form
-  , rhsProductions :: [ControlLocation]
-  } deriving (Show, Read, Eq, Ord, Data)
+cardinality :: Symbol -> [Rule] -> Int
+cardinality cinst = length . filter (\r -> _productionSymbol (_ruleLHS r) == cinst)
 
-instance Pretty RHS where
-  pretty (RHS cons prods) = pretty cons <> pretty " | "  <> pretty prods
-
-cardinality :: Symbol -> Grammar -> Int
-cardinality cinst = length . filter (\r -> controlSymbol (ruleLHS r) == cinst)
-
-instances :: Grammar -> Set Symbol
-instances = S.fromList . map (controlSymbol . ruleLHS)
+instances :: [Rule] -> Set Symbol
+instances = S.fromList . map (_productionSymbol . _ruleLHS)
 
 -- | Delete the rules for the instance.
-delete :: Symbol -> Grammar -> Grammar
-delete cinst = filter (\r -> controlSymbol (ruleLHS r) /= cinst)
+delete :: Symbol -> [Rule] -> [Rule]
+delete cinst = filter (\r -> _productionSymbol (_ruleLHS r) /= cinst)
 
 -- | Collect the rules whose nonterminal match the predicate.
-rulesFor :: Symbol -> Grammar -> [Rule]
-rulesFor cinst = filter (\r -> controlSymbol (ruleLHS r) == cinst)
-
-productions :: Rule -> [ControlLocation]
-productions = rhsProductions . ruleRHS
-
-type Grammar = [Rule]
-
--- interpolate
--- inductive
+rulesFor :: Symbol -> [Rule] -> [Rule]
+rulesFor cinst = filter (\r -> _productionSymbol (_ruleLHS r) == cinst)

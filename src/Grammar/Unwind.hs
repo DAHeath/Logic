@@ -3,7 +3,6 @@ module Grammar.Unwind where
 import           Control.Lens
 import           Control.Monad.State
 
-import           Data.Data.Lens
 import qualified Data.Map as M
 
 import           Grammar.Grammar
@@ -11,44 +10,47 @@ import           Grammar.Grammar
  -- | Find the corresponding non-recursive grammar from the given start symbol.
  -- That is, remove all productions which contain nonterminals which have already
  -- been seen.
-nonrecursive :: Symbol -> Grammar -> Grammar
-nonrecursive start g = fst $ unwind' start g
+nonrecursive :: Grammar -> Grammar
+nonrecursive g = let (old, _) = unwind' g in g & grammarRules .~ old
 
-unwind :: Symbol -> Grammar -> Grammar
-unwind start g = let (old, new) = unwind' start g in old ++ new
+-- | Find the first recursive invocation in the grammar along each branch and unwind it.
+-- That is, follow the rules until a nonterminal symbol appears which has already been
+-- seen. Create new copies of all the rules succeeding this one with new symbols.
+unwind :: Grammar -> Grammar
+unwind g = let (old, new) = unwind' g in g & grammarRules .~ (old ++ new)
 
-unwind' :: Symbol -> Grammar -> (Grammar, Grammar)
-unwind' start g =
+unwind' :: Grammar -> ([Rule], [Rule])
+unwind' (Grammar start rs) =
   let (toAdd, toDelete) = execState (recNT [start] start) ([], []) in
-  (filter (`notElem` toDelete) g, toAdd)
+  (filter (`notElem` toDelete) rs, toAdd)
   where
-    highestInst = maximum (map controlSymbol (g ^. biplate))
+    highestSym = maximum (map (view (ruleLHS . productionSymbol)) rs)
 
-    recNT seen nt = mapM_ (recRule seen) (rulesFor nt g)
-    recRule seen (Rule lhs rhs) =
-      if any (`elem` seen) (map controlSymbol $ rhsProductions rhs)
+    recNT seen nt = mapM_ (recRule seen) (rulesFor nt rs)
+    recRule seen (Rule lhs body rhs) =
+      if any (`elem` seen) (map (view productionSymbol) rhs)
       then do
-        _2 %= (Rule lhs rhs:)
-        rhsPs' <- evalStateT
-          (mapM (cloneNT (controlSymbol lhs : seen)) (rhsProductions rhs)) (M.empty, highestInst)
-        _1 %= (Rule lhs (RHS (rhsConstraint rhs) rhsPs'):)
+        _2 %= (Rule lhs body rhs:)
+        rhs' <- evalStateT
+          (mapM (cloneNT (lhs ^. productionSymbol : seen)) rhs) (M.empty, highestSym)
+        _1 %= (Rule lhs body rhs':)
       else
-        mapM_ (recNT (controlSymbol lhs:seen) . controlSymbol) (rhsProductions rhs)
+        mapM_ (recNT ((lhs ^. productionSymbol) : seen) . view productionSymbol) rhs
 
     cloneNT seen nt = do
       (m, _) <- get
-      case M.lookup (controlSymbol nt) m of
-        Just i -> pure nt { controlSymbol = i }
+      case M.lookup (nt ^. productionSymbol) m of
+        Just i -> pure (nt & productionSymbol .~ i)
         Nothing -> do
-          i <- newInst (controlSymbol nt)
-          mapM_ (cloneRule seen) (rulesFor (controlSymbol nt) g)
-          pure (nt { controlSymbol = i })
+          i <- newInst (nt ^. productionSymbol )
+          mapM_ (cloneRule seen) (rulesFor (nt ^. productionSymbol) rs)
+          pure (nt & productionSymbol .~ i)
 
-    cloneRule seen (Rule lhs rhs) = do
+    cloneRule seen (Rule lhs body rhs) = do
       (m, _) <- get
-      let lhs' = lhs { controlSymbol = m M.! controlSymbol lhs }
-      rhsPs' <- mapM (cloneNT (controlSymbol lhs : seen)) (rhsProductions rhs)
-      lift (_1 %= (Rule lhs' (RHS (rhsConstraint rhs) rhsPs'):))
+      let lhs' = lhs & productionSymbol .~ m M.! (lhs ^. productionSymbol)
+      rhs' <- mapM (cloneNT ((lhs ^. productionSymbol) : seen)) rhs
+      lift (_1 %= (Rule lhs' body rhs':))
 
     newInst i = do
       (m, j) <- get

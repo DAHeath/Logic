@@ -11,35 +11,35 @@ import           Logic.Formula hiding (Rule)
 import           Language.Unstructured.Unstructured
 import           Grammar.Grammar
 
-mkGrammar :: MonadVocab m => Program -> m (Symbol, Grammar)
+mkGrammar :: MonadVocab m => Program -> m Grammar
 mkGrammar p = do
-  gs <- evalStateT (mapM (procGrammar procMap) procs) (M.empty, length procs)
-  pure (controlSymbol $ view _3 $ procMap M.! (p ^. entryPoint), concat gs)
+  gs <- evalStateT (mapM (procRules procMap) procs) (M.empty, length procs)
+  pure (Grammar (view (_3 . productionSymbol) $ procMap M.! (p ^. entryPoint)) (concat gs))
   where
     procs = M.toList $ p ^. procedures
     procMap = M.fromList (zipWith
       (\(pn, (inputs, outputs, _)) loc ->
-        (pn, (inputs, outputs, ControlLocation loc loc (inputs ++ outputs)))) procs [0..])
+        (pn, (inputs, outputs, Production loc (inputs ++ outputs)))) procs [0..])
 
-procGrammar :: MonadVocab m
-     => Map ProcName ([Var], [Var], ControlLocation)
+procRules :: MonadVocab m
+     => Map ProcName ([Var], [Var], Production)
      -> (ProcName, ([Var], [Var], Imp))
-     -> StateT (Map (ProcName, Int) ControlLocation, Symbol) m Grammar
-procGrammar procMap (pn, (inps, _, insts)) = do
-  -- create a control location for each instruction
-  mapM_ controlLocation (zip [0..] insts)
+     -> StateT (Map (ProcName, Int) Production, Symbol) m [Rule]
+procRules procMap (pn, (inps, _, insts)) = do
+  -- create a production location for each instruction
+  mapM_ productionLocation (zip [0..] insts)
   -- create rules for each instruction
   original <- concat <$> mapM inst (zip [0..] insts)
   -- remove rules with false constraint
-  let noFalse = filter (\r -> rhsConstraint (ruleRHS r) /= LBool False) original
+  let noFalse = filter (\r -> (r ^. ruleBody) /= LBool False) original
   -- attach a rule which enters the procedure unconditionally
   (m, _) <- get
-  pure (Rule (m M.! (pn, 0)) (RHS (LBool True) []) : noFalse)
+  pure (Rule (m M.! (pn, 0)) (LBool True) [] : noFalse)
 
     where
-      controlLocation (loc, (_, live)) = do
+      productionLocation (loc, (_, live)) = do
         (m, i) <- get
-        let m' = M.insert (pn, loc) (ControlLocation i i (nub $ inps ++ live)) m
+        let m' = M.insert (pn, loc) (Production i (nub $ inps ++ live)) m
         put (m', i+1)
 
       inst (loc, (instruction, _)) = case instruction of
@@ -48,7 +48,7 @@ procGrammar procMap (pn, (inps, _, insts)) = do
           (end, t2, v') <- freshenInto (loc+1) v
 
           let car = carry start end t1 t2 (S.singleton v)
-          pure [ Rule end (RHS (mkAnd (mkEql (typeOf v') (V v') f') car) [start]) ]
+          pure [ Rule end (mkAnd (mkEql (typeOf v') (V v') f') car) [start] ]
 
         Call pn' as rs -> do
           let (inputs, outputs, pLoc) = procMap M.! pn'
@@ -58,7 +58,7 @@ procGrammar procMap (pn, (inps, _, insts)) = do
           let args = equate (as & vars %~ t1) (map (V . t2) inputs)
           let outs = equate (map (V . t3) rs) (map (V . t2) outputs)
           let car = carry start end t1 t3 (S.fromList rs)
-          pure [ Rule end (RHS (manyAnd [args, outs, car]) [start, pExit]) ]
+          pure [ Rule end (manyAnd [args, outs, car]) [start, pExit] ]
 
         Cond f dest -> do
           (start, t1, f') <- freshenInto loc f
@@ -68,14 +68,14 @@ procGrammar procMap (pn, (inps, _, insts)) = do
           let car1 = carry start end1 t1 t2 S.empty
           let car2 = carry start end2 t1 t3 S.empty
 
-          pure [ Rule end1 (RHS (mkAnd f' car1) [start])
-               , Rule end2 (RHS (mkAnd (mkNot f') car2) [start]) ]
+          pure [ Rule end1 (mkAnd f' car1) [start]
+               , Rule end2 (mkAnd (mkNot f') car2) [start] ]
 
         Done -> do
           (start, t1, ()) <- freshenInto loc ()
           (end, t2, ()) <- freshenInst (view _3 (procMap M.! pn)) ()
           let car = carry start end t1 t2 S.empty
-          pure [ Rule end (RHS car [start]) ]
+          pure [ Rule end car [start] ]
 
       freshenInto loc x = do
         (m, _) <- get

@@ -31,17 +31,6 @@ instance Typed Var
 instance Pretty Var
   where pretty = pretty . _varName
 
-parseName :: String -> ([String], Integer, Bool)
-parseName n =
-  let (n', b) = case n of
-       '#':rest -> (rest, True)
-       _ -> (n, False)
-      ws = splitOn "/" n'
-  in
-  case readMaybe (last ws) of
-    Just iden -> (init ws, iden, b)
-    Nothing -> (ws, 0, b)
-
 -- | A traversal which targets all of the variables in a given expression.
 vars :: Data a => Traversal' a Var
 vars = biplate
