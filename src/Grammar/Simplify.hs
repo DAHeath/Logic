@@ -3,7 +3,6 @@ module Grammar.Simplify where
 import           Control.Lens
 
 import           Data.Foldable
-import           Data.Set (Set)
 import qualified Data.Set as S
 import qualified Data.Map as M
 
@@ -38,12 +37,12 @@ inlineRule :: MonadVocab m => Rule -> [Rule] -> m [Rule]
 inlineRule (Rule lhs body rhs) g =
   delete sym <$> mapM (\(Rule lhs' f rhs') -> uncurry (Rule lhs') <$> repRHS (f, rhs')) g
   where
-    sym = _productionSymbol lhs
+    sym = lhs ^. productionSymbol
     repRHS (f, ps) = repRHS' ([], f, ps)
     repRHS' (acc, f, p:ps) =
-      if _productionSymbol p == sym
+      if (p ^. productionSymbol) == sym
       then do
-        (f', ps') <- freshen (M.fromList $ zip (_productionVars lhs) (_productionVars p)) (body, rhs)
+        (f', ps') <- freshen (M.fromList $ zip (lhs ^. productionVars ) (p ^. productionVars)) (body, rhs)
         repRHS' (ps' ++ acc, mkAnd f f', ps)
       else repRHS' (p : acc, f, ps)
     repRHS' (acc, f, []) = pure (f, acc)
@@ -51,12 +50,12 @@ inlineRule (Rule lhs body rhs) g =
 disjoin :: Grammar -> Grammar
 disjoin (Grammar start rs)  = Grammar start $ foldr disjoinCandidate rs candidates
   where
-    disjoinCandidate rs g' = disjoinRules rs : filter (`notElem` rs) g'
-    candidates = M.elems (M.filter (\rs -> length rs > 1) instMap)
+    disjoinCandidate rs' g' = disjoinRules rs' : filter (`notElem` rs') g'
+    candidates = M.elems (M.filter (\rs' -> length rs' > 1) instMap)
     -- a map from all instances in a rule to corresponding rules
     instMap = foldr addInstEntry M.empty rs
     addInstEntry r@(Rule lhs _ rhs) =
-      M.insertWith (++) (_productionSymbol lhs : map _productionSymbol rhs) [r]
+      M.insertWith (++) (map (view productionSymbol) (lhs : rhs)) [r]
 
 disjoinRules :: [Rule] -> Rule
 disjoinRules rules =
