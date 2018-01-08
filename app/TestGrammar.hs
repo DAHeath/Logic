@@ -11,10 +11,11 @@ test (f1, m1) = do
   case f' of
     Left _ -> putStrLn "oops"
     Right p -> do
-      let g = runVocab (do
+      let (start, g) = runVocab (do
             (start, rs) <- mkGrammar p
-            simplify start rs)
-      mapM_ (print . pretty) g
+            (,) start <$> simplify start rs)
+      -- mapM_ (print . pretty) g
+      mapM_ (print . pretty) (nonrecursive start $ unwind start g)
 
 main :: IO ()
 main =

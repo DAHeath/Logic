@@ -11,10 +11,10 @@ import           Logic.Formula hiding (Rule)
 import           Language.Unstructured.Unstructured
 import           Grammar.Grammar
 
-mkGrammar :: MonadVocab m => Program -> m (ControlInst, Grammar)
+mkGrammar :: MonadVocab m => Program -> m (Symbol, Grammar)
 mkGrammar p = do
   gs <- evalStateT (mapM (procGrammar procMap) procs) (M.empty, length procs)
-  pure (controlInst $ view _3 $ procMap M.! (p ^. entryPoint), concat gs)
+  pure (controlSymbol $ view _3 $ procMap M.! (p ^. entryPoint), concat gs)
   where
     procs = M.toList $ p ^. procedures
     procMap = M.fromList (zipWith
@@ -24,7 +24,7 @@ mkGrammar p = do
 procGrammar :: MonadVocab m
      => Map ProcName ([Var], [Var], ControlLocation)
      -> (ProcName, ([Var], [Var], Imp))
-     -> StateT (Map (ProcName, Int) ControlLocation, ControlInst) m Grammar
+     -> StateT (Map (ProcName, Int) ControlLocation, Symbol) m Grammar
 procGrammar procMap (pn, (inps, _, insts)) = do
   -- create a control location for each instruction
   mapM_ controlLocation (zip [0..] insts)

@@ -15,7 +15,7 @@ import Grammar.Grammar
 -- If there is a nonterminal with multiple rules that share the same nonterminals in the body,
 -- disjoin them into a single rule.
 -- Repeat the rules into no more reductions are possible.
-simplify :: MonadVocab m => ControlInst -> Grammar -> m Grammar
+simplify :: MonadVocab m => Symbol -> Grammar -> m Grammar
 simplify start = fmap (map cleanUp) . loop
   where
     loop g = do
@@ -25,7 +25,7 @@ simplify start = fmap (map cleanUp) . loop
     cleanUp (Rule lhs (RHS f ps)) =
       Rule lhs (RHS (varElim (varSet lhs `S.union` varSet ps) f) ps)
 
-inline :: MonadVocab m => ControlInst -> Grammar -> m Grammar
+inline :: MonadVocab m => Symbol -> Grammar -> m Grammar
 inline start g = do
   let toInline = S.filter (\inst -> inst /= start && cardinality inst g == 1) (instances g)
   foldrM (\inst g' -> inlineRule (head $ rulesFor inst g') g') g toInline
@@ -38,7 +38,7 @@ inlineRule (Rule lhs rhs) g =
     cinst = controlID lhs
     repRHS (RHS f ps) = repRHS' ([], f, ps)
     repRHS' (acc, f, p:ps) =
-      if controlInst p == cinst
+      if controlSymbol p == cinst
       then do
         RHS f' ps' <- freshen (M.fromList $ zip (controlVars lhs) (controlVars p)) rhs
         repRHS' (ps' ++ acc, mkAnd f f', ps)
@@ -53,7 +53,7 @@ disjoin g = foldr disjoinCandidate g candidates
     -- a map from all instances in a rule to corresponding rules
     instMap = foldr addInstEntry M.empty g
     addInstEntry r@(Rule lhs rhs) =
-      M.insertWith (++) (controlInst lhs : map controlInst (rhsProductions rhs)) [r]
+      M.insertWith (++) (controlSymbol lhs : map controlSymbol (rhsProductions rhs)) [r]
 
 disjoinRules :: [Rule] -> Rule
 disjoinRules rules =
