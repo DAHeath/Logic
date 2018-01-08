@@ -2,6 +2,7 @@
 import           Control.Lens
 
 import           Data.Text.Prettyprint.Doc
+import           Data.Map as M
 
 import           Logic.Formula hiding (Rule)
 import           Language.Unstructured
@@ -20,9 +21,9 @@ test (f1, m1) = do
       print cs'
       mapM_ (print . pretty) (view grammarRules g'')
 
-main :: IO ()
-main =
-  test ("~/Documents/Research/logic/example/Mult.class", "mult(II)I")
+-- main :: IO ()
+-- main =
+--   test ("~/Documents/Research/logic/example/Mult.class", "mult(II)I")
 
 a0, a1, a2 :: Production
 a0 = Production 0 []
@@ -40,3 +41,15 @@ g =
     , Rule a1 [form|d=0|] [a2]
     , Rule a2 [form|e=0|] []
     ]
+
+main :: IO ()
+main = do
+  r <- unstructuredJava "~/Documents/Research/logic/example/Count.class" "count(I)I"
+  case r of
+    Left e -> print e
+    Right p -> do
+      let g = runVocab (simplify =<< mkGrammar p)
+      r <- solve g [form|not (__RESULT__ = 11)|]
+      case r of
+        Left m -> print (pretty m)
+        Right m -> print (pretty (M.toList m))
