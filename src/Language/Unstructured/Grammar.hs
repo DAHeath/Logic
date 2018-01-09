@@ -34,7 +34,7 @@ procRules procMap (pn, (inps, _, insts)) = do
   let noFalse = filter (\r -> (r ^. ruleBody) /= LBool False) original
   -- attach a rule which enters the procedure unconditionally
   (m, _) <- get
-  pure (Rule (m M.! (pn, 0)) (LBool True) [] : noFalse)
+  pure (rule (m M.! (pn, 0)) (LBool True) [] : noFalse)
 
     where
       productionLocation (loc, (_, live)) = do
@@ -48,7 +48,7 @@ procRules procMap (pn, (inps, _, insts)) = do
           (end, t2, v') <- freshenInto (loc+1) v
 
           let car = carry start end t1 t2 (S.singleton v)
-          pure [ Rule end (mkAnd (mkEql (typeOf v') (V v') f') car) [start] ]
+          pure [ rule end (mkAnd (mkEql (typeOf v') (V v') f') car) [start] ]
 
         Call pn' as rs -> do
           let (inputs, outputs, pLoc) = procMap M.! pn'
@@ -58,7 +58,7 @@ procRules procMap (pn, (inps, _, insts)) = do
           let args = equate (as & vars %~ t1) (map (V . t2) inputs)
           let outs = equate (map (V . t3) rs) (map (V . t2) outputs)
           let car = carry start end t1 t3 (S.fromList rs)
-          pure [ Rule end (manyAnd [args, outs, car]) [start, pExit] ]
+          pure [ rule end (manyAnd [args, outs, car]) [start, pExit] ]
 
         Cond f dest -> do
           (start, t1, f') <- freshenInto loc f
@@ -68,14 +68,16 @@ procRules procMap (pn, (inps, _, insts)) = do
           let car1 = carry start end1 t1 t2 S.empty
           let car2 = carry start end2 t1 t3 S.empty
 
-          pure [ Rule end1 (mkAnd f' car1) [start]
-               , Rule end2 (mkAnd (mkNot f') car2) [start] ]
+          pure [ rule end1 (mkAnd f' car1) [start]
+               , rule end2 (mkAnd (mkNot f') car2) [start] ]
 
         Done -> do
           (start, t1, ()) <- freshenInto loc ()
           (end, t2, ()) <- freshenInst (view _3 (procMap M.! pn)) ()
           let car = carry start end t1 t2 S.empty
-          pure [ Rule end car [start] ]
+          pure [ rule end car [start] ]
+
+      rule = Rule 0
 
       freshenInto loc x = do
         (m, _) <- get

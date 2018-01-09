@@ -23,8 +23,8 @@ simplify = fmap (over grammarRules (map cleanUp)) . loop
       g' <- disjoin <$> inline g
       if g' == g then pure g' else loop g'
 
-    cleanUp (Rule lhs f ps) =
-      Rule lhs (varElim (varSet lhs `S.union` varSet ps) f) ps
+    cleanUp (Rule cats lhs f ps) =
+      Rule cats lhs (varElim (varSet lhs `S.union` varSet ps) f) ps
 
 inline :: MonadVocab m => Grammar -> m Grammar
 inline (Grammar start rs) = do
@@ -34,8 +34,8 @@ inline (Grammar start rs) = do
 
 -- | Substitute occurrences of the rule left hand side instance with the body of the rule.
 inlineRule :: MonadVocab m => Rule -> [Rule] -> m [Rule]
-inlineRule (Rule lhs body rhs) g =
-  delete sym <$> mapM (\(Rule lhs' f rhs') -> uncurry (Rule lhs') <$> repRHS (f, rhs')) g
+inlineRule (Rule _ lhs body rhs) g =
+  delete sym <$> mapM (\(Rule cats lhs' f rhs') -> uncurry (Rule cats lhs') <$> repRHS (f, rhs')) g
   where
     sym = lhs ^. productionSymbol
     repRHS (f, ps) = repRHS' ([], f, ps)
@@ -54,13 +54,13 @@ disjoin (Grammar start rs)  = Grammar start $ foldr disjoinCandidate rs candidat
     candidates = M.elems (M.filter (\rs' -> length rs' > 1) instMap)
     -- a map from all instances in a rule to corresponding rules
     instMap = foldr addInstEntry M.empty rs
-    addInstEntry r@(Rule lhs _ rhs) =
-      M.insertWith (++) (map (view productionSymbol) (lhs : rhs)) [r]
+    addInstEntry r@(Rule ct lhs _ rhs) =
+      M.insertWith (++) (ct, map (view productionSymbol) (lhs : rhs)) [r]
 
 disjoinRules :: [Rule] -> Rule
 disjoinRules rules =
   let rs = map rename rules in
-  Rule (_ruleLHS first) (manyOr (map _ruleBody rs)) (_ruleRHS first)
+  first & ruleBody .~ manyOr (map _ruleBody rs)
   where
     prodVars r = concatMap _productionVars (_ruleLHS r : _ruleRHS r)
     first = head rules

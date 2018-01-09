@@ -37,6 +37,7 @@ library
                      , Logic.ImplicationGraph.Accessors
 
   default-extensions:  LambdaCase
+                     , MultiWayIf
                      , DeriveDataTypeable
                      , DeriveFunctor
                      , DeriveFoldable

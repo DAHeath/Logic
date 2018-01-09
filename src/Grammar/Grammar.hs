@@ -3,11 +3,13 @@ module Grammar.Grammar where
 import           Control.Lens
 import           Control.Monad.State
 
+import           Data.Data.Lens
 import           Data.Data (Data)
 import           Data.Set (Set)
 import qualified Data.Set as S
+import           Data.Map (Map)
+import qualified Data.Map as M
 import           Data.Text.Prettyprint.Doc
-import           Data.List (nub)
 
 import Logic.Formula hiding (Rule)
 
@@ -20,9 +22,12 @@ data Production = Production
   } deriving (Show, Read, Eq, Ord, Data)
 makeLenses ''Production
 
+type Category = Int
+
 -- It is crucial that every variable in a production location over a rule is unique.
 data Rule = Rule
-  { _ruleLHS :: Production
+  { _ruleCategory :: Category
+  , _ruleLHS :: Production
   , _ruleBody :: Form
   , _ruleRHS :: [Production]
   } deriving (Show, Read, Eq, Ord, Data)
@@ -44,7 +49,13 @@ instance Pretty Production where
   pretty (Production sym vs) = pretty sym <> pretty vs
 
 instance Pretty Rule where
-  pretty (Rule lhs body rhs) = pretty lhs <> pretty ": " <> pretty body <> pretty " | " <> pretty rhs
+  pretty (Rule ct lhs body rhs) =
+    mconcat [ pretty ct
+            , pretty lhs
+            , pretty ": "
+            , pretty body
+            , pretty " | "
+            , pretty rhs ]
 
 cardinality :: Symbol -> [Rule] -> Int
 cardinality sym = length . filter (\r -> _productionSymbol (_ruleLHS r) == sym)
@@ -71,12 +82,11 @@ clone i j [] = [S.fromList [i, j]]
 
 cloneFor :: Symbol -> Clones -> Maybe (Set Symbol)
 cloneFor i (cs:css) = if i `elem` cs then Just cs else cloneFor i css
-cloneFor i [] = Nothing
+cloneFor _ [] = Nothing
 
-predecessors :: Grammar -> Symbol -> Set Symbol
-predecessors g s =
-  S.fromList $ concatMap (map
-    (view productionSymbol) . view ruleRHS) (rulesFor s (g ^. grammarRules))
+predecessors :: [Rule] -> Symbol -> Set Symbol
+predecessors rs s =
+  S.fromList $ concatMap (toListOf (ruleRHS . traverse . productionSymbol)) (rulesFor s rs)
 
 successors :: Grammar -> Symbol -> Set Symbol
 successors g s =
@@ -95,3 +105,15 @@ descendants g s = evalState (desc s) S.empty
         let ss = successors g sym
         ss' <- mapM desc (S.toList ss)
         return (S.unions $ ss : ss')
+
+productions :: (Applicative f, Data a) => (Production -> f Production) -> a -> f a
+productions = biplate
+
+allSymbols :: (Applicative f, Data a) => (Symbol -> f Symbol) -> a -> f a
+allSymbols = biplate
+
+symbols :: Grammar -> Set Symbol
+symbols = S.fromList . toListOf allSymbols
+
+categorize :: [Rule] -> Map Category [Rule]
+categorize = foldr (\r -> M.insertWith (++) (r ^. ruleCategory) [r]) M.empty
