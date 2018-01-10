@@ -1,5 +1,6 @@
 dist/
 .stack-work/
+
 *~
 *.swp
 .DS_STORE
@@ -15,3 +16,4 @@ cabal.config
 *.dot
 *.pdf
 test.json
+Logic.cabal

@@ -1,0 +1,66 @@
+name: Logic
+version: '0.1.0.0'
+category: Compilers
+author: David Heath
+maintainer: heath.davidanthony@gmail.com
+copyright: 2017 David Heath
+license: BSD3
+github: https://github.com/DAHeath/Logic
+
+extra-source-files:
+- README.md
+
+default-extensions:
+- LambdaCase
+
+dependencies:
+- prettyprinter
+- text >=1.2
+- bytestring
+
+library:
+  source-dirs: src
+  default-extensions:
+  - MultiWayIf
+  - DeriveDataTypeable
+  - DeriveFunctor
+  - DeriveFoldable
+  - DeriveTraversable
+  - GeneralizedNewtypeDeriving
+  - RankNTypes
+  - FlexibleContexts
+  - FlexibleInstances
+
+  ghc-options: -Wall
+
+  exposed-modules:
+  - Formula
+  - Formula.Z3
+  - Grammar
+  - Language
+
+  dependencies:
+  - base >=4.8
+  - containers >=0.5
+  - turtle
+  - lens >=4.15
+  - mtl >=2.2
+  - monad-loops
+  - extra
+  - parsec >=3.1
+  - template-haskell >=2.11
+  - syb
+  - transformers >=0.5
+  - z3 >=4.1
+  - split
+
+executables:
+  Examples:
+    main: Main.hs
+    source-dirs: app
+    dependencies:
+    - base
+    - lens
+    - mtl
+    - containers
+    - Logic
