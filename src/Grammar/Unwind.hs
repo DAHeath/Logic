@@ -19,7 +19,7 @@ nonrecursive g =
   if g' == g then g'
   else nonrecursive g'
   where
-    killLoop g = let (_, old, _) = unwind' [] g in g & grammarRules .~ old
+    killLoop g' = let (_, old, _) = unwind' [] g' in g' & grammarRules .~ old
 
 -- | Find the first recursive invocation in the grammar along each branch and unwind it.
 -- That is, follow the rules until a nonterminal symbol appears which has already been

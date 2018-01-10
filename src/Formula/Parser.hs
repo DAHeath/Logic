@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Formula.Parser where
 
 import           Control.Lens hiding (op)
@@ -141,7 +142,7 @@ parseChc = many parseChc'
     app :: CharParser st App
     app = braces $ do i <- ident
                       args <- many var
-                      let ts = map T.typeOf args
+                      let ts = map (view varType) args
                       return $ App (Var i (T.curryType ts T.Bool)) args
 
 promote :: Monad m => CharParser () a -> (String, Int, Int) -> String -> m a

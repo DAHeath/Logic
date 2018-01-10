@@ -1,8 +1,8 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Formula.Var where
 
 import           Control.Lens
 
-import           Data.Foldable (foldrM)
 import           Data.Data (Data)
 import           Data.Data.Lens (biplate)
 import           Data.Map (Map)
@@ -11,17 +11,13 @@ import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Text.Prettyprint.Doc
 
-import           Formula.Type (Type, Typed)
-import qualified Formula.Type as T
+import           Formula.Type
 
 data Var = Var
   { _varName :: String
   , _varType :: Type
   } deriving (Show, Read, Eq, Ord, Data)
 makeLenses ''Var
-
-instance Typed Var
-  where typeOf v = v ^. varType
 
 instance Pretty Var
   where pretty = pretty . _varName
@@ -35,9 +31,6 @@ vars = biplate
 subst :: Data a => Map Var Var -> a -> a
 subst m = over vars (\v -> M.findWithDefault v v m)
 
-mapVars :: Data a => (Var -> Var) -> a -> a
-mapVars = over vars
-
 -- | The set of all variables in the expression.
 varSet :: Data a => a -> Set Var
 varSet x = S.fromList (x ^.. vars)
@@ -45,7 +38,7 @@ varSet x = S.fromList (x ^.. vars)
 -- | Replace bound variables in the structure by those in the list.
 instantiate :: Data a => [Var] -> a -> a
 instantiate vs =
-  let ts = map T.typeOf vs
+  let ts = map (view varType) vs
       bs = zipWith bound [0..] ts
       m = M.fromList (zip bs vs)
   in subst m

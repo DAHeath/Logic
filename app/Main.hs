@@ -34,7 +34,7 @@ main =
     Right p -> do
       let g = runVocab (simplify =<< mkGrammar p)
       solve g [form|not (__RESULT__ = 11)|] >>= \case
-        Left m -> print (pretty m)
+        Left m -> print (pretty (M.toList m))
         Right m -> print (pretty (M.toList m))
 
 testE :: (String, String) -> (String, String) -> Form -> IO ()
@@ -58,7 +58,7 @@ testUnstructured f g cond = do
   print (pretty gr)
 
   solve gr cond >>= \case
-    Left e -> print (pretty e)
+    Left e -> print (pretty (M.toList e))
     Right sol -> print (pretty (M.toList sol))
 
 multMultAcc :: IO ()

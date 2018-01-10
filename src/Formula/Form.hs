@@ -1,17 +1,18 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Formula.Form where
 
 import           Control.Lens
 import           Control.Monad.State
 
 import           Data.Set (Set)
-import qualified Data.Set as S
+import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Data (Data)
 import           Data.Data.Lens (uniplate)
 import           Data.List (sort)
 import           Data.Text.Prettyprint.Doc
 
-import           Formula.Type (Type((:=>)), Typed)
+import           Formula.Type (Type((:=>)))
 import qualified Formula.Type as T
 import           Formula.Var
 
@@ -60,42 +61,42 @@ instance Monoid Form where
   mappend = mkAnd
   mempty = LBool True
 
-instance Typed Form where
-  typeOf = \case
-    V v         -> T.typeOf v
-    v :@ _      -> case T.typeOf v of
-                     _ :=> t -> t
-                     _ -> error "bad function application type"
+formType :: Form -> Type
+formType = \case
+  V v         -> v ^. varType
+  o :@ _      -> case formType o of
+                   _ :=> t -> t
+                   _ -> error "bad function application type"
 
-    If t        -> T.Bool :=> t :=> t :=> t
+  If t        -> T.Bool :=> t :=> t :=> t
 
-    Not         -> T.Bool :=> T.Bool
-    Impl        -> T.Bool :=> T.Bool
-    Iff         -> T.Bool :=> T.Bool
-    And         -> T.Bool :=> T.Bool
-    Or          -> T.Bool :=> T.Bool
+  Not         -> T.Bool :=> T.Bool
+  Impl        -> T.Bool :=> T.Bool
+  Iff         -> T.Bool :=> T.Bool
+  And         -> T.Bool :=> T.Bool
+  Or          -> T.Bool :=> T.Bool
 
-    Add t       -> t :=> t :=> t
-    Mul t       -> t :=> t :=> t
-    Sub t       -> t :=> t :=> t
-    Div t       -> t :=> t :=> t
-    Mod t       -> t :=> t :=> t
+  Add t       -> t :=> t :=> t
+  Mul t       -> t :=> t :=> t
+  Sub t       -> t :=> t :=> t
+  Div t       -> t :=> t :=> t
+  Mod t       -> t :=> t :=> t
 
-    Distinct t  -> T.List t :=> T.Bool
-    Eql t       -> t :=> t :=> T.Bool
-    Nql t       -> t :=> t :=> T.Bool
-    Lt t        -> t :=> t :=> T.Bool
-    Le t        -> t :=> t :=> T.Bool
-    Gt t        -> t :=> t :=> T.Bool
-    Ge t        -> t :=> t :=> T.Bool
+  Distinct t  -> T.List t :=> T.Bool
+  Eql t       -> t :=> t :=> T.Bool
+  Nql t       -> t :=> t :=> T.Bool
+  Lt t        -> t :=> t :=> T.Bool
+  Le t        -> t :=> t :=> T.Bool
+  Gt t        -> t :=> t :=> T.Bool
+  Ge t        -> t :=> t :=> T.Bool
 
-    Select t t' -> T.Array t t' :=> t :=> t' :=> T.Array t t'
-    Store t t'  -> T.Array t t' :=> t :=> t'
+  Select t t' -> T.Array t t' :=> t :=> t' :=> T.Array t t'
+  Store t t'  -> T.Array t t' :=> t :=> t'
 
-    LUnit       -> T.Unit
-    LBool _     -> T.Bool
-    LInt _      -> T.Int
-    LReal _     -> T.Real
+  LUnit       -> T.Unit
+  LBool _     -> T.Bool
+  LInt _      -> T.Int
+  LReal _     -> T.Real
 
 instance Pretty Form where
   pretty = \case
@@ -143,11 +144,7 @@ instance Pretty Form where
         f' :@ y -> inlinePrint f' y <+> pretty x
         f' -> pretty f' <+> pretty x
 
-class Formulaic a where
-  toForm :: a -> Form
-
-instance Formulaic Form where
-  toForm = id
+type Model = Map Var Form
 
 -- | Apply a function to two arguments.
 app2 :: Form -> Form -> Form -> Form
@@ -258,28 +255,12 @@ isBinaryInfix = \case
     Ge _  -> True
     _     -> False
 
--- | Collect all the variables in this formula
-collectVars :: Form -> Set Var
-collectVars = \case
-    V var -> S.singleton var
-    left :@ right -> S.union (collectVars left) (collectVars right)
-    _ -> S.empty
-
-
--- | Map vars to something else
-mapVar :: (Var -> Var) -> Form -> Form
-mapVar f = \case
-    V var -> V $ f var
-    left :@ right -> mapVar f left :@ mapVar f right
-    other -> other
-
 -- | Remove simple assignments such as `v1 = v2` by rewriting the rest of the
 -- formula with one side of the equality. Variables provided in the set will
 -- not be eliminated from the formula.
 varElim :: Set Var -> Form -> Form
 varElim conserve = loop
   where
-    loop :: Form -> Form
     loop f =
       let st =
             execState (
@@ -294,9 +275,8 @@ varElim conserve = loop
         Just (v1, v2) ->
           loop (clean $ subst (M.singleton v1 v2) f)
 
-clean :: Form -> Form
-clean = transform (\case
-  Eql t :@ f1 :@ f2 -> mkEql t (clean f1) (clean f2)
-  And :@ x :@ y -> mkAnd (clean x) (clean y)
-  Or :@ x :@ y -> mkOr (clean x) (clean y)
-  f -> f)
+    clean = transform (\case
+      Eql t :@ f1 :@ f2 -> mkEql t (clean f1) (clean f2)
+      And :@ x :@ y -> mkAnd (clean x) (clean y)
+      Or :@ x :@ y -> mkOr (clean x) (clean y)
+      f -> f)

@@ -21,24 +21,24 @@ import           Grammar.Unwind
 solve :: Grammar -> Form -> IO (Either Model (Map Symbol Form))
 solve g f = loop ([], g)
   where
-    loop (clones, g) =
-      interpolate g f >>= \case
+    loop (clones, g') =
+      interpolate g' f >>= \case
         Left e -> pure (Left e)
-        Right m -> ifM (isInductive clones g m)
+        Right m -> ifM (isInductive clones g' m)
           (pure (Right m))
-          (loop $ unwind (clones, g))
+          (loop $ unwind (clones, g'))
 
 interpolate :: Grammar -> Form -> IO (Either Model (Map Symbol Form))
 interpolate g' q =
-  let chc = F.Query [app terminal] (LBool True) q : map clause (g ^. grammarRules) in
-  runExceptT (interpretModel <$> Z3.solveChc chc)
+  let clauses = F.Query [app terminal] (LBool True) q : map clause (g ^. grammarRules) in
+  runExceptT (interpretModel <$> Z3.solveChc clauses)
   where
     g = nonrecursive g'
     terminal = view ruleLHS (head $ rulesFor (g ^. grammarStart)
                                              (g ^. grammarRules)) & vars %~ unaliasedVar
     clause (Rule _ lhs f rhs) = F.Rule (map app rhs) f (app lhs)
     app (Production sym vs) = mkApp ("R" ++ show sym) vs
-    interpretModel (Model m) =
+    interpretModel m =
       M.mapKeys (read . tail)
       $ M.filterWithKey (\k _ -> head k == 'R')
       $ M.mapKeys _varName m

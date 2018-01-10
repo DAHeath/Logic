@@ -49,7 +49,7 @@ procRules procMap (pn, (inps, _, insts)) = do
           (end, t2, v') <- freshenInto (loc+1) v
 
           let car = carry start end t1 t2 (S.singleton v)
-          pure [ rule end (mkAnd (mkEql (typeOf v') (V v') f') car) [start] ]
+          pure [ rule end (mkAnd (mkEql (v' ^. varType) (V v') f') car) [start] ]
 
         Call pn' as rs -> do
           let (inputs, outputs, pLoc) = procMap M.! pn'
@@ -96,4 +96,4 @@ procRules procMap (pn, (inps, _, insts)) = do
             vs = S.toList $ S.difference (svs `S.intersection` evs) pvs
         in equate (map (V . t1) vs) (map (V . t2) vs)
 
-      equate es1 es2 = manyAnd (zipWith (\e1 e2 -> mkEql (typeOf e1) e1 e2) es1 es2)
+      equate es1 es2 = manyAnd (zipWith (\e1 e2 -> mkEql (formType e1) e1 e2) es1 es2)

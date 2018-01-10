@@ -70,11 +70,11 @@ aliasCount = read . last . splitOn "\\" . view varName
 -- The variables on the left of the list of substitutes will be replaced by the corresponding
 -- variable on the right.
 freshen :: (Data a, MonadVocab m) => Map Var Var -> a -> m a
-freshen table x = subst <$> aliasMap <*> pure x
+freshen tab x = subst <$> aliasMap <*> pure x
   where
-    aliasMap = foldrM addAlias table (varSet x)
+    aliasMap = foldrM addAlias tab (varSet x)
     addAlias v m =
-      if v `elem` M.keys table
+      if v `elem` M.keys tab
       then pure m
       else do
         v' <- fresh v

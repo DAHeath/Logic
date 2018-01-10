@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Formula.Type where
 
 import           Control.Lens hiding (List)
@@ -27,9 +28,6 @@ instance Pretty Type where
     t :=> t'    -> pretty t <+> pretty "->" <+> pretty t'
     List t      -> pretty "List<" <> pretty t <> pretty ">"
     Array t1 t2 -> pretty "Array<" <> pretty t1 <> pretty "," <> pretty t2
-
-class Typed a where
-  typeOf :: a -> Type
 
 -- | Construct a function type from a list of input types and an output type.
 curryType :: [Type] -> Type -> Type

@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Formula.Z3 where
 
 import           Control.Lens
@@ -34,7 +35,7 @@ solveChc hcs = do
       let (queries, rules) = partition F.isQuery hcs
       let qids = map (const "x0/q") queries
       let qs = zipWith mkQuery queries qids
-      let satForms = map F.toForm rules ++ qs
+      let satForms = map F.chcForm rules ++ qs
       let rids = map (\n -> "RULE" ++ show n) [0..length hcs-1]
       useDuality
       forms <- traverse formToAst satForms
@@ -50,7 +51,7 @@ solveChc hcs = do
 
     mkQuery q n =
       let theQuery = F.V $ F.Var n F.Bool in
-      F.app2 F.Impl (F.mkNot $ F.toForm q) theQuery
+      F.app2 F.Impl (F.mkNot $ F.chcForm q) theQuery
 
     useDuality = do
       pars <- mkParams
@@ -202,21 +203,6 @@ appToZ3 f args =
                        <*> formToAst (args !! 1)
                        <*> formToAst (args !! 2)
 
-funcToDecl :: (MonadState Env z3, MonadZ3 z3) => Var -> z3 FuncDecl
-funcToDecl r = do
-  let t = F.typeOf r
-  let n = F._varName r
-  env <- use envFuns
-  case M.lookup r env of
-    Nothing -> do
-      sorts <- traverse typeToSort (F.domain t)
-      sym <- mkStringSymbol n
-      r' <- mkFuncDecl sym sorts =<< typeToSort (F.range t)
-      fixedpointRegisterRelation r'
-      envFuns %= M.insert r r'
-      return r'
-    Just r' -> return r'
-
 formFromApp :: MonadZ3 z3 => String -> [AST] -> Sort -> z3 Form
 formFromApp n args range
   | n == "true"  = return $ F.LBool True
@@ -229,7 +215,7 @@ formFromApp n args range
     c <- astToForm (head args)
     e1 <- astToForm (args !! 1)
     e2 <- astToForm (args !! 2)
-    return $ F.appMany (F.If (F.typeOf e1)) [c, e1, e2]
+    return $ F.appMany (F.If (F.formType e1)) [c, e1, e2]
   | n == "and"      = F.manyAnd  <$> traverse astToForm args
   | n == "or"       = F.manyOr   <$> traverse astToForm args
   | n == "+"        = F.manyIAdd <$> traverse astToForm args
@@ -268,7 +254,7 @@ formFromApp n args range
 -- | Convert a Z3 model to the AST-based formula model.
 modelToModel :: (MonadState Env z3, MonadZ3 z3)
              => Model -> z3 F.Model
-modelToModel m = F.Model <$> (traverse superSimplify =<< M.union <$> functions <*> constants)
+modelToModel m = traverse superSimplify =<< M.union <$> functions <*> constants
   where
     functions = do
       fds <- modelGetFuncDecls m
@@ -363,9 +349,24 @@ getType = getSort >=> sortToType
 declName :: MonadZ3 z3 => FuncDecl -> z3 String
 declName = getDeclName >=> getSymbolString
 
+funcToDecl :: (MonadState Env z3, MonadZ3 z3) => Var -> z3 FuncDecl
+funcToDecl r = do
+  let t = r ^. F.varType
+  let n = r ^. F.varName
+  env <- use envFuns
+  case M.lookup r env of
+    Nothing -> do
+      sorts <- traverse typeToSort (F.domain t)
+      sym <- mkStringSymbol n
+      r' <- mkFuncDecl sym sorts =<< typeToSort (F.range t)
+      fixedpointRegisterRelation r'
+      envFuns %= M.insert r r'
+      return r'
+    Just r' -> return r'
+
 varDec :: MonadZ3 z3 => Var -> z3 FuncDecl
 varDec v = do
-  let t = F.typeOf v
-  let n = F._varName v
+  let t = v ^. F.varType
+  let n = v ^. F.varName
   sym <- mkStringSymbol n
   mkFuncDecl sym [] =<< typeToSort t

@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Grammar.Grammar where
 
 import           Control.Lens
