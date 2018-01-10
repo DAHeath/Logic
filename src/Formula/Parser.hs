@@ -16,41 +16,41 @@ import           Language.Haskell.TH.Quote
 
 import           Formula.Type (Type)
 import qualified Formula.Type as T
-import           Formula.Form
+import           Formula.Expr
 import           Formula.Var
 import           Formula.Chc
 
 lexeme :: Stream s m Char => ParsecT s u m b -> ParsecT s u m b
 lexeme p = do { x <- p; spaces; return x  }
 
-parseForm :: CharParser st Form
-parseForm = ex1
+parseExpr :: CharParser st Expr
+parseExpr = ex1
 
-ex1 :: CharParser st Form
+ex1 :: CharParser st Expr
 ex1 = ex2 `chainl1` impop
 
-ex2 :: CharParser st Form
+ex2 :: CharParser st Expr
 ex2 = ex3 `chainl1` (op "||" >> return (\x y -> manyOr [x, y]))
 
-ex3 :: CharParser st Form
+ex3 :: CharParser st Expr
 ex3 = ex4 `chainl1` (op "&&" >> return (\x y -> manyAnd [x, y]))
 
-ex4 :: CharParser st Form
+ex4 :: CharParser st Expr
 ex4 = ex6 `chainl1` compareop
 
-ex6 :: CharParser st Form
+ex6 :: CharParser st Expr
 ex6 = ex7 `chainl1` addop
 
-ex7 :: CharParser st Form
+ex7 :: CharParser st Expr
 ex7 = exInf `chainl1` mulop
 
-exInf :: CharParser st Form
+exInf :: CharParser st Expr
 exInf = atom
 
-atom :: CharParser st Form
+atom :: CharParser st Expr
 atom = try app <|> nonapp
   where
-    nonapp = parens parseForm <|> (V <$> try var) <|> bool <|> (LInt <$> integer)
+    nonapp = parens parseExpr <|> (V <$> try var) <|> bool <|> (LInt <$> integer)
     app = (res "not"      >> (:@) Not                    <$> nonapp)
       <|> (res "if"       >> appMany (If T.Int)          <$> sequence [nonapp, nonapp, nonapp])
       <|> (res "store"    >> appMany (Store T.Int T.Int) <$> sequence [nonapp, nonapp, nonapp])
@@ -73,7 +73,7 @@ atom = try app <|> nonapp
               args <- many1 nonapp
               return $ appMany (V v) args)
 
-bool :: CharParser st Form
+bool :: CharParser st Expr
 bool = const (LBool True)  <$> res "true"
    <|> const (LBool False) <$> res "false"
 
@@ -99,7 +99,7 @@ var = do
 annot :: CharParser st Type
 annot = (op ":" >> typ) <|> pure T.Int
 
-impop, compareop, mulop, addop :: CharParser st (Form -> Form -> Form)
+impop, compareop, mulop, addop :: CharParser st (Expr -> Expr -> Expr)
 
 impop = (op "<->" >> return (app2 Iff))
     <|> (op "->"  >> return (app2 Impl))
@@ -133,11 +133,11 @@ parseChc = many parseChc'
         Left a  -> return $ Rule as f a
         Right q -> return $ Query as f q
 
-    lhs :: CharParser st ([App], Form)
-    lhs = (,) <$> many app <*> (try parseForm <|> return (LBool True))
+    lhs :: CharParser st ([App], Expr)
+    lhs = (,) <$> many app <*> (try parseExpr <|> return (LBool True))
 
-    rhs :: CharParser st (Either App Form)
-    rhs = (Left <$> app) <|> (Right <$> parseForm)
+    rhs :: CharParser st (Either App Expr)
+    rhs = (Left <$> app) <|> (Right <$> parseExpr)
 
     app :: CharParser st App
     app = braces $ do i <- ident
@@ -161,9 +161,9 @@ promote par (file, line, col) s =
            eof
            return x
 
-form :: QuasiQuoter
-form = QuasiQuoter { quoteExp = quoteFormExp parseForm
-                   , quotePat = quoteFormPat parseForm
+expr :: QuasiQuoter
+expr = QuasiQuoter { quoteExp = quoteFormExp parseExpr
+                   , quotePat = quoteFormPat parseExpr
                    , quoteType = undefined
                    , quoteDec = undefined
                    }
@@ -188,7 +188,7 @@ quoteFormExp par s = do pos <- thPos
                         ex <- promote par pos s
                         dataToExpQ (const Nothing `extQ` metaExp) ex
 
-metaExp :: Form -> Maybe TH.ExpQ
+metaExp :: Expr -> Maybe TH.ExpQ
 metaExp (V (Var i _))
   | head i == '$' = Just [| $(TH.varE (TH.mkName (tail i))) |]
   | head i == '@' = Just [| V $ $(TH.varE (TH.mkName (tail i))) |]

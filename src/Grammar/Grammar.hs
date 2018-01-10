@@ -29,7 +29,7 @@ type Category = Int
 data Rule = Rule
   { _ruleCategory :: Category
   , _ruleLHS :: Production
-  , _ruleBody :: Form
+  , _ruleBody :: Expr
   , _ruleRHS :: [Production]
   } deriving (Show, Read, Eq, Ord, Data)
 makeLenses ''Rule

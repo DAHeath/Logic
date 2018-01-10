@@ -18,7 +18,7 @@ import qualified Formula.Z3 as Z3
 import           Grammar.Grammar
 import           Grammar.Unwind
 
-solve :: Grammar -> Form -> IO (Either Model (Map Symbol Form))
+solve :: Grammar -> Expr -> IO (Either Model (Map Symbol Expr))
 solve g f = loop ([], g)
   where
     loop (clones, g') =
@@ -28,7 +28,7 @@ solve g f = loop ([], g)
           (pure (Right m))
           (loop $ unwind (clones, g'))
 
-interpolate :: Grammar -> Form -> IO (Either Model (Map Symbol Form))
+interpolate :: Grammar -> Expr -> IO (Either Model (Map Symbol Expr))
 interpolate g' q =
   let clauses = F.Query [app terminal] (LBool True) q : map clause (g ^. grammarRules) in
   runExceptT (interpretModel <$> Z3.solveChc clauses)
@@ -43,7 +43,7 @@ interpolate g' q =
       $ M.filterWithKey (\k _ -> head k == 'R')
       $ M.mapKeys _varName m
 
-isInductive :: Clones -> Grammar -> Map Symbol Form -> IO Bool
+isInductive :: Clones -> Grammar -> Map Symbol Expr -> IO Bool
 isInductive clones g m = evalStateT (ind S.empty (g ^. grammarStart)) M.empty
   where
     descs sym =

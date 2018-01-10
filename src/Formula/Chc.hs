@@ -5,13 +5,13 @@ import           Control.Lens
 import           Data.Data (Data)
 import           Data.Text.Prettyprint.Doc
 
-import           Formula.Form
+import           Formula.Expr
 import           Formula.Var
 import qualified Formula.Type as T
 
 data Chc
-  = Rule [App] Form App
-  | Query [App] Form Form
+  = Rule [App] Expr App
+  | Query [App] Expr Expr
   deriving (Show, Eq, Ord, Data)
 
 data App = App Var [Var]
@@ -20,12 +20,12 @@ data App = App Var [Var]
 mkApp :: String -> [Var] -> App
 mkApp n vs = App (Var n (T.curryType (map (view varType) vs) T.Bool)) vs
 
-chcForm :: Chc -> Form
-chcForm (Rule lhs phi rhs) = app2 Impl (manyAnd (map appForm lhs ++ [phi])) (appForm rhs)
-chcForm (Query lhs phi goal) = app2 Impl (manyAnd (map appForm lhs ++ [phi])) goal
+chcExpr :: Chc -> Expr
+chcExpr (Rule lhs phi rhs) = app2 Impl (manyAnd (map appExpr lhs ++ [phi])) (appExpr rhs)
+chcExpr (Query lhs phi goal) = app2 Impl (manyAnd (map appExpr lhs ++ [phi])) goal
 
-appForm :: App -> Form
-appForm (App rel vs) = appMany (V rel) (map V vs)
+appExpr :: App -> Expr
+appExpr (App rel vs) = appMany (V rel) (map V vs)
 
 isQuery :: Chc -> Bool
 isQuery Query{} = True

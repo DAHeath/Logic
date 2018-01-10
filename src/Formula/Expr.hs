@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Formula.Form where
+module Formula.Expr where
 
 import           Control.Lens
 import           Control.Monad.State
@@ -16,8 +16,8 @@ import           Formula.Type (Type((:=>)))
 import qualified Formula.Type as T
 import           Formula.Var
 
-data Form
-  = Form :@ Form
+data Expr
+  = Expr :@ Expr
   | V Var
 
   | If Type
@@ -53,15 +53,15 @@ data Form
 
 infixl 9 :@
 
-makePrisms ''Form
+makePrisms ''Expr
 
-instance Plated Form where plate = uniplate
+instance Plated Expr where plate = uniplate
 
-instance Monoid Form where
+instance Monoid Expr where
   mappend = mkAnd
   mempty = LBool True
 
-formType :: Form -> Type
+formType :: Expr -> Type
 formType = \case
   V v         -> v ^. varType
   o :@ _      -> case formType o of
@@ -98,7 +98,7 @@ formType = \case
   LInt _      -> T.Int
   LReal _     -> T.Real
 
-instance Pretty Form where
+instance Pretty Expr where
   pretty = \case
     f :@ x :@ y ->
       if isBinaryInfix f
@@ -144,19 +144,19 @@ instance Pretty Form where
         f' :@ y -> inlinePrint f' y <+> pretty x
         f' -> pretty f' <+> pretty x
 
-type Model = Map Var Form
+type Model = Map Var Expr
 
 -- | Apply a function to two arguments.
-app2 :: Form -> Form -> Form -> Form
+app2 :: Expr -> Expr -> Expr -> Expr
 app2 f x y = f :@ x :@ y
 
-app3 :: Form -> Form -> Form -> Form -> Form
+app3 :: Expr -> Expr -> Expr -> Expr -> Expr
 app3 f x y z = f :@ x :@ y :@ z
 
-appMany :: Form -> [Form] -> Form
+appMany :: Expr -> [Expr] -> Expr
 appMany = foldl (:@)
 
-mkAnd :: Form -> Form -> Form
+mkAnd :: Expr -> Expr -> Expr
 mkAnd x@(Ge t1 :@ x1 :@ y1) y@(Le t2 :@ x2 :@ y2)
   | t1 == t2 && x1 == x2 && y1 == y2 = Eql t1 :@ x1 :@ y1
   | otherwise                        = app2 And x y
@@ -177,7 +177,7 @@ mkAnd x y
   | x == y           = x
   | otherwise        = app2 And x y
 
-mkOr :: Form -> Form -> Form
+mkOr :: Expr -> Expr -> Expr
 mkOr x y
   | x == LBool True  = LBool True
   | y == LBool True  = LBool True
@@ -186,29 +186,29 @@ mkOr x y
   | x == y           = x
   | otherwise        = app2 Or x y
 
-mkNot :: Form -> Form
+mkNot :: Expr -> Expr
 mkNot (LBool True) = LBool False
 mkNot (LBool False) = LBool True
 mkNot (Nql t :@ x :@ y) = Eql t :@ x :@ y
 mkNot (Not :@ y) = y
 mkNot x = Not :@ x
 
-mkEql :: Type -> Form -> Form -> Form
+mkEql :: Type -> Expr -> Expr -> Expr
 mkEql t x y
   | x == y = LBool True
   | otherwise = let [x', y'] = sort [x, y] in app2 (Eql t) x' y'
 
-manyAnd, manyOr :: Foldable f => f Form -> Form
+manyAnd, manyOr :: Foldable f => f Expr -> Expr
 manyAnd = foldr mkAnd (LBool True)
 manyOr  = foldr mkOr (LBool False)
 
-mkIAdd :: Form -> Form -> Form
+mkIAdd :: Expr -> Expr -> Expr
 mkIAdd (LInt 0) x = x
 mkIAdd x (LInt 0) = x
 mkIAdd (LInt x) (LInt y) = LInt (x + y)
 mkIAdd x y = Add T.Int :@ x :@ y
 
-mkIMul :: Form -> Form -> Form
+mkIMul :: Expr -> Expr -> Expr
 mkIMul (LInt 0) _ = LInt 0
 mkIMul _ (LInt 0) = LInt 0
 mkIMul (LInt 1) x = x
@@ -216,12 +216,12 @@ mkIMul x (LInt 1) = x
 mkIMul (LInt x) (LInt y) = LInt (x * y)
 mkIMul x y = Mul T.Int :@ x :@ y
 
-manyIAdd, manyIMul :: Foldable f => f Form -> Form
+manyIAdd, manyIMul :: Foldable f => f Expr -> Expr
 manyIAdd = foldr mkIAdd (LInt 0)
 manyIMul = foldr mkIMul (LInt 1)
 
 -- | Is the formula a literal?
-isLit :: Form -> Bool
+isLit :: Expr -> Bool
 isLit = \case
   LUnit   -> True
   LBool _ -> True
@@ -230,13 +230,13 @@ isLit = \case
   _       -> False
 
 -- | Is the formula simply a variable?
-isVar :: Form -> Bool
+isVar :: Expr -> Bool
 isVar = \case
   V _ -> True
   _   -> False
 
 -- | Is the formula an infix operator?
-isBinaryInfix :: Form -> Bool
+isBinaryInfix :: Expr -> Bool
 isBinaryInfix = \case
     And   -> True
     Or    -> True
@@ -258,7 +258,7 @@ isBinaryInfix = \case
 -- | Remove simple assignments such as `v1 = v2` by rewriting the rest of the
 -- formula with one side of the equality. Variables provided in the set will
 -- not be eliminated from the formula.
-varElim :: Set Var -> Form -> Form
+varElim :: Set Var -> Expr -> Expr
 varElim conserve = loop
   where
     loop f =

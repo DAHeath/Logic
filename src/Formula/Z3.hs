@@ -11,7 +11,7 @@ import           Data.Maybe
 import qualified Data.Map as M
 import           Data.Map (Map)
 
-import           Formula (Form((:@)), Chc, Type((:=>)), Var(..))
+import           Formula (Expr((:@)), Chc, Type((:=>)), Var(..))
 import qualified Formula as F
 
 import           Z3.Monad hiding (local)
@@ -35,7 +35,7 @@ solveChc hcs = do
       let (queries, rules) = partition F.isQuery hcs
       let qids = map (const "x0/q") queries
       let qs = zipWith mkQuery queries qids
-      let satForms = map F.chcForm rules ++ qs
+      let satForms = map F.chcExpr rules ++ qs
       let rids = map (\n -> "RULE" ++ show n) [0..length hcs-1]
       useDuality
       forms <- traverse formToAst satForms
@@ -51,7 +51,7 @@ solveChc hcs = do
 
     mkQuery q n =
       let theQuery = F.V $ F.Var n F.Bool in
-      F.app2 F.Impl (F.mkNot $ F.chcForm q) theQuery
+      F.app2 F.Impl (F.mkNot $ F.chcExpr q) theQuery
 
     useDuality = do
       pars <- mkParams
@@ -59,7 +59,7 @@ solveChc hcs = do
       fixedpointSetParams pars
 
 -- | Find a satisfying model of an input formula (if one exists).
-satisfy :: MonadIO m => Form -> m (Maybe F.Model)
+satisfy :: MonadIO m => Expr -> m (Maybe F.Model)
 satisfy f = runEnvZ3 $ do
   assert =<< formToAst f
   (_, m) <- solverCheckAndGetModel
@@ -68,7 +68,7 @@ satisfy f = runEnvZ3 $ do
     Just m' -> Just <$> modelToModel m'
 
 -- | The the satisfiability of the input formula.
-isSat :: MonadIO m => Form -> m Bool
+isSat :: MonadIO m => Expr -> m Bool
 isSat f = do
   sol <- runEnvZ3 sc
   case sol of
@@ -77,7 +77,7 @@ isSat f = do
   where sc = (assert =<< formToAst f) >> check
 
 -- | Test the validity of the input formula.
-isValid :: MonadIO m => Form -> m Bool
+isValid :: MonadIO m => Expr -> m Bool
 isValid f = runEnvZ3 $ do
   sol <- sc
   case sol of
@@ -86,15 +86,15 @@ isValid f = runEnvZ3 $ do
   where sc = (assert =<< formToAst (F.mkNot f)) >> check
 
 -- | Is `f -> g` a valid formula?
-entails :: MonadIO m => Form -> Form -> m Bool
+entails :: MonadIO m => Expr -> Expr -> m Bool
 entails f g = isValid (F.app2 F.Impl f g)
 
-simplify :: MonadIO m => Form -> m Form
-simplify f = runEnvZ3 $ astToForm =<< Z3.Monad.simplify =<< formToAst f
+simplify :: MonadIO m => Expr -> m Expr
+simplify f = runEnvZ3 $ astToExpr =<< Z3.Monad.simplify =<< formToAst f
 
-superSimplify :: MonadIO m => Form -> m Form
+superSimplify :: MonadIO m => Expr -> m Expr
 superSimplify (F.LInt n) = return (F.LInt n)
-superSimplify f = runEnvZ3 $ astToForm =<< superSimp =<< formToAst f
+superSimplify f = runEnvZ3 $ astToExpr =<< superSimp =<< formToAst f
   where
     superSimp :: MonadZ3 m => AST -> m AST
     superSimp ast = do
@@ -132,7 +132,7 @@ runEnvZ3 ac = liftIO $ evalZ3 (evalStateT (getEnvZ3 ac') emptyEnv)
     emptyEnv = Env M.empty M.empty
 
 -- | Convert the ADT formula to a Z3 formula.
-formToAst :: SMT n m => Form -> m AST
+formToAst :: SMT n m => Expr -> m AST
 formToAst f =
   case f of
     F.V v               -> var v
@@ -145,7 +145,7 @@ formToAst f =
                            in appToZ3 f'' as
     _ -> undefined
   where
-    gatherApp :: Form -> [Form] -> (Form, [Form])
+    gatherApp :: Expr -> [Expr] -> (Expr, [Expr])
     gatherApp (f' :@ a) args = gatherApp f' (a : args)
     gatherApp x args = (x, args)
 
@@ -163,7 +163,7 @@ formToAst f =
         Just v' -> return v'
 
 -- | Convert a function application to a Z3 formula.
-appToZ3 :: SMT n m => Form -> [Form] -> m AST
+appToZ3 :: SMT n m => Expr -> [Expr] -> m AST
 appToZ3 f args =
   case f of
     F.V v        -> join $ mkApp <$> funcToDecl v <*> traverse formToAst args
@@ -203,7 +203,7 @@ appToZ3 f args =
                        <*> formToAst (args !! 1)
                        <*> formToAst (args !! 2)
 
-formFromApp :: MonadZ3 z3 => String -> [AST] -> Sort -> z3 Form
+formFromApp :: MonadZ3 z3 => String -> [AST] -> Sort -> z3 Expr
 formFromApp n args range
   | n == "true"  = return $ F.LBool True
   | n == "false" = return $ F.LBool False
@@ -212,14 +212,14 @@ formFromApp n args range
     typ <- sortToType range
     return $ F.V $ F.Var n typ
   | n == "ite" || n == "if" = do
-    c <- astToForm (head args)
-    e1 <- astToForm (args !! 1)
-    e2 <- astToForm (args !! 2)
+    c <- astToExpr (head args)
+    e1 <- astToExpr (args !! 1)
+    e2 <- astToExpr (args !! 2)
     return $ F.appMany (F.If (F.formType e1)) [c, e1, e2]
-  | n == "and"      = F.manyAnd  <$> traverse astToForm args
-  | n == "or"       = F.manyOr   <$> traverse astToForm args
-  | n == "+"        = F.manyIAdd <$> traverse astToForm args
-  | n == "*"        = F.manyIMul <$> traverse astToForm args
+  | n == "and"      = F.manyAnd  <$> traverse astToExpr args
+  | n == "or"       = F.manyOr   <$> traverse astToExpr args
+  | n == "+"        = F.manyIAdd <$> traverse astToExpr args
+  | n == "*"        = F.manyIMul <$> traverse astToExpr args
   | n == "mod"      = liftMany (F.Mod F.Int)
   | n == "rem"      = liftMany (F.Mod F.Int)
   | n == "distinct" = liftMany (F.Distinct F.Int)
@@ -230,26 +230,26 @@ formFromApp n args range
   | n == "<="       = lift2 (F.Le F.Int)
   | n == ">"        = lift2 (F.Gt F.Int)
   | n == ">="       = lift2 (F.Ge F.Int)
-  | n == "="        = F.mkEql F.Int <$> astToForm (head args) <*> astToForm (args !! 1)
-  | n == "not"      = F.mkNot <$> astToForm (head args)
+  | n == "="        = F.mkEql F.Int <$> astToExpr (head args) <*> astToExpr (args !! 1)
+  | n == "not"      = F.mkNot <$> astToExpr (head args)
   | n == "-"        = if length args == 1
-                         then F.app2 (F.Sub F.Int) (F.LInt 0) <$> astToForm (head args)
+                         then F.app2 (F.Sub F.Int) (F.LInt 0) <$> astToExpr (head args)
                          else lift2 (F.Sub F.Int)
   | n == "select"   = lift2 (F.Select F.Int F.Int)
   | n == "store"    = lift3 (F.Store F.Int F.Int)
   | otherwise = do
     -- Found a function that is as of yet unknown.
     liftIO $ putStrLn ("applying: " ++ n)
-    args' <- traverse astToForm args
+    args' <- traverse astToExpr args
     domain <- traverse getType args
     range' <- sortToType range
     let f = F.Var n (F.curryType domain range')
     return $ F.appMany (F.V f) args'
-  where lift2 f = F.app2 f <$> astToForm (head args) <*> astToForm (args !! 1)
-        lift3 f = F.app3 f <$> astToForm (head args)
-                           <*> astToForm (args !! 1)
-                           <*> astToForm (args !! 2)
-        liftMany f = F.appMany f <$> traverse astToForm args
+  where lift2 f = F.app2 f <$> astToExpr (head args) <*> astToExpr (args !! 1)
+        lift3 f = F.app3 f <$> astToExpr (head args)
+                           <*> astToExpr (args !! 1)
+                           <*> astToExpr (args !! 2)
+        liftMany f = F.appMany f <$> traverse astToExpr args
 
 -- | Convert a Z3 model to the AST-based formula model.
 modelToModel :: (MonadState Env z3, MonadZ3 z3)
@@ -260,14 +260,14 @@ modelToModel m = traverse superSimplify =<< M.union <$> functions <*> constants
       fds <- modelGetFuncDecls m
       fds' <- traverse declToFunc fds
       fi <- catMaybes <$> traverse (modelGetFuncInterp m) fds
-      fe <- traverse (astToForm <=< funcInterpGetElse) fi
+      fe <- traverse (astToExpr <=< funcInterpGetElse) fi
       return $ M.fromList $ zip fds' fe
 
     constants = do
       fds <- modelGetConstDecls m
       vs <- traverse declToFunc fds
       fi <- catMaybes <$> traverse (modelGetConstInterp m) fds
-      fe <- traverse astToForm fi
+      fe <- traverse astToExpr fi
       return $ M.fromList $ zip vs fe
 
     declToFunc fd = do
@@ -279,8 +279,8 @@ modelToModel m = traverse superSimplify =<< M.union <$> functions <*> constants
       else return $ F.Var n (F.curryType domain range)
 
 -- | Convert the Z3 internal representation of a formula to the AST representation.
-astToForm :: MonadZ3 z3 => AST -> z3 Form
-astToForm arg = do
+astToExpr :: MonadZ3 z3 => AST -> z3 Expr
+astToExpr arg = do
   k <- getAstKind arg
   case k of
     Z3_NUMERAL_AST ->

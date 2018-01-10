@@ -11,7 +11,7 @@ com :: CharParser st Com
 com = (do
     v <- var
     op ":="
-    f <- parseForm
+    f <- parseExpr
     return (v := f))
   <|> (do
     res "jump"
@@ -20,13 +20,13 @@ com = (do
   <|> pure (Cond (LBool False) 0) <* res "skip"
   <|> (do
     res "cond"
-    f <- parens parseForm
+    f <- parens parseExpr
     i <- integer
     return (Cond f i))
   <|> (do
     res "call"
     n <- ident
-    args <- parens (commaSep parseForm)
+    args <- parens (commaSep parseExpr)
     vals <- parens (commaSep var)
     return (Call n args vals))
   <|> (const Done <$> res "done")

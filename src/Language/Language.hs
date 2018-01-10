@@ -15,13 +15,13 @@ import           Formula
 -- calls as control flow elements.
 data Com
   -- Set the variable to the value of the formula and proceed to the next instruction.
-  = Var := Form
+  = Var := Expr
   -- Jump to the specified instruction if the condition holds. Otherwise, proceed to
   -- the next instruction.
-  | Cond Form Int
+  | Cond Expr Int
   -- Call the named procedure with the given arguments, assigning the results to the
   -- given variables. Then, proceed to the next instruction.
-  | Call ProcName [Form] [Var]
+  | Call ProcName [Expr] [Var]
   -- A special marker indicating the end of the procedure. Every procedure should
   -- have a `Done` marker as the last instruction.
   | Done
