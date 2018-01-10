@@ -1,14 +1,15 @@
-module Language.Unstructured.Grammar where
+module Language.Grammar where
 
-import Control.Lens
-import Control.Monad.State
+import           Control.Lens
+import           Control.Monad.State
+
 import           Data.Map (Map)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import           Data.List (nub)
 
-import           Logic.Formula hiding (Rule)
-import           Language.Unstructured.Unstructured
+import           Formula hiding (Rule)
+import           Language.Language
 import           Grammar.Grammar
 
 mkGrammar :: MonadVocab m => Program -> m Grammar

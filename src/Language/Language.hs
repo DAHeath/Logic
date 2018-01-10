@@ -1,4 +1,4 @@
-module Language.Unstructured.Unstructured where
+module Language.Language where
 
 import           Control.Lens
 
@@ -7,7 +7,7 @@ import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Text.Prettyprint.Doc
 
-import           Logic.Formula
+import           Formula
 
 -- | An unstructured program contains no structured loops of if statements.
 -- Instead it supports only jumps (conditional and unconditional) and procedure

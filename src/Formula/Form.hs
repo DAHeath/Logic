@@ -1,4 +1,4 @@
-module Logic.Formula.Form where
+module Formula.Form where
 
 import           Control.Lens
 import           Control.Monad.State
@@ -11,9 +11,9 @@ import           Data.Data.Lens (uniplate)
 import           Data.List (sort)
 import           Data.Text.Prettyprint.Doc
 
-import           Logic.Formula.Type (Type((:=>)), Typed)
-import qualified Logic.Formula.Type as T
-import           Logic.Formula.Var
+import           Formula.Type (Type((:=>)), Typed)
+import qualified Formula.Type as T
+import           Formula.Var
 
 data Form
   = Form :@ Form

@@ -1,5 +1,5 @@
 {-# LANGUAGE ConstraintKinds #-}
-module Logic.Solver.Z3 where
+module Formula.Z3 where
 
 import           Control.Lens
 import           Control.Monad.State
@@ -10,10 +10,11 @@ import           Data.Maybe
 import qualified Data.Map as M
 import           Data.Map (Map)
 
-import           Logic.Formula (Form((:@)), Chc, Type((:=>)), Var(..))
-import qualified Logic.Formula as F
+import           Formula (Form((:@)), Chc, Type((:=>)), Var(..))
+import qualified Formula as F
 
 import           Z3.Monad hiding (local)
+
 data Env = Env { _envVars :: Map Var AST
                , _envFuns :: Map Var FuncDecl
                } deriving (Show, Eq, Ord)

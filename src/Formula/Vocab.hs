@@ -1,5 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses, UndecidableInstances #-}
-module Logic.Formula.Vocab where
+module Formula.Vocab where
 
 import           Control.Lens
 import           Control.Monad.State
@@ -10,7 +10,7 @@ import qualified Data.Map as M
 import           Data.Map (Map)
 import           Data.List.Split
 
-import           Logic.Formula.Var
+import           Formula.Var
 
 class Monad m => MonadVocab m where
   fresh :: Var -> m Var

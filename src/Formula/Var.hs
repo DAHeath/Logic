@@ -1,7 +1,6 @@
-module Logic.Formula.Var where
+module Formula.Var where
 
 import           Control.Lens
-import           Control.Monad.State
 
 import           Data.Foldable (foldrM)
 import           Data.Data (Data)
@@ -11,13 +10,9 @@ import qualified Data.Map as M
 import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Text.Prettyprint.Doc
-import           Data.List (intercalate)
-import           Data.List.Split (splitOn)
 
-import           Logic.Formula.Type (Type, Typed)
-import qualified Logic.Formula.Type as T
-
-import           Text.Read (readMaybe)
+import           Formula.Type (Type, Typed)
+import qualified Formula.Type as T
 
 data Var = Var
   { _varName :: String

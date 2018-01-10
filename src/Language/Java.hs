@@ -1,14 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Language.Unstructured.Java where
+module Language.Java where
 
-import Language.Unstructured.Unstructured
-import Language.Unstructured.Parser
+import           Language.Language
+import           Language.Parser
 
-import Text.Parsec
+import           Data.Monoid ((<>))
+import           Data.Text
 
-import Data.Monoid ((<>))
-import Data.Text
-
+import           Text.Parsec (ParseError, parse)
 import qualified Turtle
 
 data JavaError

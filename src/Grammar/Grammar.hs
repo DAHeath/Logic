@@ -11,7 +11,7 @@ import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Text.Prettyprint.Doc
 
-import Logic.Formula hiding (Rule)
+import Formula hiding (Rule)
 
 -- An identifier which should be completely unique per location.
 type Symbol = Int

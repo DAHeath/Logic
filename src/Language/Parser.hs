@@ -1,11 +1,11 @@
-module Language.Unstructured.Parser where
+module Language.Parser where
 
 import qualified Data.Map as M
 import           Text.Parsec
 import           Text.ParserCombinators.Parsec.Char
 
-import           Logic.Formula
-import           Language.Unstructured.Unstructured
+import           Formula
+import           Language.Language
 
 com :: CharParser st Com
 com = (do

@@ -1,12 +1,12 @@
-module Logic.Formula.Chc where
+module Formula.Chc where
 
 import           Data.Data (Data)
 import           Data.Monoid ((<>))
 import           Data.Text.Prettyprint.Doc hiding ((<>))
 
-import           Logic.Formula.Form
-import           Logic.Formula.Var
-import qualified Logic.Formula.Type as T
+import           Formula.Form
+import           Formula.Var
+import qualified Formula.Type as T
 
 data Chc
   = Rule [App] Form App

@@ -1,4 +1,4 @@
-module Logic.Formula.Parser where
+module Formula.Parser where
 
 import           Control.Lens hiding (op)
 
@@ -13,11 +13,11 @@ import           Text.Parsec.Language (emptyDef)
 import qualified Language.Haskell.TH as TH
 import           Language.Haskell.TH.Quote
 
-import           Logic.Formula.Type (Type)
-import qualified Logic.Formula.Type as T
-import           Logic.Formula.Form
-import           Logic.Formula.Var
-import           Logic.Formula.Chc
+import           Formula.Type (Type)
+import qualified Formula.Type as T
+import           Formula.Form
+import           Formula.Var
+import           Formula.Chc
 
 lexeme :: Stream s m Char => ParsecT s u m b -> ParsecT s u m b
 lexeme p = do { x <- p; spaces; return x  }
@@ -188,7 +188,7 @@ quoteFormExp par s = do pos <- thPos
                         dataToExpQ (const Nothing `extQ` metaExp) ex
 
 metaExp :: Form -> Maybe TH.ExpQ
-metaExp (V v@(Var i _))
+metaExp (V (Var i _))
   | head i == '$' = Just [| $(TH.varE (TH.mkName (tail i))) |]
   | head i == '@' = Just [| V $ $(TH.varE (TH.mkName (tail i))) |]
 metaExp _ = Nothing

@@ -6,9 +6,9 @@ import           Data.Foldable
 import qualified Data.Set as S
 import qualified Data.Map as M
 
-import Logic.Formula hiding (Rule)
+import           Formula hiding (Rule)
 
-import Grammar.Grammar
+import           Grammar.Grammar
 
 -- | There are two ruels for logical grammar simplification:
 -- If there is a nonterminal with cardinality one (that is non-recursive), inline the body

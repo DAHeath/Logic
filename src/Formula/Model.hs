@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
-module Logic.Formula.Model where
+module Formula.Model where
 
 import           Control.Lens
 
@@ -8,8 +8,8 @@ import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Text.Prettyprint.Doc
 
-import           Logic.Formula.Var
-import           Logic.Formula.Form
+import           Formula.Var
+import           Formula.Form
 
 -- | A model is an assignment of variables to formulas.
 newtype Model = Model { _getModel :: Map Var Form }

@@ -14,27 +14,25 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   ghc-options: -Wall
-  exposed-modules:     Logic.Formula
-                     , Logic.ImplicationGraph
-                     , Logic.Solver.Equivalence
-                     , Logic.Solver.Safety
-                     , Logic.Solver.Z3
-                     , Language.Structured
-                     , Language.Unstructured
-                     , Data.Optic.Graph.Extras
-                     , Data.Loc
-  other-modules:       Logic.Formula.Var
-                     , Logic.Formula.Type
-                     , Logic.Formula.Model
-                     , Logic.Formula.Chc
-                     , Logic.Formula.Parser
-                     , Logic.Formula.Form
-                     , Logic.ImplicationGraph.Chc
-                     , Logic.ImplicationGraph.Induction
-                     , Logic.ImplicationGraph.Simplify
-                     , Logic.ImplicationGraph.LTree
-                     , Logic.ImplicationGraph.Types
-                     , Logic.ImplicationGraph.Accessors
+  exposed-modules:     Formula
+                     , Formula.Z3
+                     , Grammar
+                     , Language
+  other-modules:       Formula.Var
+                     , Formula.Type
+                     , Formula.Model
+                     , Formula.Chc
+                     , Formula.Parser
+                     , Formula.Form
+                     , Grammar.Grammar
+                     , Grammar.Product
+                     , Grammar.Simplify
+                     , Grammar.Solve
+                     , Grammar.Unwind
+                     , Language.Grammar
+                     , Language.Java
+                     , Language.Language
+                     , Language.Parser
 
   default-extensions:  LambdaCase
                      , MultiWayIf
@@ -55,7 +53,6 @@ library
                      , lens             >= 4.15
                      , mtl              >= 2.2
                      , monad-loops
-                     , pointed
                      , extra
                      , parsec           >= 3.1
                      , prettyprinter
@@ -64,9 +61,7 @@ library
                      , text             >= 1.2
                      , transformers     >= 0.5
                      , z3               >= 4.1
-                     , optic-graph
                      , split
-                     , aeson
                      , bytestring
   default-language:    Haskell2010
 
@@ -74,9 +69,6 @@ executable Examples
   hs-source-dirs:      app
   main-is:             Main.hs
   ghc-options:
-  other-modules:       KeyExample
-                     , EquivalenceExample
-                     , SafetyExample
   build-depends:       base
                      , text             >= 1.2
                      , lens
@@ -84,19 +76,7 @@ executable Examples
                      , prettyprinter
                      , containers
                      , Logic
-                     , optic-graph
                      , bytestring
-  default-language:    Haskell2010
-
-test-suite logic-test
-  type:                exitcode-stdio-1.0
-  hs-source-dirs:      test
-  main-is:             Data/LocTest.hs
-  build-depends:       base
-                     , Logic
-                     , hspec
-                     , QuickCheck
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
 
 source-repository head

@@ -1,4 +1,4 @@
-module Logic.Formula.Type where
+module Formula.Type where
 
 import           Control.Lens hiding (List)
 import           Data.Data (Data)

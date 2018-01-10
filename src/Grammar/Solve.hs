@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 module Grammar.Solve where
 
 import           Control.Lens
@@ -12,9 +11,9 @@ import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Maybe (fromMaybe)
 
-import           Logic.Formula hiding (Rule)
-import qualified Logic.Formula as F
-import qualified Logic.Solver.Z3 as Z3
+import           Formula hiding (Rule)
+import qualified Formula as F
+import qualified Formula.Z3 as Z3
 
 import           Grammar.Grammar
 import           Grammar.Unwind
@@ -59,6 +58,7 @@ isInductive clones g m = evalStateT (ind S.empty (g ^. grammarStart)) M.empty
       case M.lookup sym memo of
         Just b -> pure b
         Nothing ->
+          (at sym <?=) =<<
           let f = M.findWithDefault (LBool False) sym m
               seen' = S.insert sym seen
           in or <$> sequence
@@ -72,6 +72,6 @@ isInductive clones g m = evalStateT (ind S.empty (g ^. grammarStart)) M.empty
       if | null ps -> pure True
          | null (S.intersection ps seen) ->
            let cats = M.elems (categorize (g ^. grammarRules))
-               cps = map (`predecessors` sym) cats :: [Set Symbol]
-           in anyM (\(ps' :: Set Symbol) -> allM (ind seen) (S.toList ps')) cps
+               cps = map (`predecessors` sym) cats
+           in anyM (allM (ind seen) . S.toList) cps
          | otherwise -> pure False

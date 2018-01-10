@@ -6,7 +6,7 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 
 import           Grammar.Grammar
-import           Logic.Formula hiding (Rule)
+import           Formula hiding (Rule)
 
 product :: Grammar -> Grammar -> Grammar
 product g1' g2' = Grammar start (initial : rs1' ++ rs2')

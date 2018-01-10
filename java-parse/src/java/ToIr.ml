@@ -56,7 +56,7 @@ let rec java_to_expr = function
       | JBir.Add  t -> let t' = java_to_kind t in Ir.Add t'
       | JBir.Sub  t -> let t' = java_to_kind t in Ir.Sub t'
       | JBir.Mult t -> let t' = java_to_kind t in Ir.Mul t'
-      | JBir.Div  t -> let t' = java_to_kind t in Ir.Mul t'
+      | JBir.Div  t -> let t' = java_to_kind t in Ir.Div t'
       | JBir.Rem  t -> let t' = java_to_kind t in Ir.Mod t'
       | JBir.IShl
       | JBir.IShr
