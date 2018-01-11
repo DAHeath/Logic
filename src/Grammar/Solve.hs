@@ -17,16 +17,16 @@ import qualified Formula.Z3 as Z3
 
 import           Grammar.Grammar
 import           Grammar.Unwind
+import           Grammar.Plot
 
 solve :: Grammar -> Expr -> IO (Either Model (Map Symbol Expr))
 solve g f = loop ([], g)
   where
-    loop (clones, g') =
-      interpolate g' f >>= \case
-        Left e -> pure (Left e)
-        Right m -> ifM (isInductive clones g' m)
-          (pure (Right m))
-          (loop $ unwind (clones, g'))
+    loop (clones, g') = interpolate g' f >>= \case
+      Left e -> pure (Left e)
+      Right m -> ifM (isInductive clones g' m)
+        (pure (Right m))
+        (loop $ unwind (clones, g'))
 
 interpolate :: Grammar -> Expr -> IO (Either Model (Map Symbol Expr))
 interpolate g' q =

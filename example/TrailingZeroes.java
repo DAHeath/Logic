@@ -1,10 +1,11 @@
 class TrailingZeroes {
   // https://leetcode.com/problems/factorial-trailing-zeroes/discuss/52428
   public static int trailingZeroes1(int n) {
+    int nn = n;
     int count = 0;
-    while(n > 0) {
-      n /= 5;
-      count += n;
+    while(nn > 0) {
+      nn /= 5;
+      count += nn;
     }
     return count;
   }

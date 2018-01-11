@@ -20,12 +20,14 @@ public class CanMeasureWater {
     return z%gcd2(x, y) == 0;
   }
   public static int gcd2(int a, int b){
-    while(b != 0 ){
-      int temp = b;
-      b = a%b;
-      a = temp;
+    int aa = a;
+    int bb = b;
+    while(bb != 0) {
+      int temp = bb;
+      bb = aa%bb;
+      aa = temp;
     }
-    return a;
+    return aa;
   }
 
   // public static boolean canMeasureWaterTest(int x, int y, int z) {
